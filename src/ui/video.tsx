@@ -70,7 +70,7 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
       setState(next)
       if (stopped) void settings.releasePlayback?.(player.stopping.then(() => {})).catch(showError)
     },
-    onError: (message: string) => { setError(message); api.ui.toast({ title: "像素影院", message, variant: "error" }) },
+    onError: (message: string) => { setError(message); api.ui.toast({ title: "墨鱼视频", message, variant: "error" }) },
   })
   function save() {
     const current = video()
@@ -240,7 +240,7 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
     try {
       const resources = (await library.resources()).filter((item) => item.kind === "video")
       if (api.lifecycle.signal.aborted) return
-      settings.dialog(() => <api.ui.DialogSelect title="视频库 · 像素影院" placeholder="选择视频，或打开本地文件" current={video()?.id}
+      settings.dialog(() => <api.ui.DialogSelect title="视频库 · 墨鱼视频" placeholder="选择视频，或打开本地文件" current={video()?.id}
         options={[
           { title: "＋ 打开本地视频…", value: "", description: "MP4 / MKV / WebM / MOV / AVI / GIF" },
           { title: "＋ B 站 / YouTube 视频链接…", value: "url", description: "下载可公开访问的视频，加密入库" },

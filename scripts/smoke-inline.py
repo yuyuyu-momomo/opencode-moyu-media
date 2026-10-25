@@ -96,7 +96,7 @@ def choose_width(percent, name):
 
 
 def sidebar_column(text):
-    return next(line.index("随手读") for line in text.splitlines() if "随手读" in line)
+    return next(line.index("墨鱼") for line in text.splitlines() if "墨鱼" in line)
 
 
 def start(session):
@@ -106,7 +106,7 @@ def start(session):
 
 
 def has_pixels(text):
-    if "随手读" not in text: return False
+    if "墨鱼" not in text: return False
     column = sidebar_column(text)
     return '[object Object]' not in text and sum(bool(re.search('[▀-▟]', line[column:])) for line in text.splitlines()) >= 3
 

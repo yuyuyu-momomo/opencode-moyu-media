@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url"
 import { createHash } from "node:crypto"
 import { chaptersOf, expandPath, listBooks, loadBook, pageAt, createPaginator } from "../library/text-reader.mjs"
 import { LibraryStore } from "../library/store.mjs"
+import { readingPosition, restorePosition } from "../library/reading-position.mjs"
 import { sidebarDock, sidebarLayout } from "./sidebar-layout.mjs"
 import { scaledVideoSize, VIDEO_SCALE_PRESETS } from "./video-size.mjs"
 import { createVideoReader } from "./video"
@@ -85,10 +86,13 @@ const tui: TuiPlugin = async (host, options) => {
   const progressKey = (path: string) => prefix + "position:" + createHash("sha256").update(path).digest("hex")
   function save() {
     const current = book()
-    if (current) api.kv.set(progressKey(current.path), offset())
+    if (current) {
+      api.kv.set(progressKey(current.path), offset())
+      api.kv.set(progressKey(current.path) + ":anchor", readingPosition(current, offset()))
+    }
   }
   function toast(message: string, variant: "info" | "error" = "info") {
-    api.ui.toast({ title: "摸鱼阅读", message, variant, duration: 3500 })
+    api.ui.toast({ title: "墨鱼阅读", message, variant, duration: 3500 })
   }
   function closeDialog() {
     ownsDialog = false
@@ -123,9 +127,10 @@ const tui: TuiPlugin = async (host, options) => {
       let next = await loadBook(path, api.state.path.directory || process.cwd(), { keyFile })
       if (!next.resourceId) next = await library.importLocal(next)
       if (token !== request || api.lifecycle.signal.aborted) return
+      const anchor = book()?.path === next.path ? readingPosition(book()!, offset()) : api.kv.get(progressKey(next.path) + ":anchor")
       save()
       const stored = api.kv.get<number>(progressKey(next.path), 0)
-      setOffset(Number.isFinite(stored) ? Math.max(0, Math.min(stored, next.text.length - 1)) : 0)
+      setOffset(restorePosition(next, anchor, stored))
       setBook(next)
       api.kv.set(prefix + "last", next.path)
       if (!quiet) {
@@ -184,13 +189,13 @@ const tui: TuiPlugin = async (host, options) => {
       const items = await listBooks(booksDir, { keyFile })
       if (api.lifecycle.signal.aborted) return
       dialog(() => <api.ui.DialogSelect
-        title="书架 · 摸鱼阅读"
+        title="书架 · 墨鱼阅读"
         placeholder="搜索书名，或选择采集 / 打开本地文件"
         options={[
           ...(collect ? [{ title: "＋ 让当前模型采集小说…", value: "moyu:collect", description: "输入书名、作者或目录链接" }] : []),
           ...(collect ? [{ title: "＋ 视频搜索 / 热门采集…", value: "moyu:video", description: "用当前模型浏览 B 站热门、搜索或下载视频" }] : []),
           { title: "＋ 打开本地文件…", value: "", description: "输入任意 TXT 文件路径" },
-          ...items.map((item) => ({ title: item.title, value: item.path, description: item.path })),
+          ...items.map((item) => ({ title: item.title, value: item.path, description: item.progress || item.path })),
         ]}
         onSelect={(item) => {
           closeDialog()
@@ -219,8 +224,29 @@ const tui: TuiPlugin = async (host, options) => {
       title={`${current.title} · 目录`}
       placeholder="搜索章节"
       current={(items.findLast((item) => item.offset <= offset()) ?? items[0]).offset}
-      options={items.map((item) => ({ title: item.title, value: item.offset }))}
+      options={items.map((item) => ({ title: item.title, value: item.offset, description: item.status === "ready" ? "已采集" : item.status === "pending" ? "待补正文" : item.status === "failed" ? "正文暂缺，可稍后补采" : undefined }))}
       onSelect={(item) => { closeDialog(); setOffset(Number(item.value)); save() }}
+    />)
+  }
+  function supplement() {
+    const current = book(), catalog = current?.catalog
+    if (!catalog || !collect) return
+    const chapter = current.chapters.findLast(item => item.offset <= offset()) ?? current.chapters[0]
+    const source = { url: catalog.url, sourceId: catalog.sourceId }
+    dialog(() => <api.ui.DialogSelect
+      title="补采小说正文"
+      options={[
+        { title: "补采当前章节", value: "current", description: chapter?.status === "ready" ? "本章已采集，将跳过" : chapter?.title },
+        { title: "继续补采 5 章", value: "next", description: "先补未尝试章节；已成功章节自动跳过" },
+        { title: "刷新完整目录", value: "catalog", description: "保留成功正文，检查新增或分页目录；不采正文" },
+      ]}
+      onSelect={(item) => {
+        closeDialog()
+        if (item.value === "current" && chapter?.status === "ready") return toast("当前章节正文已采集")
+        const query = item.value === "catalog" ? `小说：仅刷新并保存完整章节目录，moyu_catalog refresh=true；不采正文。来源参数 ${JSON.stringify(source)}`
+          : `小说：从已保存目录补采${item.value === "current" ? "当前 1 章" : "5 章"}，调用 moyu_import，已采章节跳过，错误时停止。参数 ${JSON.stringify({ ...source, limit: item.value === "current" ? 1 : 5, ...(item.value === "current" ? { start: chapter?.index ?? 0 } : {}) })}`
+        void collect(query).catch(error => toast(String(error), "error"))
+      }}
     />)
   }
   function jump() {
@@ -420,6 +446,7 @@ const tui: TuiPlugin = async (host, options) => {
         void library.deleteResource(current.resourceId).then(() => {
           if (api.lifecycle.signal.aborted) return
           api.kv.set(progressKey(current.path), 0)
+          api.kv.set(progressKey(current.path) + ":anchor", null)
           if (book()?.path === current.path) {
             api.kv.set(prefix + "last", "")
             setBook(undefined)
@@ -476,22 +503,22 @@ const tui: TuiPlugin = async (host, options) => {
   })
 
   api.keymap.registerLayer({
-    commands: [{ name: "moyu.toggle", title: "摸鱼阅读：显示 / 隐藏", category: "Moyu 阅读", namespace: "palette", run: toggle }],
+    commands: [{ name: "moyu.toggle", title: "墨鱼阅读：显示 / 隐藏", category: "Moyu 阅读", namespace: "palette", run: toggle }],
     bindings: [{ key: "alt+m", cmd: "moyu.toggle", desc: "显示 / 隐藏小说" }],
   })
   api.keymap.registerLayer({
     mode: "base",
     commands: [
-      { name: "moyu.open", title: "摸鱼阅读：打开书架", slashName: "moyu", run: openMoyu },
+      { name: "moyu.open", title: "墨鱼阅读：打开书架", slashName: "moyu", run: openMoyu },
       { name: "moyu.video", title: "摸鱼视频：打开视频库", slashName: "video", run: () => { selectMode("video"); setVisible(true); return video.shelf() } },
-      { name: "moyu.music", title: "摸鱼音乐：打开聚合播放器", slashName: "music", run: () => { selectMode("music"); setVisible(true); api.kv.set(prefix + "visible", true) } },
-      { name: "moyu.shelf", title: "摸鱼阅读：书架 / 打开文件", slashName: "read", run: shelf },
-      { name: "moyu.chapters", title: "摸鱼阅读：章节目录", slashName: "chapters", run: chapters },
-      { name: "moyu.jump", title: "摸鱼阅读：跳转进度", run: jump },
-      { name: "moyu.size", title: "摸鱼阅读：调整阅读区域大小", slashName: "readsize", run: size },
-      { name: "moyu.delete", title: "摸鱼阅读：删除当前资料", run: removeBook },
-      { name: "moyu.next", title: "摸鱼阅读：下一页", enabled: () => visible() && api.route.current.name === "session", run: () => turn(1) },
-      { name: "moyu.prev", title: "摸鱼阅读：上一页", enabled: () => visible() && api.route.current.name === "session", run: () => turn(-1) },
+      { name: "moyu.music", title: "墨鱼音乐：打开聚合播放器", slashName: "music", run: () => { selectMode("music"); setVisible(true); api.kv.set(prefix + "visible", true) } },
+      { name: "moyu.shelf", title: "墨鱼阅读：书架 / 打开文件", slashName: "read", run: shelf },
+      { name: "moyu.chapters", title: "墨鱼阅读：章节目录", slashName: "chapters", run: chapters },
+      { name: "moyu.jump", title: "墨鱼阅读：跳转进度", run: jump },
+      { name: "moyu.size", title: "墨鱼阅读：调整阅读区域大小", slashName: "readsize", run: size },
+      { name: "moyu.delete", title: "墨鱼阅读：删除当前资料", run: removeBook },
+      { name: "moyu.next", title: "墨鱼阅读：下一页", enabled: () => visible() && api.route.current.name === "session", run: () => turn(1) },
+      { name: "moyu.prev", title: "墨鱼阅读：上一页", enabled: () => visible() && api.route.current.name === "session", run: () => turn(-1) },
     ].map((item) => ({ ...item, category: "Moyu 阅读", namespace: "palette" })),
     bindings: [
       { key: "alt+o", cmd: "moyu.shelf", desc: "打开书架" },
@@ -581,7 +608,7 @@ const tui: TuiPlugin = async (host, options) => {
     return <Show when={visible()} fallback={<box height={1}><Button label="[显示阅读]" action={toggle} /></box>}>
       <box ref={(node: BoxRenderable) => { readerNode = node }} flexShrink={0} width="100%" marginBottom={options?.hostMajor === 2 ? "auto" : 0} height={book() || mode() !== "novel" ? rows() + chromeRows() : undefined} onSizeChange={function(this: BoxRenderable) { readerNode = this; setBodyWidth(Math.max(2, Math.floor(this.width))); observe(this); dock() }}>
         <box flexShrink={0} height={1} flexDirection="row" justifyContent="space-between">
-          <text fg={theme().text}><b>随手读</b></text>
+          <text fg={theme().text}><b>{bodyWidth() >= 43 ? "墨鱼多媒体" : "墨鱼"}</b></text>
           <box flexDirection="row" gap={1}>
             <Button label="[小说]" action={() => selectMode("novel")} muted={mode() !== "novel"} />
             <Button label="[视频]" action={() => selectMode("video")} muted={mode() !== "video"} />
@@ -593,6 +620,7 @@ const tui: TuiPlugin = async (host, options) => {
           <Button label={mode() === "video" ? "[视频库]" : "[书架]"} action={() => mode() === "video" ? video.shelf() : shelf()} />
           <Button label={mode() === "video" ? "[搜索]" : "[目录]"} action={() => mode() === "video" ? video.search() : chapters()} />
           <Show when={mode() === "video"}><Button label="[热门]" action={() => video.popular()} /></Show>
+          <Show when={mode() === "novel" && book()?.catalog && collect}><Button label="[补采]" action={supplement} /></Show>
           <Button label="[删除]" action={removeBook} />
         </box>}>
           <box flexShrink={0} height={1} flexDirection="row" gap={1}>
@@ -635,7 +663,7 @@ const tui: TuiPlugin = async (host, options) => {
               <Button label="[‹ 上一页]" action={() => turn(-1)} />
               <Button label="[下一页 ›]" action={() => turn(1)} />
             </box>
-            <text fg={theme().textMuted} height={1} wrapMode="none">点击上方按钮调整宽高</text>
+            <text fg={theme().textMuted} height={1} wrapMode="none">{book()?.catalog ? `正文 ${book()!.catalog.downloaded}/${book()!.catalog.total} 章${book()!.catalog.complete === false ? " · 目录未完整" : ""}` : "点击上方按钮调整宽高"}</text>
           </box>
         </Show>
         </Show>

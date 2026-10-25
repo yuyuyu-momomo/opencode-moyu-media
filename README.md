@@ -1,4 +1,4 @@
-# OpenCode 摸鱼阅读
+# 墨鱼多媒体
 
 在 OpenCode 的**原生右侧栏**看小说、视频和听音乐，适配 OpenCode 2.1.3，兼容 2.1.2 / 1.19.x。点击顶部「小说 / 视频 / 音乐」切换，终端需要显示会话侧栏；首页没有侧栏。
 
@@ -12,13 +12,13 @@
 
 ## 快速安装
 
-[下载安装包 ZIP](https://github.com/yuyuyu-momomo/opencode-yu/raw/refs/heads/main/releases/opencode-moyu-v0.5.1.zip)，解压后阅读 `TERMS.md` 和 `LICENSE`，再运行 `bash install.sh`；Windows 原生 OpenCode 可双击 `install.cmd`。
+[下载安装包 ZIP](https://github.com/yuyuyu-momomo/opencode-moyu-media/raw/refs/heads/main/releases/opencode-moyu-media-v0.6.0.zip)，解压后阅读 `TERMS.md` 和 `LICENSE`，再运行 `bash install.sh`；Windows 原生 OpenCode 可双击 `install.cmd`。
 
 也可直接安装仓库中的预编译版本：
 
 ```bash
-git clone https://github.com/yuyuyu-momomo/opencode-yu.git
-cd opencode-yu
+git clone https://github.com/yuyuyu-momomo/opencode-moyu-media.git
+cd opencode-moyu-media
 bash install.sh
 ```
 
@@ -26,7 +26,7 @@ bash install.sh
 
 ## 使用
 
-安装后重启 `opencode`，进入任意会话，右侧会出现「随手读」和原创示例小说。若侧栏关闭，按 `Ctrl+X` 后再按 `B` 显示侧栏，或在 `Ctrl+P` 中搜索 sidebar。建议终端至少 140 列、30 行（默认侧栏在大于 120 列时自动显示）。
+安装后重启 `opencode`，进入任意会话，右侧会出现「墨鱼多媒体」和原创示例小说。若侧栏关闭，按 `Ctrl+X` 后再按 `B` 显示侧栏，或在 `Ctrl+P` 中搜索 sidebar。建议终端至少 140 列、30 行（默认侧栏在大于 120 列时自动显示）。
 
 | 按键 | 功能 |
 | --- | --- |
@@ -38,11 +38,17 @@ bash install.sh
 | `Ctrl+X` 后按 `J` | 打开宽高设置（也可直接点击面板按钮） |
 | `Alt+D` | 删除当前资料及采集缓存，操作前确认 |
 
-直接点击面板中的「书架」「目录」「宽度」「高度」、进度或翻页按钮即可操作；弹窗选项也可鼠标点击，无需快捷键。按钮在松开鼠标后打开菜单，避免同一次点击把新菜单关掉。「隐藏」会折叠正文，点击「显示阅读」即可恢复。`Ctrl+P` 搜索 `moyu` 或「摸鱼阅读」可以找到全部命令；`/read` 和 `/moyu` 打开书架，`/chapters` 打开目录，`/readsize` 打开宽高设置。
+直接点击面板中的「书架」「目录」「宽度」「高度」、进度或翻页按钮即可操作；弹窗选项也可鼠标点击，无需快捷键。按钮在松开鼠标后打开菜单，避免同一次点击把新菜单关掉。「隐藏」会折叠正文，点击「显示阅读」即可恢复。`Ctrl+P` 搜索 `moyu` 或「墨鱼」可以找到全部命令；`/read` 和 `/moyu` 打开书架，`/chapters` 打开目录，`/readsize` 打开宽高设置。
 
 2.x 中小说保持在侧栏上方，OpenCode 自带的 Context、任务等信息放到底部并预留高度；缩小阅读区时，两部分之间留白，统计信息不会紧跟正文上移。
 
 点击「目录」时自动滚动到当前章节并选中，直接回车保持当前章节，也可搜索或点击其他章节。
+
+v0.6.0 小说先保存完整章节目录，正文可后补。`moyu_catalog` 会把目录加密入库，即使正文为 0 章也能在书架打开；返回模型的 10 条摘要不会限制本地目录数量。通用来源支持同站明确的“下一页”，最多 50 页、20000 章；达到上限或分页失败会标明“目录未完整”，不会冒充已经抓全。章节内的正文分页仍需要专用来源适配。
+
+例如输入 `/moyu 小说 只保存这个链接的完整目录，不采正文 https://example.com/book/`；稍后输入 `/moyu 小说 从这个目录继续补采5章 https://example.com/book/`。也可在阅读区点击「补采」，选择当前章节、继续 5 章或刷新目录。此入口会交给当前模型调用采集工具；本地阅读和翻页不调用模型。
+
+目录标明“已采集 / 待补正文 / 正文暂缺”。404/410 缺章保留占位，可继续采后续章节；其他访问拒绝或提取错误会停止，成功正文和目录保留。后续补采跳过成功章节，刷新目录按章节 URL 合并，新增、重排或移除章节不会覆盖已经保存的正文。补入早期章节时，阅读位置按章节身份恢复；只有已经失败的缺章剩余时停止自动续采，等用户再次要求。
 
 按 `Alt+O` 选择「打开本地文件」，输入路径，例如 `/mnt/d/books/三体.txt`。导入会生成加密副本，外部原文件保留。支持 UTF-8、带 BOM 的 UTF-16、GBK / GB18030、Markdown；单本最多 32 MiB。目前不支持 EPUB、PDF。
 
@@ -146,7 +152,7 @@ OpenCode 2.x 中，在输入框提交：
 
 模型可调用 `moyu_search` 查找来源、`moyu_sources` 查看来源能力、`moyu_catalog` 查看目录、`moyu_import` 分批采集、`moyu_library` 查看资源、`moyu_delete` 删除用户指定的资源。相同 URL 重复采集会续接未完成章节，成功章节不重复下载；抓到的书按 `Alt+O` 即可打开。
 
-默认适配器支持可直接访问的 HTML 目录和正文页，可指定 `catalogSelector` / `contentSelector` 适配网站。不会执行页面脚本；登录、验证码、动态渲染页面和分页目录需要专用来源适配器。访问来源沿用 OpenCode 的 `webfetch` 权限。工具返回进度和路径摘要，正文留在本地资料库。
+默认适配器支持可直接访问的 HTML 目录、同站明确的目录翻页和正文页，可指定 `catalogSelector` / `contentSelector` 适配网站。不会执行页面脚本；登录、验证码、动态渲染页面、复杂目录及章节正文分页需要专用来源适配器。访问来源沿用 OpenCode 的 `webfetch` 权限。工具返回进度和路径摘要，正文留在本地资料库。
 
 ## 加密与删除
 

@@ -66,10 +66,10 @@ export default Plugin.define({
           if (!musicLogin) throw new Error("音乐登录入口尚未准备好，请稍后重试")
           musicLogin(platform)
         } })
-        if (result.kind === "collection") context.ui.toast.show({ title: "摸鱼采集", message: "已交给当前模型，采集结果将在会话中显示", variant: "info" })
+        if (result.kind === "collection") context.ui.toast.show({ title: "墨鱼采集", message: "已交给当前模型，采集结果将在会话中显示", variant: "info" })
         return result.sessionID
       } catch (error) {
-        context.ui.toast.show({ title: "摸鱼请求失败", message: error instanceof Error ? error.message : String(error), variant: "error" })
+        context.ui.toast.show({ title: "墨鱼请求失败", message: error instanceof Error ? error.message : String(error), variant: "error" })
       }
     }
     const bridge = {

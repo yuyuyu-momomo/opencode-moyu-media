@@ -2,7 +2,7 @@
 export type ContentKind = "novel" | "article" | "video" | "audio" | "image" | "dataset"
 export type Capability = "catalog" | "fetch"
 export type SourceItem = { id: string; title: string; url: string; kind: ContentKind; metadata?: Record<string, unknown> }
-export type SourceCatalog = { title: string; url: string; kind: ContentKind; items: SourceItem[] }
+export type SourceCatalog = { title: string; url: string; kind: ContentKind; items: SourceItem[]; catalogComplete?: boolean; catalogError?: string }
 export type ContentAsset = { role: "body" | "media" | "subtitle" | "thumbnail" | "data"; mime: string; path?: string; url?: string }
 export type ContentResource = {
   schemaVersion: 1
@@ -16,6 +16,7 @@ export type ContentResource = {
 }
 export type SourceContext = {
   signal?: AbortSignal
+  delayMs?: number
   page: (url: string) => Promise<{ url: string; text: string; contentType: string }>
   selectors?: { catalog?: string; content?: string }
 }

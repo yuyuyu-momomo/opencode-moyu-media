@@ -38,7 +38,7 @@ export function createMusicReader(api: API, library: LibraryStore, controller: S
   let lastPlaylist: Awaited<ReturnType<MusicService["playlist"]>> | undefined
   let searchAbort: AbortController | undefined, loginAbort: AbortController | undefined, loginPlatform = ""
   const loginTasks = new Set<Promise<void>>()
-  function toast(message: string, error = false) { if (!api.lifecycle.signal.aborted) api.ui.toast({ title: "摸鱼音乐", message, variant: error ? "error" : "info" }) }
+  function toast(message: string, error = false) { if (!api.lifecycle.signal.aborted) api.ui.toast({ title: "墨鱼音乐", message, variant: error ? "error" : "info" }) }
   function failed(error: unknown) { toast(error instanceof Error ? error.message : "音乐操作失败", true) }
   let previousError = ""
   const unsubscribe = controller.subscribe((value: MusicController["state"]) => {

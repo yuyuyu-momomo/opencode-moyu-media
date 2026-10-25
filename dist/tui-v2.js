@@ -2971,7 +2971,6 @@ var require_qrcode = __commonJS({
 import { Plugin } from "@opencode/plugin/tui";
 
 // src/ui/index.tsx
-import { createTextNode as _$createTextNode2 } from "@opentui/solid";
 import { insertNode as _$insertNode3 } from "@opentui/solid";
 import { use as _$use2 } from "@opentui/solid";
 import { effect as _$effect3 } from "@opentui/solid";
@@ -3276,10 +3275,12 @@ var LibraryStore = class {
   async readPart(id, index) {
     return (await this.vault.unseal(await readFile2(this.partPath(id, index)))).text;
   }
-  async writeBook(id, title, text2) {
+  async writeBook(id, title, text2, extra = {}) {
     await this.ready();
     const path = join(this.directory, id + ".moyubook");
-    await atomicWrite(path, await this.vault.seal({ schemaVersion: 1, resourceId: id, title, text: text2 }));
+    const payload = { ...extra, schemaVersion: 1, resourceId: id, title, text: text2 };
+    if (Buffer.byteLength(JSON.stringify(payload)) > 32 * 1024 * 1024) throw new Error("\u5355\u672C\u8D85\u8FC7 32 MiB\uFF0C\u8BF7\u6309\u5377\u62C6\u5206\u91C7\u96C6");
+    await atomicWrite(path, await this.vault.seal(payload));
     return path;
   }
   async importLocal(book) {
@@ -3466,20 +3467,51 @@ async function loadBook(input, cwd, { keyFile } = {}) {
     if (info.size > 34 * 1024 * 1024) throw new Error("\u52A0\u5BC6\u6587\u4EF6\u8D85\u8FC7\u5927\u5C0F\u9650\u5236");
     const payload = await new LibraryVault(keyFile || defaultKeyFile(dirname2(path))).unseal(await readFile3(path));
     if (typeof payload.title !== "string" || typeof payload.text !== "string" || typeof payload.resourceId !== "string") throw new Error("\u52A0\u5BC6\u8D44\u6599\u683C\u5F0F\u65E0\u6548");
-    return { path, title: payload.title, text: payload.text, chapters: chaptersOf(payload.text), resourceId: payload.resourceId };
+    let chapters = chaptersOf(payload.text);
+    if (payload.chapters !== void 0) {
+      if (!Array.isArray(payload.chapters) || payload.chapters.length > 2e4 || !payload.chapters.every((item, index, items) => item && typeof item.title === "string" && /^[a-f0-9]{24}$/.test(item.id) && item.index === index && Number.isInteger(item.offset) && item.offset >= 0 && item.offset < payload.text.length && (!index || item.offset > items[index - 1].offset) && ["ready", "pending", "failed"].includes(item.status))) throw new Error("\u7AE0\u8282\u76EE\u5F55\u683C\u5F0F\u65E0\u6548");
+      chapters = payload.chapters;
+    }
+    const catalog = payload.catalog;
+    if (catalog && (typeof catalog.url !== "string" || !/^https?:\/\//.test(catalog.url) || typeof catalog.sourceId !== "string" || !Number.isInteger(catalog.total) || !Number.isInteger(catalog.downloaded))) throw new Error("\u6765\u6E90\u76EE\u5F55\u683C\u5F0F\u65E0\u6548");
+    return { path, title: payload.title, text: payload.text, chapters, catalog, resourceId: payload.resourceId };
   }
   if (![".txt", ".md"].includes(extname(path).toLowerCase())) throw new Error("\u76EE\u524D\u652F\u6301 .txt\u3001.md \u548C\u52A0\u5BC6\u8D44\u6599\u6587\u4EF6");
   if (info.size > 32 * 1024 * 1024) throw new Error("\u6587\u4EF6\u8D85\u8FC7 32 MiB\uFF0C\u8BF7\u6309\u5377\u62C6\u5206");
   const text2 = cleanText(decodeBook(await readFile3(path)));
   if (!text2.trim()) throw new Error("\u8FD9\u4E2A\u6587\u4EF6\u6CA1\u6709\u53EF\u9605\u8BFB\u7684\u5185\u5BB9");
-  return { path, title: basename(path, extname(path)), text: text2, chapters: chaptersOf(text2) };
+  return { path, title: basename(path, extname(path)), text: text2, chapters: chaptersOf(text2), catalog: void 0 };
 }
 async function listBooks(directory, { keyFile } = {}) {
   const entries = await readdir2(directory, { withFileTypes: true });
-  const plain = entries.filter((item) => item.isFile() && /\.(?:txt|md)$/i.test(item.name)).map((item) => ({ title: basename(item.name, extname(item.name)), path: resolve2(directory, item.name) })).sort((a, b) => a.title.localeCompare(b.title, "zh"));
+  const plain = entries.filter((item) => item.isFile() && /\.(?:txt|md)$/i.test(item.name)).map((item) => ({ title: basename(item.name, extname(item.name)), path: resolve2(directory, item.name), progress: void 0 })).sort((a, b) => a.title.localeCompare(b.title, "zh"));
   const resources = entries.some((item) => item.name === ".moyu") ? await new LibraryStore(directory, { keyFile }).resources() : [];
-  const managed = resources.filter((item) => item.kind === "novel").map((item) => ({ title: item.title, path: item.assets.find((asset) => asset.role === "body")?.path, resourceId: item.id })).filter((item) => item.path);
+  const managed = resources.filter((item) => item.kind === "novel").map((item) => ({
+    title: item.title,
+    path: item.assets.find((asset) => asset.role === "body")?.path,
+    resourceId: item.id,
+    progress: Number.isInteger(item.metadata.totalChapters) ? `\u6B63\u6587 ${item.metadata.chapters}/${item.metadata.totalChapters} \u7AE0${item.metadata.catalogComplete === false ? " \xB7 \u76EE\u5F55\u672A\u5B8C\u6574" : ""}` : void 0
+  })).filter((item) => item.path);
   return [...managed, ...plain.filter((item) => !managed.some((saved) => saved.title === item.title))];
+}
+
+// src/library/reading-position.mjs
+function readingPosition(book, offset) {
+  const chapter = book.chapters.findLast((item) => item.offset <= offset);
+  return chapter ? { offset, chapterId: chapter.id, chapterTitle: chapter.title, within: Math.max(0, offset - chapter.offset), status: chapter.status } : { offset };
+}
+function restorePosition(book, saved, fallback = 0) {
+  let offset = Number.isFinite(saved?.offset) ? saved.offset : Number.isFinite(fallback) ? fallback : 0;
+  if (typeof saved?.chapterId === "string" || typeof saved?.chapterTitle === "string") {
+    let index = typeof saved.chapterId === "string" ? book.chapters.findIndex((item) => item.id === saved.chapterId) : -1;
+    if (index < 0 && book.chapters.filter((item) => item.title === saved.chapterTitle).length === 1) index = book.chapters.findIndex((item) => item.title === saved.chapterTitle);
+    if (index >= 0) {
+      const chapter = book.chapters[index], end = book.chapters[index + 1]?.offset ?? book.text.length;
+      const within = saved.status && saved.status !== "ready" && chapter.status === "ready" ? 0 : Number.isFinite(saved.within) ? Math.max(0, saved.within) : 0;
+      offset = chapter.offset + Math.min(within, Math.max(0, end - chapter.offset - 1));
+    }
+  }
+  return Math.max(0, Math.min(Math.trunc(offset), Math.max(0, book.text.length - 1)));
 }
 
 // src/ui/sidebar-layout.mjs
@@ -4654,7 +4686,7 @@ function createVideoReader(api, library, settings) {
     onError: (message) => {
       setError(message);
       api.ui.toast({
-        title: "\u50CF\u7D20\u5F71\u9662",
+        title: "\u58A8\u9C7C\u89C6\u9891",
         message,
         variant: "error"
       });
@@ -5070,7 +5102,7 @@ function createVideoReader(api, library, settings) {
       const resources = (await library.resources()).filter((item) => item.kind === "video");
       if (api.lifecycle.signal.aborted) return;
       settings.dialog(() => _$createComponent(api.ui.DialogSelect, {
-        title: "\u89C6\u9891\u5E93 \xB7 \u50CF\u7D20\u5F71\u9662",
+        title: "\u89C6\u9891\u5E93 \xB7 \u58A8\u9C7C\u89C6\u9891",
         placeholder: "\u9009\u62E9\u89C6\u9891\uFF0C\u6216\u6253\u5F00\u672C\u5730\u6587\u4EF6",
         get current() {
           return video()?.id;
@@ -6305,7 +6337,7 @@ function createMusicReader(api, library, controller, settings) {
   const loginTasks = /* @__PURE__ */ new Set();
   function toast(message, error = false) {
     if (!api.lifecycle.signal.aborted) api.ui.toast({
-      title: "\u6478\u9C7C\u97F3\u4E50",
+      title: "\u58A8\u9C7C\u97F3\u4E50",
       message,
       variant: error ? "error" : "info"
     });
@@ -8150,11 +8182,14 @@ var tui = async (host, options) => {
   const progressKey = (path) => prefix2 + "position:" + createHash6("sha256").update(path).digest("hex");
   function save() {
     const current = book();
-    if (current) api.kv.set(progressKey(current.path), offset());
+    if (current) {
+      api.kv.set(progressKey(current.path), offset());
+      api.kv.set(progressKey(current.path) + ":anchor", readingPosition(current, offset()));
+    }
   }
   function toast(message, variant = "info") {
     api.ui.toast({
-      title: "\u6478\u9C7C\u9605\u8BFB",
+      title: "\u58A8\u9C7C\u9605\u8BFB",
       message,
       variant,
       duration: 3500
@@ -8213,9 +8248,10 @@ var tui = async (host, options) => {
       });
       if (!next.resourceId) next = await library.importLocal(next);
       if (token !== request || api.lifecycle.signal.aborted) return;
+      const anchor = book()?.path === next.path ? readingPosition(book(), offset()) : api.kv.get(progressKey(next.path) + ":anchor");
       save();
       const stored = api.kv.get(progressKey(next.path), 0);
-      setOffset(Number.isFinite(stored) ? Math.max(0, Math.min(stored, next.text.length - 1)) : 0);
+      setOffset(restorePosition(next, anchor, stored));
       setBook(next);
       api.kv.set(prefix2 + "last", next.path);
       if (!quiet) {
@@ -8291,7 +8327,7 @@ var tui = async (host, options) => {
       });
       if (api.lifecycle.signal.aborted) return;
       dialog(() => _$createComponent3(api.ui.DialogSelect, {
-        title: "\u4E66\u67B6 \xB7 \u6478\u9C7C\u9605\u8BFB",
+        title: "\u4E66\u67B6 \xB7 \u58A8\u9C7C\u9605\u8BFB",
         placeholder: "\u641C\u7D22\u4E66\u540D\uFF0C\u6216\u9009\u62E9\u91C7\u96C6 / \u6253\u5F00\u672C\u5730\u6587\u4EF6",
         get options() {
           return [...collect ? [{
@@ -8309,7 +8345,7 @@ var tui = async (host, options) => {
           }, ...items.map((item) => ({
             title: item.title,
             value: item.path,
-            description: item.path
+            description: item.progress || item.path
           }))];
         },
         onSelect: (item) => {
@@ -8346,13 +8382,53 @@ var tui = async (host, options) => {
       get options() {
         return items.map((item) => ({
           title: item.title,
-          value: item.offset
+          value: item.offset,
+          description: item.status === "ready" ? "\u5DF2\u91C7\u96C6" : item.status === "pending" ? "\u5F85\u8865\u6B63\u6587" : item.status === "failed" ? "\u6B63\u6587\u6682\u7F3A\uFF0C\u53EF\u7A0D\u540E\u8865\u91C7" : void 0
         }));
       },
       onSelect: (item) => {
         closeDialog();
         setOffset(Number(item.value));
         save();
+      }
+    }));
+  }
+  function supplement() {
+    const current = book(), catalog = current?.catalog;
+    if (!catalog || !collect) return;
+    const chapter = current.chapters.findLast((item) => item.offset <= offset()) ?? current.chapters[0];
+    const source = {
+      url: catalog.url,
+      sourceId: catalog.sourceId
+    };
+    dialog(() => _$createComponent3(api.ui.DialogSelect, {
+      title: "\u8865\u91C7\u5C0F\u8BF4\u6B63\u6587",
+      get options() {
+        return [{
+          title: "\u8865\u91C7\u5F53\u524D\u7AE0\u8282",
+          value: "current",
+          description: chapter?.status === "ready" ? "\u672C\u7AE0\u5DF2\u91C7\u96C6\uFF0C\u5C06\u8DF3\u8FC7" : chapter?.title
+        }, {
+          title: "\u7EE7\u7EED\u8865\u91C7 5 \u7AE0",
+          value: "next",
+          description: "\u5148\u8865\u672A\u5C1D\u8BD5\u7AE0\u8282\uFF1B\u5DF2\u6210\u529F\u7AE0\u8282\u81EA\u52A8\u8DF3\u8FC7"
+        }, {
+          title: "\u5237\u65B0\u5B8C\u6574\u76EE\u5F55",
+          value: "catalog",
+          description: "\u4FDD\u7559\u6210\u529F\u6B63\u6587\uFF0C\u68C0\u67E5\u65B0\u589E\u6216\u5206\u9875\u76EE\u5F55\uFF1B\u4E0D\u91C7\u6B63\u6587"
+        }];
+      },
+      onSelect: (item) => {
+        closeDialog();
+        if (item.value === "current" && chapter?.status === "ready") return toast("\u5F53\u524D\u7AE0\u8282\u6B63\u6587\u5DF2\u91C7\u96C6");
+        const query = item.value === "catalog" ? `\u5C0F\u8BF4\uFF1A\u4EC5\u5237\u65B0\u5E76\u4FDD\u5B58\u5B8C\u6574\u7AE0\u8282\u76EE\u5F55\uFF0Cmoyu_catalog refresh=true\uFF1B\u4E0D\u91C7\u6B63\u6587\u3002\u6765\u6E90\u53C2\u6570 ${JSON.stringify(source)}` : `\u5C0F\u8BF4\uFF1A\u4ECE\u5DF2\u4FDD\u5B58\u76EE\u5F55\u8865\u91C7${item.value === "current" ? "\u5F53\u524D 1 \u7AE0" : "5 \u7AE0"}\uFF0C\u8C03\u7528 moyu_import\uFF0C\u5DF2\u91C7\u7AE0\u8282\u8DF3\u8FC7\uFF0C\u9519\u8BEF\u65F6\u505C\u6B62\u3002\u53C2\u6570 ${JSON.stringify({
+          ...source,
+          limit: item.value === "current" ? 1 : 5,
+          ...item.value === "current" ? {
+            start: chapter?.index ?? 0
+          } : {}
+        })}`;
+        void collect(query).catch((error) => toast(String(error), "error"));
       }
     }));
   }
@@ -8633,6 +8709,7 @@ var tui = async (host, options) => {
         void library.deleteResource(current.resourceId).then(() => {
           if (api.lifecycle.signal.aborted) return;
           api.kv.set(progressKey(current.path), 0);
+          api.kv.set(progressKey(current.path) + ":anchor", null);
           if (book()?.path === current.path) {
             api.kv.set(prefix2 + "last", "");
             setBook(void 0);
@@ -8688,7 +8765,7 @@ var tui = async (host, options) => {
   api.keymap.registerLayer({
     commands: [{
       name: "moyu.toggle",
-      title: "\u6478\u9C7C\u9605\u8BFB\uFF1A\u663E\u793A / \u9690\u85CF",
+      title: "\u58A8\u9C7C\u9605\u8BFB\uFF1A\u663E\u793A / \u9690\u85CF",
       category: "Moyu \u9605\u8BFB",
       namespace: "palette",
       run: toggle
@@ -8703,7 +8780,7 @@ var tui = async (host, options) => {
     mode: "base",
     commands: [{
       name: "moyu.open",
-      title: "\u6478\u9C7C\u9605\u8BFB\uFF1A\u6253\u5F00\u4E66\u67B6",
+      title: "\u58A8\u9C7C\u9605\u8BFB\uFF1A\u6253\u5F00\u4E66\u67B6",
       slashName: "moyu",
       run: openMoyu
     }, {
@@ -8717,7 +8794,7 @@ var tui = async (host, options) => {
       }
     }, {
       name: "moyu.music",
-      title: "\u6478\u9C7C\u97F3\u4E50\uFF1A\u6253\u5F00\u805A\u5408\u64AD\u653E\u5668",
+      title: "\u58A8\u9C7C\u97F3\u4E50\uFF1A\u6253\u5F00\u805A\u5408\u64AD\u653E\u5668",
       slashName: "music",
       run: () => {
         selectMode("music");
@@ -8726,35 +8803,35 @@ var tui = async (host, options) => {
       }
     }, {
       name: "moyu.shelf",
-      title: "\u6478\u9C7C\u9605\u8BFB\uFF1A\u4E66\u67B6 / \u6253\u5F00\u6587\u4EF6",
+      title: "\u58A8\u9C7C\u9605\u8BFB\uFF1A\u4E66\u67B6 / \u6253\u5F00\u6587\u4EF6",
       slashName: "read",
       run: shelf
     }, {
       name: "moyu.chapters",
-      title: "\u6478\u9C7C\u9605\u8BFB\uFF1A\u7AE0\u8282\u76EE\u5F55",
+      title: "\u58A8\u9C7C\u9605\u8BFB\uFF1A\u7AE0\u8282\u76EE\u5F55",
       slashName: "chapters",
       run: chapters
     }, {
       name: "moyu.jump",
-      title: "\u6478\u9C7C\u9605\u8BFB\uFF1A\u8DF3\u8F6C\u8FDB\u5EA6",
+      title: "\u58A8\u9C7C\u9605\u8BFB\uFF1A\u8DF3\u8F6C\u8FDB\u5EA6",
       run: jump
     }, {
       name: "moyu.size",
-      title: "\u6478\u9C7C\u9605\u8BFB\uFF1A\u8C03\u6574\u9605\u8BFB\u533A\u57DF\u5927\u5C0F",
+      title: "\u58A8\u9C7C\u9605\u8BFB\uFF1A\u8C03\u6574\u9605\u8BFB\u533A\u57DF\u5927\u5C0F",
       slashName: "readsize",
       run: size
     }, {
       name: "moyu.delete",
-      title: "\u6478\u9C7C\u9605\u8BFB\uFF1A\u5220\u9664\u5F53\u524D\u8D44\u6599",
+      title: "\u58A8\u9C7C\u9605\u8BFB\uFF1A\u5220\u9664\u5F53\u524D\u8D44\u6599",
       run: removeBook
     }, {
       name: "moyu.next",
-      title: "\u6478\u9C7C\u9605\u8BFB\uFF1A\u4E0B\u4E00\u9875",
+      title: "\u58A8\u9C7C\u9605\u8BFB\uFF1A\u4E0B\u4E00\u9875",
       enabled: () => visible() && api.route.current.name === "session",
       run: () => turn(1)
     }, {
       name: "moyu.prev",
-      title: "\u6478\u9C7C\u9605\u8BFB\uFF1A\u4E0A\u4E00\u9875",
+      title: "\u58A8\u9C7C\u9605\u8BFB\uFF1A\u4E0A\u4E00\u9875",
       enabled: () => visible() && api.route.current.name === "session",
       run: () => turn(-1)
     }].map((item) => ({
@@ -8900,17 +8977,17 @@ var tui = async (host, options) => {
       },
       get fallback() {
         return (() => {
-          var _el$17 = _$createElement3("box");
-          _$setProp3(_el$17, "height", 1);
-          _$insert3(_el$17, _$createComponent3(Button, {
+          var _el$15 = _$createElement3("box");
+          _$setProp3(_el$15, "height", 1);
+          _$insert3(_el$15, _$createComponent3(Button, {
             label: "[\u663E\u793A\u9605\u8BFB]",
             action: toggle
           }));
-          return _el$17;
+          return _el$15;
         })();
       },
       get children() {
-        var _el$2 = _$createElement3("box"), _el$3 = _$createElement3("box"), _el$4 = _$createElement3("text"), _el$5 = _$createElement3("b"), _el$7 = _$createElement3("box");
+        var _el$2 = _$createElement3("box"), _el$3 = _$createElement3("box"), _el$4 = _$createElement3("text"), _el$5 = _$createElement3("b"), _el$6 = _$createElement3("box");
         _$insertNode3(_el$2, _el$3);
         _$use2((node) => {
           readerNode = node;
@@ -8924,37 +9001,37 @@ var tui = async (host, options) => {
           dock();
         });
         _$insertNode3(_el$3, _el$4);
-        _$insertNode3(_el$3, _el$7);
+        _$insertNode3(_el$3, _el$6);
         _$setProp3(_el$3, "flexShrink", 0);
         _$setProp3(_el$3, "height", 1);
         _$setProp3(_el$3, "flexDirection", "row");
         _$setProp3(_el$3, "justifyContent", "space-between");
         _$insertNode3(_el$4, _el$5);
-        _$insertNode3(_el$5, _$createTextNode2(`\u968F\u624B\u8BFB`));
-        _$setProp3(_el$7, "flexDirection", "row");
-        _$setProp3(_el$7, "gap", 1);
-        _$insert3(_el$7, _$createComponent3(Button, {
+        _$insert3(_el$5, () => bodyWidth() >= 43 ? "\u58A8\u9C7C\u591A\u5A92\u4F53" : "\u58A8\u9C7C");
+        _$setProp3(_el$6, "flexDirection", "row");
+        _$setProp3(_el$6, "gap", 1);
+        _$insert3(_el$6, _$createComponent3(Button, {
           label: "[\u5C0F\u8BF4]",
           action: () => selectMode("novel"),
           get muted() {
             return mode() !== "novel";
           }
         }), null);
-        _$insert3(_el$7, _$createComponent3(Button, {
+        _$insert3(_el$6, _$createComponent3(Button, {
           label: "[\u89C6\u9891]",
           action: () => selectMode("video"),
           get muted() {
             return mode() !== "video";
           }
         }), null);
-        _$insert3(_el$7, _$createComponent3(Button, {
+        _$insert3(_el$6, _$createComponent3(Button, {
           label: "[\u97F3\u4E50]",
           action: () => selectMode("music"),
           get muted() {
             return mode() !== "music";
           }
         }), null);
-        _$insert3(_el$7, _$createComponent3(Button, {
+        _$insert3(_el$6, _$createComponent3(Button, {
           label: "[\u9690\u85CF]",
           action: toggle,
           muted: true
@@ -8965,24 +9042,24 @@ var tui = async (host, options) => {
           },
           get fallback() {
             return (() => {
-              var _el$18 = _$createElement3("box");
-              _$setProp3(_el$18, "flexShrink", 0);
-              _$setProp3(_el$18, "height", 1);
-              _$setProp3(_el$18, "flexDirection", "row");
-              _$setProp3(_el$18, "gap", 2);
-              _$insert3(_el$18, _$createComponent3(Button, {
+              var _el$16 = _$createElement3("box");
+              _$setProp3(_el$16, "flexShrink", 0);
+              _$setProp3(_el$16, "height", 1);
+              _$setProp3(_el$16, "flexDirection", "row");
+              _$setProp3(_el$16, "gap", 2);
+              _$insert3(_el$16, _$createComponent3(Button, {
                 get label() {
                   return mode() === "video" ? "[\u89C6\u9891\u5E93]" : "[\u4E66\u67B6]";
                 },
                 action: () => mode() === "video" ? video.shelf() : shelf()
               }), null);
-              _$insert3(_el$18, _$createComponent3(Button, {
+              _$insert3(_el$16, _$createComponent3(Button, {
                 get label() {
                   return mode() === "video" ? "[\u641C\u7D22]" : "[\u76EE\u5F55]";
                 },
                 action: () => mode() === "video" ? video.search() : chapters()
               }), null);
-              _$insert3(_el$18, _$createComponent3(Show3, {
+              _$insert3(_el$16, _$createComponent3(Show3, {
                 get when() {
                   return mode() === "video";
                 },
@@ -8993,32 +9070,43 @@ var tui = async (host, options) => {
                   });
                 }
               }), null);
-              _$insert3(_el$18, _$createComponent3(Button, {
+              _$insert3(_el$16, _$createComponent3(Show3, {
+                get when() {
+                  return mode() === "novel" && book()?.catalog && collect;
+                },
+                get children() {
+                  return _$createComponent3(Button, {
+                    label: "[\u8865\u91C7]",
+                    action: supplement
+                  });
+                }
+              }), null);
+              _$insert3(_el$16, _$createComponent3(Button, {
                 label: "[\u5220\u9664]",
                 action: removeBook
               }), null);
-              return _el$18;
+              return _el$16;
             })();
           },
           get children() {
-            var _el$8 = _$createElement3("box");
-            _$setProp3(_el$8, "flexShrink", 0);
-            _$setProp3(_el$8, "height", 1);
-            _$setProp3(_el$8, "flexDirection", "row");
-            _$setProp3(_el$8, "gap", 1);
-            _$insert3(_el$8, _$createComponent3(Button, {
+            var _el$7 = _$createElement3("box");
+            _$setProp3(_el$7, "flexShrink", 0);
+            _$setProp3(_el$7, "height", 1);
+            _$setProp3(_el$7, "flexDirection", "row");
+            _$setProp3(_el$7, "gap", 1);
+            _$insert3(_el$7, _$createComponent3(Button, {
               label: "[\u641C\u7D22]",
               get action() {
                 return music.search;
               }
             }), null);
-            _$insert3(_el$8, _$createComponent3(Button, {
+            _$insert3(_el$7, _$createComponent3(Button, {
               label: "[\u7ED3\u679C]",
               get action() {
                 return music.results;
               }
             }), null);
-            _$insert3(_el$8, _$createComponent3(Button, {
+            _$insert3(_el$7, _$createComponent3(Button, {
               get label() {
                 return `[\u961F\u5217${music.state().queue.length}]`;
               },
@@ -9026,13 +9114,13 @@ var tui = async (host, options) => {
                 return music.queue;
               }
             }), null);
-            _$insert3(_el$8, _$createComponent3(Button, {
+            _$insert3(_el$7, _$createComponent3(Button, {
               label: "[\u8D26\u53F7]",
               get action() {
                 return music.accounts;
               }
             }), null);
-            return _el$8;
+            return _el$7;
           }
         }), null);
         _$insert3(_el$2, _$createComponent3(Show3, {
@@ -9041,10 +9129,10 @@ var tui = async (host, options) => {
           },
           get children() {
             return [(() => {
-              var _el$9 = _$createElement3("box");
-              _$setProp3(_el$9, "flexShrink", 0);
-              _$setProp3(_el$9, "flexDirection", "row");
-              _$insert3(_el$9, _$createComponent3(Show3, {
+              var _el$8 = _$createElement3("box");
+              _$setProp3(_el$8, "flexShrink", 0);
+              _$setProp3(_el$8, "flexDirection", "row");
+              _$insert3(_el$8, _$createComponent3(Show3, {
                 get when() {
                   return options?.hostMajor === 2;
                 },
@@ -9057,13 +9145,13 @@ var tui = async (host, options) => {
                   });
                 }
               }), null);
-              _$insert3(_el$9, _$createComponent3(Button, {
+              _$insert3(_el$8, _$createComponent3(Button, {
                 get label() {
                   return `[\u9AD8\u5EA6 ${heightPercent() === void 0 ? "\u81EA\u52A8" : Math.round(heightPercent() * 10) / 10 + "%"}]`;
                 },
                 action: heightSize
               }), null);
-              _$insert3(_el$9, _$createComponent3(Show3, {
+              _$insert3(_el$8, _$createComponent3(Show3, {
                 get when() {
                   return _$memo3(() => mode() === "video")() && options?.hostMajor === 2;
                 },
@@ -9078,49 +9166,49 @@ var tui = async (host, options) => {
               }), null);
               _$effect3((_p$) => {
                 var _v$ = 1 + gap(), _v$2 = mode() === "video" ? 1 : 2;
-                _v$ !== _p$.e && (_p$.e = _$setProp3(_el$9, "height", _v$, _p$.e));
-                _v$2 !== _p$.t && (_p$.t = _$setProp3(_el$9, "gap", _v$2, _p$.t));
+                _v$ !== _p$.e && (_p$.e = _$setProp3(_el$8, "height", _v$, _p$.e));
+                _v$2 !== _p$.t && (_p$.t = _$setProp3(_el$8, "gap", _v$2, _p$.t));
                 return _p$;
               }, {
                 e: void 0,
                 t: void 0
               });
-              return _el$9;
+              return _el$8;
             })(), _$createComponent3(Show3, {
               get when() {
                 return _$memo3(() => mode() === "video")() && options?.hostMajor === 2;
               },
               get children() {
-                var _el$0 = _$createElement3("box");
-                _$setProp3(_el$0, "height", 1);
-                _$setProp3(_el$0, "flexShrink", 0);
-                _$setProp3(_el$0, "flexDirection", "row");
-                _$setProp3(_el$0, "gap", 1);
-                _$insert3(_el$0, _$createComponent3(Button, {
+                var _el$9 = _$createElement3("box");
+                _$setProp3(_el$9, "height", 1);
+                _$setProp3(_el$9, "flexShrink", 0);
+                _$setProp3(_el$9, "flexDirection", "row");
+                _$setProp3(_el$9, "gap", 1);
+                _$insert3(_el$9, _$createComponent3(Button, {
                   label: "[\u2212]",
                   action: () => stepVideoScale(-1),
                   get muted() {
                     return videoSize().percent <= 25;
                   }
                 }), null);
-                _$insert3(_el$0, _$createComponent3(Button, {
+                _$insert3(_el$9, _$createComponent3(Button, {
                   get label() {
                     return `[\u7F29\u653E${videoSize().percent}%]`;
                   },
                   action: videoScaleMenu
                 }), null);
-                _$insert3(_el$0, _$createComponent3(Button, {
+                _$insert3(_el$9, _$createComponent3(Button, {
                   label: "[+]",
                   action: () => stepVideoScale(1),
                   get muted() {
                     return videoSize().percent >= videoSize().maximum;
                   }
                 }), null);
-                _$insert3(_el$0, _$createComponent3(Button, {
+                _$insert3(_el$9, _$createComponent3(Button, {
                   label: "[\u91CD\u7F6E]",
                   action: () => scaleVideo(100)
                 }), null);
-                return _el$0;
+                return _el$9;
               }
             })];
           }
@@ -9169,87 +9257,90 @@ var tui = async (host, options) => {
               },
               get children() {
                 return [(() => {
-                  var _el$1 = _$createElement3("box");
-                  _$setProp3(_el$1, "flexShrink", 0);
-                  _$insert3(_el$1, _$createComponent3(Button, {
+                  var _el$0 = _$createElement3("box");
+                  _$setProp3(_el$0, "flexShrink", 0);
+                  _$insert3(_el$0, _$createComponent3(Button, {
                     get label() {
                       return book()?.title ?? "";
                     },
                     action: shelf,
                     muted: true
                   }), null);
-                  _$insert3(_el$1, _$createComponent3(Button, {
+                  _$insert3(_el$0, _$createComponent3(Button, {
                     get label() {
                       return currentChapter();
                     },
                     action: chapters
                   }), null);
-                  _$effect3((_$p) => _$setProp3(_el$1, "height", 2 + gap(), _$p));
-                  return _el$1;
+                  _$effect3((_$p) => _$setProp3(_el$0, "height", 2 + gap(), _$p));
+                  return _el$0;
                 })(), (() => {
-                  var _el$10 = _$createElement3("box"), _el$11 = _$createElement3("text");
-                  _$insertNode3(_el$10, _el$11);
-                  _$setProp3(_el$10, "flexShrink", 0);
-                  _$setProp3(_el$11, "width", "100%");
-                  _$setProp3(_el$11, "height", "100%");
-                  _$setProp3(_el$11, "wrapMode", "none");
-                  _$insert3(_el$11, () => pages()[page()].text);
+                  var _el$1 = _$createElement3("box"), _el$10 = _$createElement3("text");
+                  _$insertNode3(_el$1, _el$10);
+                  _$setProp3(_el$1, "flexShrink", 0);
+                  _$setProp3(_el$10, "width", "100%");
+                  _$setProp3(_el$10, "height", "100%");
+                  _$setProp3(_el$10, "wrapMode", "none");
+                  _$insert3(_el$10, () => pages()[page()].text);
                   _$effect3((_p$) => {
                     var _v$3 = rows(), _v$4 = rows(), _v$5 = theme().text;
-                    _v$3 !== _p$.e && (_p$.e = _$setProp3(_el$10, "height", _v$3, _p$.e));
-                    _v$4 !== _p$.t && (_p$.t = _$setProp3(_el$10, "minHeight", _v$4, _p$.t));
-                    _v$5 !== _p$.a && (_p$.a = _$setProp3(_el$11, "fg", _v$5, _p$.a));
+                    _v$3 !== _p$.e && (_p$.e = _$setProp3(_el$1, "height", _v$3, _p$.e));
+                    _v$4 !== _p$.t && (_p$.t = _$setProp3(_el$1, "minHeight", _v$4, _p$.t));
+                    _v$5 !== _p$.a && (_p$.a = _$setProp3(_el$10, "fg", _v$5, _p$.a));
                     return _p$;
                   }, {
                     e: void 0,
                     t: void 0,
                     a: void 0
                   });
-                  return _el$10;
+                  return _el$1;
                 })(), (() => {
-                  var _el$12 = _$createElement3("box"), _el$13 = _$createElement3("box"), _el$14 = _$createElement3("box"), _el$15 = _$createElement3("text");
-                  _$insertNode3(_el$12, _el$13);
-                  _$insertNode3(_el$12, _el$14);
-                  _$insertNode3(_el$12, _el$15);
+                  var _el$11 = _$createElement3("box"), _el$12 = _$createElement3("box"), _el$13 = _$createElement3("box"), _el$14 = _$createElement3("text");
+                  _$insertNode3(_el$11, _el$12);
+                  _$insertNode3(_el$11, _el$13);
+                  _$insertNode3(_el$11, _el$14);
+                  _$setProp3(_el$11, "flexShrink", 0);
                   _$setProp3(_el$12, "flexShrink", 0);
-                  _$setProp3(_el$13, "flexShrink", 0);
-                  _$setProp3(_el$13, "height", 1);
-                  _$setProp3(_el$13, "flexDirection", "row");
-                  _$setProp3(_el$13, "justifyContent", "space-between");
-                  _$insert3(_el$13, _$createComponent3(Button, {
+                  _$setProp3(_el$12, "height", 1);
+                  _$setProp3(_el$12, "flexDirection", "row");
+                  _$setProp3(_el$12, "justifyContent", "space-between");
+                  _$insert3(_el$12, _$createComponent3(Button, {
                     get label() {
                       return `${page() + 1} / ${pages().length} \u9875 \xB7 ${percentage()}%`;
                     },
                     action: jump,
                     muted: true
                   }));
-                  _$setProp3(_el$14, "flexShrink", 0);
-                  _$setProp3(_el$14, "height", 1);
-                  _$setProp3(_el$14, "flexDirection", "row");
-                  _$setProp3(_el$14, "justifyContent", "space-between");
-                  _$insert3(_el$14, _$createComponent3(Button, {
+                  _$setProp3(_el$13, "flexShrink", 0);
+                  _$setProp3(_el$13, "height", 1);
+                  _$setProp3(_el$13, "flexDirection", "row");
+                  _$setProp3(_el$13, "justifyContent", "space-between");
+                  _$insert3(_el$13, _$createComponent3(Button, {
                     label: "[\u2039 \u4E0A\u4E00\u9875]",
                     action: () => turn(-1)
                   }), null);
-                  _$insert3(_el$14, _$createComponent3(Button, {
+                  _$insert3(_el$13, _$createComponent3(Button, {
                     label: "[\u4E0B\u4E00\u9875 \u203A]",
                     action: () => turn(1)
                   }), null);
-                  _$insertNode3(_el$15, _$createTextNode2(`\u70B9\u51FB\u4E0A\u65B9\u6309\u94AE\u8C03\u6574\u5BBD\u9AD8`));
-                  _$setProp3(_el$15, "height", 1);
-                  _$setProp3(_el$15, "wrapMode", "none");
+                  _$setProp3(_el$14, "height", 1);
+                  _$setProp3(_el$14, "wrapMode", "none");
+                  _$insert3(_el$14, (() => {
+                    var _c$ = _$memo3(() => !!book()?.catalog);
+                    return () => _c$() ? `\u6B63\u6587 ${book().catalog.downloaded}/${book().catalog.total} \u7AE0${book().catalog.complete === false ? " \xB7 \u76EE\u5F55\u672A\u5B8C\u6574" : ""}` : "\u70B9\u51FB\u4E0A\u65B9\u6309\u94AE\u8C03\u6574\u5BBD\u9AD8";
+                  })());
                   _$effect3((_p$) => {
                     var _v$6 = 4 + gap(), _v$7 = gap(), _v$8 = theme().textMuted;
-                    _v$6 !== _p$.e && (_p$.e = _$setProp3(_el$12, "height", _v$6, _p$.e));
-                    _v$7 !== _p$.t && (_p$.t = _$setProp3(_el$12, "paddingTop", _v$7, _p$.t));
-                    _v$8 !== _p$.a && (_p$.a = _$setProp3(_el$15, "fg", _v$8, _p$.a));
+                    _v$6 !== _p$.e && (_p$.e = _$setProp3(_el$11, "height", _v$6, _p$.e));
+                    _v$7 !== _p$.t && (_p$.t = _$setProp3(_el$11, "paddingTop", _v$7, _p$.t));
+                    _v$8 !== _p$.a && (_p$.a = _$setProp3(_el$14, "fg", _v$8, _p$.a));
                     return _p$;
                   }, {
                     e: void 0,
                     t: void 0,
                     a: void 0
                   });
-                  return _el$12;
+                  return _el$11;
                 })()];
               }
             });
@@ -9386,10 +9477,10 @@ var v2_default = Plugin.define({
           if (!musicLogin) throw new Error("\u97F3\u4E50\u767B\u5F55\u5165\u53E3\u5C1A\u672A\u51C6\u5907\u597D\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
           musicLogin(platform);
         } });
-        if (result.kind === "collection") context.ui.toast.show({ title: "\u6478\u9C7C\u91C7\u96C6", message: "\u5DF2\u4EA4\u7ED9\u5F53\u524D\u6A21\u578B\uFF0C\u91C7\u96C6\u7ED3\u679C\u5C06\u5728\u4F1A\u8BDD\u4E2D\u663E\u793A", variant: "info" });
+        if (result.kind === "collection") context.ui.toast.show({ title: "\u58A8\u9C7C\u91C7\u96C6", message: "\u5DF2\u4EA4\u7ED9\u5F53\u524D\u6A21\u578B\uFF0C\u91C7\u96C6\u7ED3\u679C\u5C06\u5728\u4F1A\u8BDD\u4E2D\u663E\u793A", variant: "info" });
         return result.sessionID;
       } catch (error) {
-        context.ui.toast.show({ title: "\u6478\u9C7C\u8BF7\u6C42\u5931\u8D25", message: error instanceof Error ? error.message : String(error), variant: "error" });
+        context.ui.toast.show({ title: "\u58A8\u9C7C\u8BF7\u6C42\u5931\u8D25", message: error instanceof Error ? error.message : String(error), variant: "error" });
       }
     }
     const bridge = {

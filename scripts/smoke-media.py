@@ -91,7 +91,7 @@ def choose_width(percent, name):
 
 
 def sidebar_column(text):
-    return next(line.index("随手读") for line in text.splitlines() if "随手读" in line)
+    return next(line.index("墨鱼") for line in text.splitlines() if "墨鱼" in line)
 
 
 def start(session):
@@ -101,7 +101,7 @@ def start(session):
 
 
 def has_pixels(text):
-    if "随手读" not in text: return False
+    if "墨鱼" not in text: return False
     column = sidebar_column(text)
     return '[object Object]' not in text and sum('▀' in line[column:] for line in text.splitlines()) >= 3
 
@@ -145,7 +145,7 @@ try:
     click("[视频]", "video-mode")
     wait_for(lambda s: "[视频库]" in s, "video-mode-visible")
     click("[视频库]", "video-shelf")
-    wait_for(lambda s: "视频库 · 像素影院" in s, "video-library")
+    wait_for(lambda s: "视频库 · 墨鱼视频" in s, "video-library")
     tmux("send-keys", "-t", "reader:0.0", "Enter")
     wait_for(lambda s: "打开视频 · 本地文件" in s, "video-path")
     tmux("send-keys", "-t", "reader:0.0", "-l", str(media))

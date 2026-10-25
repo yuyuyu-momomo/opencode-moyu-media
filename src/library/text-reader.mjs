@@ -54,6 +54,7 @@ function chapterIdentity(title) {
   return `${total}:${match[2]}:${match[3].replace(/\s+/gu, "")}`
 }
 
+/** @returns {Array<{title: string, offset: number, id?: string, index?: number, status?: string}>} */
 export function chaptersOf(text) {
   const chapters = []
   let offset = 0, headingEnd = 0
@@ -150,13 +151,23 @@ export async function loadBook(input, cwd, { keyFile } = {}) {
     if (info.size > 34 * 1024 * 1024) throw new Error("加密文件超过大小限制")
     const payload = await new LibraryVault(keyFile || defaultKeyFile(dirname(path))).unseal(await readFile(path))
     if (typeof payload.title !== "string" || typeof payload.text !== "string" || typeof payload.resourceId !== "string") throw new Error("加密资料格式无效")
-    return { path, title: payload.title, text: payload.text, chapters: chaptersOf(payload.text), resourceId: payload.resourceId }
+    let chapters = chaptersOf(payload.text)
+    if (payload.chapters !== undefined) {
+      if (!Array.isArray(payload.chapters) || payload.chapters.length > 20000 || !payload.chapters.every((item, index, items) =>
+        item && typeof item.title === "string" && /^[a-f0-9]{24}$/.test(item.id) && item.index === index &&
+        Number.isInteger(item.offset) && item.offset >= 0 && item.offset < payload.text.length && (!index || item.offset > items[index - 1].offset) &&
+        ["ready", "pending", "failed"].includes(item.status))) throw new Error("章节目录格式无效")
+      chapters = payload.chapters
+    }
+    const catalog = payload.catalog
+    if (catalog && (typeof catalog.url !== "string" || !/^https?:\/\//.test(catalog.url) || typeof catalog.sourceId !== "string" || !Number.isInteger(catalog.total) || !Number.isInteger(catalog.downloaded))) throw new Error("来源目录格式无效")
+    return { path, title: payload.title, text: payload.text, chapters, catalog, resourceId: payload.resourceId }
   }
   if (![".txt", ".md"].includes(extname(path).toLowerCase())) throw new Error("目前支持 .txt、.md 和加密资料文件")
   if (info.size > 32 * 1024 * 1024) throw new Error("文件超过 32 MiB，请按卷拆分")
   const text = cleanText(decodeBook(await readFile(path)))
   if (!text.trim()) throw new Error("这个文件没有可阅读的内容")
-  return { path, title: basename(path, extname(path)), text, chapters: chaptersOf(text) }
+  return { path, title: basename(path, extname(path)), text, chapters: chaptersOf(text), catalog: undefined }
 }
 
 /** @param {string} directory @param {{keyFile?: string}} [options] */
@@ -164,9 +175,10 @@ export async function listBooks(directory, { keyFile } = {}) {
   const entries = await readdir(directory, { withFileTypes: true })
   const plain = entries
     .filter((item) => item.isFile() && /\.(?:txt|md)$/i.test(item.name))
-    .map((item) => ({ title: basename(item.name, extname(item.name)), path: resolve(directory, item.name) }))
+    .map((item) => ({ title: basename(item.name, extname(item.name)), path: resolve(directory, item.name), progress: undefined }))
     .sort((a, b) => a.title.localeCompare(b.title, "zh"))
   const resources = entries.some((item) => item.name === ".moyu") ? await new LibraryStore(directory, { keyFile }).resources() : []
-  const managed = resources.filter((item) => item.kind === "novel").map((item) => ({ title: item.title, path: item.assets.find((asset) => asset.role === "body")?.path, resourceId: item.id })).filter((item) => item.path)
+  const managed = resources.filter((item) => item.kind === "novel").map((item) => ({ title: item.title, path: item.assets.find((asset) => asset.role === "body")?.path, resourceId: item.id,
+    progress: Number.isInteger(item.metadata.totalChapters) ? `正文 ${item.metadata.chapters}/${item.metadata.totalChapters} 章${item.metadata.catalogComplete === false ? " · 目录未完整" : ""}` : undefined })).filter((item) => item.path)
   return [...managed, ...plain.filter((item) => !managed.some((saved) => saved.title === item.title))]
 }

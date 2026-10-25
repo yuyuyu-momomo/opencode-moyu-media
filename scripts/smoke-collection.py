@@ -158,7 +158,7 @@ try:
             time.sleep(0.3)
     command = shlex.join(["env", *[f"{key}={value}" for key, value in ENV.items() if key.startswith(("XDG_", "OPENCODE_"))], "TERM=xterm-256color", BINARY, "--server", URL, "--session", session, str(PROJECT)])
     tmux("new-session", "-d", "-s", "reader", "-x", "160", "-y", "46", "-c", str(PROJECT), command)
-    wait_for(lambda: "随手读" in screen() and "Moyu mock" in screen(), "local-model-and-reader")
+    wait_for(lambda: "墨鱼" in screen() and "Moyu mock" in screen(), "local-model-and-reader")
     tmux("send-keys", "-t", "reader:0.0", "-l", "/moyu " + QUERY)
     time.sleep(0.3)
     tmux("send-keys", "-t", "reader:0.0", "Enter")

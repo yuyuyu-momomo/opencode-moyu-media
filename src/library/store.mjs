@@ -49,10 +49,12 @@ export class LibraryStore {
     catch (error) { if (error.code !== "ENOENT") throw error }
   }
   async readPart(id, index) { return (await this.vault.unseal(await readFile(this.partPath(id, index)))).text }
-  async writeBook(id, title, text) {
+  async writeBook(id, title, text, extra = {}) {
     await this.ready()
     const path = join(this.directory, id + ".moyubook")
-    await atomicWrite(path, await this.vault.seal({ schemaVersion: 1, resourceId: id, title, text }))
+    const payload = { ...extra, schemaVersion: 1, resourceId: id, title, text }
+    if (Buffer.byteLength(JSON.stringify(payload)) > 32 * 1024 * 1024) throw new Error("单本超过 32 MiB，请按卷拆分采集")
+    await atomicWrite(path, await this.vault.seal(payload))
     return path
   }
   async importLocal(book) {

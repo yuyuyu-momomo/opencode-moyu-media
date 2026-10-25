@@ -91,7 +91,7 @@ def choose_width(percent, name):
 
 
 def sidebar_column(text):
-    return next(line.index("随手读") for line in text.splitlines() if "随手读" in line)
+    return next(line.index("墨鱼") for line in text.splitlines() if "墨鱼" in line)
 
 
 def start(session):
@@ -123,7 +123,7 @@ try:
             raise AssertionError(plugins)
         time.sleep(0.3)
     start(session)
-    wait_for(lambda text: "随手读" in text and "夜班便利店" in text, "sidebar")
+    wait_for(lambda text: "墨鱼" in text and "夜班便利店" in text, "sidebar")
     tmux("send-keys", "-t", "reader:0.0", "M-Right")
     wait_for(lambda text: "2 /" in text, "next-page")
     tmux("send-keys", "-t", "reader:0.0", "-l", "/moyu")
@@ -131,18 +131,18 @@ try:
     tmux("send-keys", "-t", "reader:0.0", "Enter")
     time.sleep(0.4)  # Arguments-capable commands first complete to '/moyu '.
     tmux("send-keys", "-t", "reader:0.0", "Enter")
-    wait_for(lambda text: "书架 · 摸鱼阅读" in text and "让当前模型采集小说" in text, "slash-moyu-shelf")
+    wait_for(lambda text: "书架 · 墨鱼阅读" in text and "让当前模型采集小说" in text, "slash-moyu-shelf")
     tmux("send-keys", "-t", "reader:0.0", "-l", "让当前模型")
     tmux("send-keys", "-t", "reader:0.0", "Enter")
     wait_for(lambda text: "让当前模型采集小说" in text and "忘语的凡人修仙传" in text, "collection-prompt")
     tmux("send-keys", "-t", "reader:0.0", "Escape")
     wait_for(lambda text: "让当前模型采集小说" not in text, "cancel-collection")
     tmux("send-keys", "-t", "reader:0.0", "M-o")
-    wait_for(lambda text: "书架 · 摸鱼阅读" in text, "shelf")
+    wait_for(lambda text: "书架 · 墨鱼阅读" in text, "shelf")
     tmux("send-keys", "-t", "reader:0.0", "M-m")
-    wait_for(lambda text: "随手读" not in text and "书架 · 摸鱼阅读" not in text, "hide-closes-dialog")
+    wait_for(lambda text: "墨鱼" not in text and "书架 · 墨鱼阅读" not in text, "hide-closes-dialog")
     tmux("send-keys", "-t", "reader:0.0", "M-m")
-    wait_for(lambda text: "随手读" in text and "2 /" in text, "show")
+    wait_for(lambda text: "墨鱼" in text and "2 /" in text, "show")
     tmux("send-keys", "-t", "reader:0.0", "M-c")
     wait_for(lambda text: "夜班便利店 · 目录" in text, "chapters")
     tmux("send-keys", "-t", "reader:0.0", "Escape")
@@ -153,7 +153,7 @@ try:
     tmux("kill-session", "-t", "reader")
     time.sleep(1)
     start(session)
-    wait_for(lambda text: "随手读" in text and "2 /" in text, "restart-resume")
+    wait_for(lambda text: "墨鱼" in text and "2 /" in text, "restart-resume")
     initial = capture("before-size")
     original_column = sidebar_column(initial)
     click("[目录]", "chapter-press-release", hold=True)
@@ -163,19 +163,19 @@ try:
     click("第二章 一张没有日期的小票", "choose-second-chapter")
     wait_for(lambda text: "夜班便利店 · 目录" not in text and "第二章 一张没有日期的小票" in text, "mouse-selects-chapter")
     click("[书架]", "click-shelf")
-    wait_for(lambda text: "书架 · 摸鱼阅读" in text, "click-bookshelf-stays-open")
+    wait_for(lambda text: "书架 · 墨鱼阅读" in text, "click-bookshelf-stays-open")
     click("夜班便利店", "choose-book")
-    wait_for(lambda text: "书架 · 摸鱼阅读" not in text and "随手读" in text, "mouse-selects-book")
+    wait_for(lambda text: "书架 · 墨鱼阅读" not in text and "墨鱼" in text, "mouse-selects-book")
     choose_width(50, "width-50")
     wide = wait_for(lambda text: sidebar_column(text) < original_column - 20, "sidebar-actually-widens")
     assert "第二章 一张没有日期的小票" in wide
     assert int(re.search(r"\d+ / (\d+) 页", wide)[1]) < int(re.search(r"\d+ / (\d+) 页", initial)[1]), "Wider body must reflow pagination"
     click("[隐藏]", "click-hide")
-    wait_for(lambda text: "[显示阅读]" in text and "随手读" not in text, "mouse-hides-reader")
+    wait_for(lambda text: "[显示阅读]" in text and "墨鱼" not in text, "mouse-hides-reader")
     hidden = capture("hidden-width")
     assert next(line.index("[显示阅读]") for line in hidden.splitlines() if "[显示阅读]" in line) == original_column
     click("[显示阅读]", "click-show")
-    wait_for(lambda text: "随手读" in text and sidebar_column(text) < original_column - 20, "mouse-restores-reader-width")
+    wait_for(lambda text: "墨鱼" in text and sidebar_column(text) < original_column - 20, "mouse-restores-reader-width")
     choose_height(25, "height-25")
     time.sleep(0.5)
     small_footer = footer_rows(capture("height-25-layout"))

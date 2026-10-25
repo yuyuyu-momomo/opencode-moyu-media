@@ -1,7 +1,7 @@
 {
   "name": "opencode-moyu",
-  "version": "0.5.1",
-  "description": "OpenCode 原生侧栏小说、视频与聚合音乐播放器",
+  "version": "0.6.0",
+  "description": "墨鱼多媒体：OpenCode 内的小说采集阅读、视频与聚合音乐播放器",
   "type": "module",
   "license": "MIT",
   "exports": {
