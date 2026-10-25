@@ -10,6 +10,7 @@ import { MediaSettings } from "../src/media/settings.mjs"
 import { createVideoPlatforms, videoUrl } from "../src/sources/video-platforms.mjs"
 import { createVideoIngestion, downloadVideo, downloadFailure, downloaderBinary, VIDEO_FORMAT_ARGS } from "../src/services/video-ingestion.mjs"
 import { mediaBinary } from "../src/media/runtime.mjs"
+import { videoFormatArgs } from "../src/media/video-quality.mjs"
 
 test("视频链接规范化并拒绝伪装域名、凭据、任意网站和合集", () => {
   assert.equal(videoUrl('https://youtu.be/BaW_jenozKc?t=4').url, 'https://www.youtube.com/watch?v=BaW_jenozKc')
@@ -63,6 +64,20 @@ test("YouTube 精简数据使用请求头传密钥，失败不回显服务端或
   await assert.rejects(missing.search({platform:'youtube',query:'demo'}), /API Key/)
 })
 
+test("下载清晰度默认 1080p，设置持久化且不覆盖 YouTube 密钥", async () => {
+  const root = await mkdtemp(join(tmpdir(), 'moyu-quality-')), store = new LibraryStore(join(root, 'books'))
+  const settings = new MediaSettings(store), key = 'A'.repeat(39)
+  assert.equal(await settings.downloadQuality(), 1080)
+  await settings.saveKey(key)
+  await settings.saveDownloadQuality(720)
+  assert.equal(await new MediaSettings(store).downloadQuality(), 720)
+  assert.equal(await settings.key(), key)
+  await assert.rejects(settings.saveDownloadQuality(2160), /480p、720p 或 1080p/)
+  assert.equal(await settings.downloadQuality(), 720)
+  await settings.removeKey()
+  assert.equal(await settings.downloadQuality(), 720)
+})
+
 test("B 站结果去除 HTML 与控制字符，接口拒绝不会伪装为成功", async () => {
   const api = createVideoPlatforms({settings:{key:async()=>''},read:async()=>({text:JSON.stringify({code:0,data:{result:[{bvid:'BV1xx411c7mD',title:'<em>标题</em>\x1b[31m',author:'作者',description:'说明',duration:'0:20'}]}})})})
   const items = await api.search({platform:'bilibili',query:'demo'})
@@ -94,18 +109,22 @@ test("实际 yt-dlp 离线选格式：横竖屏按短边、无低清回退、未
   const video = (id, width, height, extra={}) => ({format_id:id,url:'https://media.invalid/'+id+'.mp4',ext:'mp4',vcodec:'avc1.640033',acodec:'none',width,height,fps:30,...extra})
   const portrait = [video('v360',360,640),video('v480',480,852),video('av1',480,852,{vcodec:'av01.0.08M.08'}),video('v720',720,1280),audio]
   const fixtures = [
-    ['portrait', portrait, 'v480+audio'],
-    ['landscape', [video('v360',640,360),video('v480',852,480),video('v720',1280,720),audio], 'v480+audio'],
-    ['only-hd', [video('v720',720,1280),video('v1080',1080,1920),audio], 'v720+audio'],
+    ['portrait', portrait, 'v480+audio', 480],
+    ['landscape', [video('v360',640,360),video('v480',852,480),video('v720',1280,720),audio], 'v480+audio', 480],
+    ['portrait-full-hd', [...portrait, video('v1080',1080,1920), video('v2160',2160,3840)], 'v1080+audio'],
+    ['landscape-full-hd', [video('v720',1280,720),video('v1080',1920,1080),video('av1',1920,1080,{vcodec:'av01.0.08M.08'}),video('v2160',3840,2160),audio], 'v1080+audio'],
+    ['quality-720', [video('v480',480,852),video('v720',720,1280),video('v1080',1080,1920),audio], 'v720+audio', 720],
+    ['only-hd', [video('v720',720,1280),video('v1080',1080,1920),audio], 'v720+audio', 480],
+    ['source-only-720', portrait, 'v720+audio'],
     ['unknown-size', [video('unknown',undefined,undefined),audio], 'unknown+audio'],
     ['silent', [video('silent',480,852)], 'silent'],
     ['combined', [video('combined',480,852,{acodec:'mp4a.40.2'})], 'combined'],
   ]
-  for (const [name, formats, expected] of fixtures) {
+  for (const [name, formats, expected, quality] of fixtures) {
     const path = join(root,name+'.json')
     await writeFile(path,JSON.stringify({id:name,title:name,extractor:'test',webpage_url:'https://media.invalid/'+name,formats}))
     const args = ['--ignore-config','--no-plugin-dirs','--no-cache-dir','--simulate','--no-check-formats','--load-info-json',path,'--print','%(format_id)s']
-    const {stdout} = await promisify(execFile)(downloader,[...args,...VIDEO_FORMAT_ARGS],{timeout:15000,maxBuffer:32768})
+    const {stdout} = await promisify(execFile)(downloader,[...args,...(quality ? videoFormatArgs(quality) : VIDEO_FORMAT_ARGS)],{timeout:15000,maxBuffer:32768})
     assert.equal(stdout.trim(),expected,name)
     if (name==='portrait') await assert.rejects(promisify(execFile)(downloader,[...args,'--format','bv*[height<=480]+ba/b[height<=480]'],{timeout:15000,maxBuffer:32768}),/Requested format is not available/)
   }
@@ -142,7 +161,8 @@ test("下载结果流式加密、重复复用、播放临时解密、篡改拒�
   assert.equal(bytes.subarray(0,8).toString(),'MOYUVID1')
   assert.ok(!bytes.equals(await readFile(fixture)))
   const playable=await service.cache.open(result.resource)
-  assert.equal((await stat(playable.path)).mode & 0o777,0o600)
+  // POSIX owner permissions are only represented on Unix; Windows uses ACLs.
+  if (process.platform !== 'win32') assert.equal((await stat(playable.path)).mode & 0o777,0o600)
   assert.deepEqual(await readFile(playable.path),await readFile(fixture))
   await playable.release()
   assert.deepEqual(await readdir(service.cache.playback),[])
@@ -166,4 +186,33 @@ test("下载结果流式加密、重复复用、播放临时解密、篡改拒�
   await assert.rejects(canceled.importVideo({url:'BV1xx411c7mD',signal:abort.signal}))
   assert.deepEqual(await canceled.store.resources(),[])
   assert.deepEqual(await readdir(join(canceled.store.internal,'downloads')),[])
+})
+
+test("提高下载清晰度创建独立副本，失败保留旧缓存，同等或更高目标可复用", {skip:!ffmpeg}, async () => {
+  const root=await mkdtemp(join(tmpdir(),'moyu-video-upgrade-')), fixture=join(root,'fixture.mp4')
+  await promisify(execFile)(ffmpeg,['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=160x90:rate=10','-t','0.3','-c:v','mpeg4',fixture])
+  const requested=[]
+  let fail=false
+  const service=createVideoIngestion({directory:join(root,'books'),read:async()=>{throw new Error('offline fixture')},download:async(_url,work,options)=>{
+    requested.push(options.quality)
+    if(fail) throw new Error('offline download failed')
+    const path=join(work,'video.mp4');await copyFile(fixture,path);return{path,title:'清晰度测试'}
+  }})
+  await service.settings.saveDownloadQuality(480)
+  const low=await service.importVideo({url:'BV1xx411c7mD'})
+  const oldBytes=await readFile(service.cache.path(low.resource.id))
+  fail=true
+  await assert.rejects(service.importVideo({url:'BV1xx411c7mD',quality:1080}),/offline download failed/)
+  assert.deepEqual(await readFile(service.cache.path(low.resource.id)),oldBytes)
+  assert.deepEqual((await service.store.resources()).map(item=>item.id),[low.resource.id])
+  fail=false
+  await service.settings.saveDownloadQuality(1080)
+  const high=await service.importVideo({url:'BV1xx411c7mD'})
+  assert.notEqual(high.resource.id,low.resource.id)
+  assert.equal(high.resource.metadata.downloadQuality,1080)
+  assert.equal((await service.store.resources()).length,2)
+  assert.deepEqual(await readFile(service.cache.path(low.resource.id)),oldBytes)
+  assert.equal((await service.importVideo({url:'BV1xx411c7mD'})).cached,true)
+  assert.equal((await service.importVideo({url:'BV1xx411c7mD',quality:720})).resource.id,high.resource.id)
+  assert.deepEqual(requested,[480,1080,1080])
 })

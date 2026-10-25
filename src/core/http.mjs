@@ -27,7 +27,9 @@ export function httpUrl(input) {
 
 /** DNS is checked and pinned for each request, including redirects. */
 export function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, timeoutMs = 15000, useProxy = true, maxRedirects = 4 } = {}) {
-  return async function readPage(input, { signal, headers = {} } = {}) {
+  return async function readPage(input, { signal, headers = {}, method = "GET", body, asBytes = false, redirect = "follow" } = {}) {
+    if (!["GET", "POST"].includes(method)) throw new Error("不支持的 HTTP 请求方式")
+    if (!["follow", "manual"].includes(redirect)) throw new Error("不支持的重定向处理方式")
     let url = httpUrl(input)
     const initialOrigin = url.origin
     for (let redirects = 0; redirects <= maxRedirects; redirects++) {
@@ -46,7 +48,8 @@ export function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1
       const proxy = !useProxy || bypass ? undefined : url.protocol === "https:" ? process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy : process.env.HTTP_PROXY || process.env.http_proxy
       const agent = proxy ? new HttpsProxyAgent(proxy) : undefined
       const result = await new Promise((resolve, reject) => {
-        const request = (url.protocol === "https:" ? https : http).get(url, {
+        const request = (url.protocol === "https:" ? https : http).request(url, {
+          method,
           signal,
           agent,
           lookup: (_host, options, callback) => options?.all ? callback(null, [pinned]) : callback(null, pinned.address, pinned.family),
@@ -56,12 +59,12 @@ export function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1
             const status = response.statusCode ?? 0
             if ([301, 302, 303, 307, 308].includes(status) && response.headers.location) {
               response.resume()
-              resolve({ redirect: response.headers.location })
+              resolve({ url: url.href, redirect: response.headers.location, status, cookies: response.headers["set-cookie"] ?? [] })
               return
             }
             if (status < 200 || status >= 300) { response.resume(); throw new Error(`来源返回 HTTP ${status}；停止抓取`) }
             const contentType = String(response.headers["content-type"] ?? "text/html")
-            if (!/^(text\/|application\/(xhtml\+xml|xml|json))/i.test(contentType)) { response.resume(); throw new Error(`当前文字来源不支持：${contentType}`) }
+            if (!asBytes && !/^(text\/|application\/(xhtml\+xml|xml|json))/i.test(contentType)) { response.resume(); throw new Error(`当前文字来源不支持：${contentType}`) }
             const encoding = response.headers["content-encoding"]
             const stream = encoding === "gzip" ? response.pipe(createGunzip()) : encoding === "br" ? response.pipe(createBrotliDecompress()) : encoding === "deflate" ? response.pipe(createInflate()) : response
             const chunks = []
@@ -72,17 +75,25 @@ export function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1
               chunks.push(chunk)
             }
             const bytes = Buffer.concat(chunks)
+            const cookies = response.headers["set-cookie"] ?? []
+            if (asBytes) { resolve({ url: url.href, bytes, contentType, cookies }); return }
             const declared = contentType.match(/charset\s*=\s*["']?([^\s;"']+)/i)?.[1] ?? bytes.subarray(0, 4096).toString("latin1").match(/charset\s*=\s*["']?([\w-]+)/i)?.[1]
             const text = declared ? new TextDecoder(declared).decode(bytes) : decodeBook(bytes)
-            resolve({ url: url.href, text, contentType })
+            resolve({ url: url.href, text, contentType, cookies })
           } catch (error) { reject(error) }
         })
         request.setTimeout(timeoutMs, () => request.destroy(new Error("来源请求超时")))
         const deadline = setTimeout(() => request.destroy(new Error("来源请求超过总时限")), timeoutMs)
         request.on("close", () => clearTimeout(deadline))
         request.on("error", reject)
+        request.end(body)
       })
-      if (result.redirect) { url = httpUrl(new URL(result.redirect, url).href); continue }
+      if (result.redirect) {
+        if (redirect === "manual") return result
+        const next = httpUrl(new URL(result.redirect, url).href)
+        if (method !== "GET" && next.origin !== url.origin) throw new Error("不能将登录请求重定向到其他站点")
+        url = next; continue
+      }
       return result
     }
     throw new Error("来源重定向次数过多")

@@ -15,6 +15,10 @@ test("原生侧栏无需 Yoga API 即可改变宽度，保持主会话空间并�
   layout.apply(50, 160)
   assert.equal(sidebar.width, 80)
   assert.equal(pane.width, 80)
+  layout.apply(75, 160)
+  assert.equal(sidebar.width, 116)
+  assert.equal(pane.width, 116)
+  assert.equal(160 - pane.width, 44)
   frame.width = 100
   layout.apply(60, 100)
   assert.equal(pane.width, 56)
@@ -52,4 +56,40 @@ test("原生卡片保留底部空间，新增高度触发测量，卸载恢复�
   docking.restore()
   assert.equal(container.minHeight, null)
   assert.equal(container.onSizeChange, previous)
+})
+
+test("视频放大收起原生卡片，还原或卸载恢复，新卡片也跟随当前模式", () => {
+  const reader={height:30}, card={height:10,visible:true}, hidden={height:5,visible:false}, cards=[reader,card,hidden]
+  const container={getChildren:()=>cards}, viewport={height:42}
+  reader.parent=container
+  const docking=sidebarDock(reader,viewport)
+  assert.equal(docking.measure(true,true),0)
+  assert.equal(card.visible,false)
+  const next={height:3,visible:true};cards.push(next)
+  assert.equal(docking.measure(true,true),0)
+  assert.equal(next.visible,false)
+  assert.equal(docking.measure(true,false),15)
+  assert.equal(card.visible,true)
+  assert.equal(next.visible,true)
+  assert.equal(hidden.visible,false)
+  docking.measure(true,true)
+  docking.restore()
+  assert.equal(card.visible,true)
+  assert.equal(next.visible,true)
+  assert.equal(hidden.visible,false)
+})
+
+test("视频放大兼容原生信息位于滚动区外的宿主，保留侧栏标题并恢复原状态", () => {
+  const reader={height:41}, container={getChildren:()=>[reader]}, viewport={height:29}
+  reader.parent=container
+  const title={height:2,visible:true}, footer={height:12,visible:true}, hidden={height:1,visible:false}
+  const scrollbox={}, sidebar={getChildren:()=>[title,scrollbox,footer,hidden]}
+  scrollbox.parent=sidebar
+  const docking=sidebarDock(reader,viewport,()=>{},scrollbox)
+  docking.measure(true,true)
+  assert.equal(title.visible,true)
+  assert.equal(footer.visible,false)
+  docking.measure(false)
+  assert.equal(footer.visible,true)
+  assert.equal(hidden.visible,false)
 })

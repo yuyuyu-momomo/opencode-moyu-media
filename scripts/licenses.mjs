@@ -10,5 +10,6 @@ for (const name of [...packages].sort()) {
   const license = (await readdir(directory)).find((file) => /^license(?:\.txt|\.md)?$/i.test(file))
   output += "\n===== " + name + " " + metadata.version + " =====\n" + (license ? await readFile(directory + "/" + license, "utf8") : "License: " + metadata.license + "; " + (metadata.repository?.url ?? "")) + "\n"
 }
+output += "\n===== Music protocol references =====\n" + await readFile("src/music/PROTOCOL_NOTICES.txt", "utf8")
 await writeFile("THIRD_PARTY_NOTICES.txt", output)
 console.log(`Third-party notices: ${packages.size} packages`)

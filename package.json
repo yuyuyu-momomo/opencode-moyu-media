@@ -1,7 +1,7 @@
 {
   "name": "opencode-moyu",
-  "version": "0.4.1",
-  "description": "OpenCode 原生侧栏小说与像素视频播放器",
+  "version": "0.5.0",
+  "description": "OpenCode 原生侧栏小说、视频与聚合音乐播放器",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -16,6 +16,8 @@
     "install.sh",
     "install.cmd",
     "README.md",
+    "THIRD_PARTY_NOTICES.txt",
+    "docs/MUSIC.md",
     "LICENSE"
   ],
   "engines": {
@@ -44,6 +46,7 @@
     "esbuild": "^0.25.0",
     "https-proxy-agent": "^7.0.6",
     "jsonc-parser": "^3.3.1",
+    "qrcode": "1.5.4",
     "solid-js": "1.9.12",
     "string-width": "^7.2.0",
     "typescript": "^5.8.2"

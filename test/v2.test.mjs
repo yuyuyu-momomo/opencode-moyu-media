@@ -28,11 +28,45 @@ test("2.x 模型工具保留参数校验、服务执行及权限拒绝", async (
   try {
     assert.ok(hooks.has("context"))
     assert.ok(hooks.has("compaction"))
-    assert.deepEqual([...tools.keys()].sort(), ["moyu_catalog", "moyu_delete", "moyu_import", "moyu_library", "moyu_search", "moyu_sources", "moyu_video_import", "moyu_video_info", "moyu_video_search"])
+    assert.deepEqual([...tools.keys()].sort(), ["moyu_catalog", "moyu_delete", "moyu_import", "moyu_library", "moyu_music_playlist", "moyu_music_playlists", "moyu_music_radio", "moyu_music_search", "moyu_search", "moyu_sources", "moyu_video_import", "moyu_video_info", "moyu_video_popular", "moyu_video_search"])
     const sources = JSON.parse((await tools.get("moyu_sources").execute({}, context)).content)
     assert.equal(sources[0].id, "html-novel")
     assert.ok(sources.some((item) => item.id === "youtube"))
-    for (const [name, input] of [["moyu_video_search", { platform: "youtube", query: "demo", limit: 1 }], ["moyu_video_info", { url: "https://youtu.be/BaW_jenozKc" }], ["moyu_video_import", { url: "BV1xx411c7mD" }]]) {
+    assert.deepEqual(sources.filter((item) => item.kinds.includes("audio")).map((item) => item.id), ["netease", "qq", "kugou"])
+    assert.equal((await tools.get("moyu_music_radio").input["~standard"].validate({})).value.limit,5)
+    await assert.rejects(tools.get("moyu_music_radio").execute({limit:5},context),/test-permission-denied/)
+    assert.deepEqual(requests.at(-1).resources,["https://u.y.qq.com/*"])
+    await assert.rejects(tools.get("moyu_music_playlist").execute({platform:"qq",id:"liked",page:1,limit:20},context),/test-permission-denied/)
+    assert.deepEqual(requests.at(-1).resources,["https://u.y.qq.com/*","https://c.y.qq.com/*"])
+    requests.length=0
+    const musicSchema = tools.get("moyu_music_search").input["~standard"]
+    assert.equal((await musicSchema.validate({query:"测试歌曲"})).value.platform,"all")
+    assert.ok((await musicSchema.validate({query:"test",platform:"unknown"})).issues.length)
+    await assert.rejects(tools.get("moyu_music_search").execute({query:"test",platform:"all",limit:1},context),/test-permission-denied/)
+    assert.equal(requests.length,1)
+    requests.length=0
+    const playlistsSchema = tools.get("moyu_music_playlists").input["~standard"]
+    assert.equal((await playlistsSchema.validate({})).value.mode,"mine")
+    assert.ok((await playlistsSchema.validate({page:0})).issues.length)
+    const playlistSchema = tools.get("moyu_music_playlist").input["~standard"]
+    assert.equal((await playlistSchema.validate({platform:"qq",id:"12345"})).value.limit,20)
+    assert.ok((await playlistSchema.validate({platform:"qq",id:"https://127.0.0.1/"})).issues.length)
+    for(const [name,input] of [["moyu_music_playlists",{mode:"mine",platform:"qq",collection:"created",page:1,limit:10}],["moyu_music_playlist",{platform:"qq",id:"12345",page:1,limit:20}]]) await assert.rejects(tools.get(name).execute(input,context),/test-permission-denied/)
+    requests.length=0
+    for(const id of ["789", "collection_3_123_8_0"]) {
+      await assert.rejects(tools.get("moyu_music_playlist").execute({platform:"kugou",id,page:1,limit:20},context),/test-permission-denied/)
+      assert.deepEqual(requests.at(-1).resources, ["https://gateway.kugou.com/*", ...(/^\d+$/.test(id) ? ["https://www.kugou.com/*"] : [])])
+    }
+    requests.length=0
+    assert.ok(sources.find((item)=>item.id==='bilibili').capabilities.includes('popular'))
+    const popularSchema=tools.get('moyu_video_popular').input['~standard']
+    assert.equal((await popularSchema.validate({})).value.page,1)
+    assert.ok((await popularSchema.validate({page:0})).issues.length)
+    assert.ok((await popularSchema.validate({page:101})).issues.length)
+    const videoSchema=tools.get('moyu_video_import').input['~standard']
+    assert.equal((await videoSchema.validate({url:'BV1xx411c7mD',quality:'1080p'})).value.quality,'1080p')
+    assert.ok((await videoSchema.validate({url:'BV1xx411c7mD',quality:'2160p'})).issues.length)
+    for (const [name, input] of [["moyu_video_popular",{page:2}],["moyu_video_search", { platform: "youtube", query: "demo", limit: 1 }], ["moyu_video_info", { url: "https://youtu.be/BaW_jenozKc" }], ["moyu_video_import", { url: "BV1xx411c7mD" }]]) {
       await assert.rejects(tools.get(name).execute(input, context), /test-permission-denied/)
     }
     requests.length = 0

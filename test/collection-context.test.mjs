@@ -62,3 +62,22 @@ test("普通对话和无关会话不注入采集规则，工具输出不能冒�
     assert.deepEqual(context.system, [])
   }
 })
+
+test("视频热门和搜索注入视频接口规则，不把查询当作下载或进入小说采集", () => {
+  for(const query of ['视频 热门','视频 搜索 猫咪','下载 B站视频 BV1xx411c7mD 1080p']) {
+    const context={system:[],messages:[{role:'user',metadata:{origin:'moyu',query}}],tools:{websearch:{},webfetch:{},moyu_video_popular:{},moyu_video_import:{}}}
+    injectCollectionInstructions(context)
+    const rules=context.system[0].text
+    for(const name of ['moyu_video_popular','moyu_video_search','moyu_video_info','moyu_video_import']) assert.ok(rules.includes(name))
+    assert.match(rules,/等待用户选择，不擅自批量下载/)
+    assert.match(rules,/默认优先 1080p/)
+    assert.doesNotMatch(rules,/每批 5 章/)
+    assert.equal(context.tools.websearch,undefined)
+    assert.equal(context.tools.webfetch,undefined)
+    assert.ok(context.tools.moyu_video_popular)
+    injectCollectionInstructions(context)
+    assert.equal(context.system.length,1)
+    prepareCollectionCompaction(context)
+    assert.deepEqual(context.tools,{})
+  }
+})

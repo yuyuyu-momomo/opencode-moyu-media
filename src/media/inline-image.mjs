@@ -12,9 +12,9 @@ export function imageProtocol(core, renderer) {
 export function imageFrameSize(width, height, columns, rows, renderer, protocol) {
   const cellWidth = renderer.resolution?.width / renderer.width || 8
   const cellHeight = renderer.resolution?.height / renderer.height || 16
-  const maxWidth = Math.min(1280, Math.max(2, columns * (protocol === "blocks" ? 4 : cellWidth)))
-  const maxHeight = Math.min(1280, Math.max(2, rows * (protocol === "blocks" ? 8 : cellHeight)))
-  const scale = Math.min(1, maxWidth / width, maxHeight / height, Math.sqrt(921600 / (width * height)))
+  const maxWidth = Math.min(1920, Math.max(2, columns * (protocol === "blocks" ? 4 : cellWidth)))
+  const maxHeight = Math.min(1920, Math.max(2, rows * (protocol === "blocks" ? 8 : cellHeight)))
+  const scale = Math.min(1, maxWidth / width, maxHeight / height, Math.sqrt(2073600 / (width * height)))
   return { width: Math.max(2, Math.floor(width * scale / 2) * 2), height: Math.max(2, Math.floor(height * scale / 2) * 2) }
 }
 

@@ -747,8 +747,8 @@ var require_helpers = __commonJS({
     function req(url, opts = {}) {
       const href = typeof url === "string" ? url : url.href;
       const req2 = (href.startsWith("https:") ? https2 : http2).request(url, opts);
-      const promise = new Promise((resolve4, reject) => {
-        req2.once("response", resolve4).once("error", reject).end();
+      const promise = new Promise((resolve5, reject) => {
+        req2.once("response", resolve5).once("error", reject).end();
       });
       req2.then = promise.then.bind(promise);
       return req2;
@@ -925,7 +925,7 @@ var require_parse_proxy_response = __commonJS({
     var debug_1 = __importDefault(require_src());
     var debug = (0, debug_1.default)("https-proxy-agent:parse-proxy-response");
     function parseProxyResponse(socket) {
-      return new Promise((resolve4, reject) => {
+      return new Promise((resolve5, reject) => {
         let buffersLength = 0;
         const buffers = [];
         function read() {
@@ -991,7 +991,7 @@ var require_parse_proxy_response = __commonJS({
           }
           debug("got proxy server response: %o %o", firstLine, headers);
           cleanup();
-          resolve4({
+          resolve5({
             connect: {
               statusCode,
               statusText,
@@ -1159,34 +1159,1842 @@ var require_dist2 = __commonJS({
   }
 });
 
+// node_modules/qrcode/lib/core/utils.js
+var require_utils = __commonJS({
+  "node_modules/qrcode/lib/core/utils.js"(exports) {
+    var toSJISFunction;
+    var CODEWORDS_COUNT = [
+      0,
+      // Not used
+      26,
+      44,
+      70,
+      100,
+      134,
+      172,
+      196,
+      242,
+      292,
+      346,
+      404,
+      466,
+      532,
+      581,
+      655,
+      733,
+      815,
+      901,
+      991,
+      1085,
+      1156,
+      1258,
+      1364,
+      1474,
+      1588,
+      1706,
+      1828,
+      1921,
+      2051,
+      2185,
+      2323,
+      2465,
+      2611,
+      2761,
+      2876,
+      3034,
+      3196,
+      3362,
+      3532,
+      3706
+    ];
+    exports.getSymbolSize = function getSymbolSize(version) {
+      if (!version) throw new Error('"version" cannot be null or undefined');
+      if (version < 1 || version > 40) throw new Error('"version" should be in range from 1 to 40');
+      return version * 4 + 17;
+    };
+    exports.getSymbolTotalCodewords = function getSymbolTotalCodewords(version) {
+      return CODEWORDS_COUNT[version];
+    };
+    exports.getBCHDigit = function(data) {
+      let digit = 0;
+      while (data !== 0) {
+        digit++;
+        data >>>= 1;
+      }
+      return digit;
+    };
+    exports.setToSJISFunction = function setToSJISFunction(f) {
+      if (typeof f !== "function") {
+        throw new Error('"toSJISFunc" is not a valid function.');
+      }
+      toSJISFunction = f;
+    };
+    exports.isKanjiModeEnabled = function() {
+      return typeof toSJISFunction !== "undefined";
+    };
+    exports.toSJIS = function toSJIS(kanji) {
+      return toSJISFunction(kanji);
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/error-correction-level.js
+var require_error_correction_level = __commonJS({
+  "node_modules/qrcode/lib/core/error-correction-level.js"(exports) {
+    exports.L = { bit: 1 };
+    exports.M = { bit: 0 };
+    exports.Q = { bit: 3 };
+    exports.H = { bit: 2 };
+    function fromString(string) {
+      if (typeof string !== "string") {
+        throw new Error("Param is not a string");
+      }
+      const lcStr = string.toLowerCase();
+      switch (lcStr) {
+        case "l":
+        case "low":
+          return exports.L;
+        case "m":
+        case "medium":
+          return exports.M;
+        case "q":
+        case "quartile":
+          return exports.Q;
+        case "h":
+        case "high":
+          return exports.H;
+        default:
+          throw new Error("Unknown EC Level: " + string);
+      }
+    }
+    exports.isValid = function isValid(level) {
+      return level && typeof level.bit !== "undefined" && level.bit >= 0 && level.bit < 4;
+    };
+    exports.from = function from(value, defaultValue) {
+      if (exports.isValid(value)) {
+        return value;
+      }
+      try {
+        return fromString(value);
+      } catch (e) {
+        return defaultValue;
+      }
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/bit-buffer.js
+var require_bit_buffer = __commonJS({
+  "node_modules/qrcode/lib/core/bit-buffer.js"(exports, module) {
+    function BitBuffer() {
+      this.buffer = [];
+      this.length = 0;
+    }
+    BitBuffer.prototype = {
+      get: function(index) {
+        const bufIndex = Math.floor(index / 8);
+        return (this.buffer[bufIndex] >>> 7 - index % 8 & 1) === 1;
+      },
+      put: function(num, length) {
+        for (let i = 0; i < length; i++) {
+          this.putBit((num >>> length - i - 1 & 1) === 1);
+        }
+      },
+      getLengthInBits: function() {
+        return this.length;
+      },
+      putBit: function(bit) {
+        const bufIndex = Math.floor(this.length / 8);
+        if (this.buffer.length <= bufIndex) {
+          this.buffer.push(0);
+        }
+        if (bit) {
+          this.buffer[bufIndex] |= 128 >>> this.length % 8;
+        }
+        this.length++;
+      }
+    };
+    module.exports = BitBuffer;
+  }
+});
+
+// node_modules/qrcode/lib/core/bit-matrix.js
+var require_bit_matrix = __commonJS({
+  "node_modules/qrcode/lib/core/bit-matrix.js"(exports, module) {
+    function BitMatrix(size) {
+      if (!size || size < 1) {
+        throw new Error("BitMatrix size must be defined and greater than 0");
+      }
+      this.size = size;
+      this.data = new Uint8Array(size * size);
+      this.reservedBit = new Uint8Array(size * size);
+    }
+    BitMatrix.prototype.set = function(row, col, value, reserved) {
+      const index = row * this.size + col;
+      this.data[index] = value;
+      if (reserved) this.reservedBit[index] = true;
+    };
+    BitMatrix.prototype.get = function(row, col) {
+      return this.data[row * this.size + col];
+    };
+    BitMatrix.prototype.xor = function(row, col, value) {
+      this.data[row * this.size + col] ^= value;
+    };
+    BitMatrix.prototype.isReserved = function(row, col) {
+      return this.reservedBit[row * this.size + col];
+    };
+    module.exports = BitMatrix;
+  }
+});
+
+// node_modules/qrcode/lib/core/alignment-pattern.js
+var require_alignment_pattern = __commonJS({
+  "node_modules/qrcode/lib/core/alignment-pattern.js"(exports) {
+    var getSymbolSize = require_utils().getSymbolSize;
+    exports.getRowColCoords = function getRowColCoords(version) {
+      if (version === 1) return [];
+      const posCount = Math.floor(version / 7) + 2;
+      const size = getSymbolSize(version);
+      const intervals = size === 145 ? 26 : Math.ceil((size - 13) / (2 * posCount - 2)) * 2;
+      const positions = [size - 7];
+      for (let i = 1; i < posCount - 1; i++) {
+        positions[i] = positions[i - 1] - intervals;
+      }
+      positions.push(6);
+      return positions.reverse();
+    };
+    exports.getPositions = function getPositions(version) {
+      const coords = [];
+      const pos = exports.getRowColCoords(version);
+      const posLength = pos.length;
+      for (let i = 0; i < posLength; i++) {
+        for (let j = 0; j < posLength; j++) {
+          if (i === 0 && j === 0 || // top-left
+          i === 0 && j === posLength - 1 || // bottom-left
+          i === posLength - 1 && j === 0) {
+            continue;
+          }
+          coords.push([pos[i], pos[j]]);
+        }
+      }
+      return coords;
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/finder-pattern.js
+var require_finder_pattern = __commonJS({
+  "node_modules/qrcode/lib/core/finder-pattern.js"(exports) {
+    var getSymbolSize = require_utils().getSymbolSize;
+    var FINDER_PATTERN_SIZE = 7;
+    exports.getPositions = function getPositions(version) {
+      const size = getSymbolSize(version);
+      return [
+        // top-left
+        [0, 0],
+        // top-right
+        [size - FINDER_PATTERN_SIZE, 0],
+        // bottom-left
+        [0, size - FINDER_PATTERN_SIZE]
+      ];
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/mask-pattern.js
+var require_mask_pattern = __commonJS({
+  "node_modules/qrcode/lib/core/mask-pattern.js"(exports) {
+    exports.Patterns = {
+      PATTERN000: 0,
+      PATTERN001: 1,
+      PATTERN010: 2,
+      PATTERN011: 3,
+      PATTERN100: 4,
+      PATTERN101: 5,
+      PATTERN110: 6,
+      PATTERN111: 7
+    };
+    var PenaltyScores = {
+      N1: 3,
+      N2: 3,
+      N3: 40,
+      N4: 10
+    };
+    exports.isValid = function isValid(mask) {
+      return mask != null && mask !== "" && !isNaN(mask) && mask >= 0 && mask <= 7;
+    };
+    exports.from = function from(value) {
+      return exports.isValid(value) ? parseInt(value, 10) : void 0;
+    };
+    exports.getPenaltyN1 = function getPenaltyN1(data) {
+      const size = data.size;
+      let points = 0;
+      let sameCountCol = 0;
+      let sameCountRow = 0;
+      let lastCol = null;
+      let lastRow = null;
+      for (let row = 0; row < size; row++) {
+        sameCountCol = sameCountRow = 0;
+        lastCol = lastRow = null;
+        for (let col = 0; col < size; col++) {
+          let module2 = data.get(row, col);
+          if (module2 === lastCol) {
+            sameCountCol++;
+          } else {
+            if (sameCountCol >= 5) points += PenaltyScores.N1 + (sameCountCol - 5);
+            lastCol = module2;
+            sameCountCol = 1;
+          }
+          module2 = data.get(col, row);
+          if (module2 === lastRow) {
+            sameCountRow++;
+          } else {
+            if (sameCountRow >= 5) points += PenaltyScores.N1 + (sameCountRow - 5);
+            lastRow = module2;
+            sameCountRow = 1;
+          }
+        }
+        if (sameCountCol >= 5) points += PenaltyScores.N1 + (sameCountCol - 5);
+        if (sameCountRow >= 5) points += PenaltyScores.N1 + (sameCountRow - 5);
+      }
+      return points;
+    };
+    exports.getPenaltyN2 = function getPenaltyN2(data) {
+      const size = data.size;
+      let points = 0;
+      for (let row = 0; row < size - 1; row++) {
+        for (let col = 0; col < size - 1; col++) {
+          const last = data.get(row, col) + data.get(row, col + 1) + data.get(row + 1, col) + data.get(row + 1, col + 1);
+          if (last === 4 || last === 0) points++;
+        }
+      }
+      return points * PenaltyScores.N2;
+    };
+    exports.getPenaltyN3 = function getPenaltyN3(data) {
+      const size = data.size;
+      let points = 0;
+      let bitsCol = 0;
+      let bitsRow = 0;
+      for (let row = 0; row < size; row++) {
+        bitsCol = bitsRow = 0;
+        for (let col = 0; col < size; col++) {
+          bitsCol = bitsCol << 1 & 2047 | data.get(row, col);
+          if (col >= 10 && (bitsCol === 1488 || bitsCol === 93)) points++;
+          bitsRow = bitsRow << 1 & 2047 | data.get(col, row);
+          if (col >= 10 && (bitsRow === 1488 || bitsRow === 93)) points++;
+        }
+      }
+      return points * PenaltyScores.N3;
+    };
+    exports.getPenaltyN4 = function getPenaltyN4(data) {
+      let darkCount = 0;
+      const modulesCount = data.data.length;
+      for (let i = 0; i < modulesCount; i++) darkCount += data.data[i];
+      const k = Math.abs(Math.ceil(darkCount * 100 / modulesCount / 5) - 10);
+      return k * PenaltyScores.N4;
+    };
+    function getMaskAt(maskPattern, i, j) {
+      switch (maskPattern) {
+        case exports.Patterns.PATTERN000:
+          return (i + j) % 2 === 0;
+        case exports.Patterns.PATTERN001:
+          return i % 2 === 0;
+        case exports.Patterns.PATTERN010:
+          return j % 3 === 0;
+        case exports.Patterns.PATTERN011:
+          return (i + j) % 3 === 0;
+        case exports.Patterns.PATTERN100:
+          return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0;
+        case exports.Patterns.PATTERN101:
+          return i * j % 2 + i * j % 3 === 0;
+        case exports.Patterns.PATTERN110:
+          return (i * j % 2 + i * j % 3) % 2 === 0;
+        case exports.Patterns.PATTERN111:
+          return (i * j % 3 + (i + j) % 2) % 2 === 0;
+        default:
+          throw new Error("bad maskPattern:" + maskPattern);
+      }
+    }
+    exports.applyMask = function applyMask(pattern2, data) {
+      const size = data.size;
+      for (let col = 0; col < size; col++) {
+        for (let row = 0; row < size; row++) {
+          if (data.isReserved(row, col)) continue;
+          data.xor(row, col, getMaskAt(pattern2, row, col));
+        }
+      }
+    };
+    exports.getBestMask = function getBestMask(data, setupFormatFunc) {
+      const numPatterns = Object.keys(exports.Patterns).length;
+      let bestPattern = 0;
+      let lowerPenalty = Infinity;
+      for (let p = 0; p < numPatterns; p++) {
+        setupFormatFunc(p);
+        exports.applyMask(p, data);
+        const penalty = exports.getPenaltyN1(data) + exports.getPenaltyN2(data) + exports.getPenaltyN3(data) + exports.getPenaltyN4(data);
+        exports.applyMask(p, data);
+        if (penalty < lowerPenalty) {
+          lowerPenalty = penalty;
+          bestPattern = p;
+        }
+      }
+      return bestPattern;
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/error-correction-code.js
+var require_error_correction_code = __commonJS({
+  "node_modules/qrcode/lib/core/error-correction-code.js"(exports) {
+    var ECLevel = require_error_correction_level();
+    var EC_BLOCKS_TABLE = [
+      // L  M  Q  H
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      2,
+      2,
+      1,
+      2,
+      2,
+      4,
+      1,
+      2,
+      4,
+      4,
+      2,
+      4,
+      4,
+      4,
+      2,
+      4,
+      6,
+      5,
+      2,
+      4,
+      6,
+      6,
+      2,
+      5,
+      8,
+      8,
+      4,
+      5,
+      8,
+      8,
+      4,
+      5,
+      8,
+      11,
+      4,
+      8,
+      10,
+      11,
+      4,
+      9,
+      12,
+      16,
+      4,
+      9,
+      16,
+      16,
+      6,
+      10,
+      12,
+      18,
+      6,
+      10,
+      17,
+      16,
+      6,
+      11,
+      16,
+      19,
+      6,
+      13,
+      18,
+      21,
+      7,
+      14,
+      21,
+      25,
+      8,
+      16,
+      20,
+      25,
+      8,
+      17,
+      23,
+      25,
+      9,
+      17,
+      23,
+      34,
+      9,
+      18,
+      25,
+      30,
+      10,
+      20,
+      27,
+      32,
+      12,
+      21,
+      29,
+      35,
+      12,
+      23,
+      34,
+      37,
+      12,
+      25,
+      34,
+      40,
+      13,
+      26,
+      35,
+      42,
+      14,
+      28,
+      38,
+      45,
+      15,
+      29,
+      40,
+      48,
+      16,
+      31,
+      43,
+      51,
+      17,
+      33,
+      45,
+      54,
+      18,
+      35,
+      48,
+      57,
+      19,
+      37,
+      51,
+      60,
+      19,
+      38,
+      53,
+      63,
+      20,
+      40,
+      56,
+      66,
+      21,
+      43,
+      59,
+      70,
+      22,
+      45,
+      62,
+      74,
+      24,
+      47,
+      65,
+      77,
+      25,
+      49,
+      68,
+      81
+    ];
+    var EC_CODEWORDS_TABLE = [
+      // L  M  Q  H
+      7,
+      10,
+      13,
+      17,
+      10,
+      16,
+      22,
+      28,
+      15,
+      26,
+      36,
+      44,
+      20,
+      36,
+      52,
+      64,
+      26,
+      48,
+      72,
+      88,
+      36,
+      64,
+      96,
+      112,
+      40,
+      72,
+      108,
+      130,
+      48,
+      88,
+      132,
+      156,
+      60,
+      110,
+      160,
+      192,
+      72,
+      130,
+      192,
+      224,
+      80,
+      150,
+      224,
+      264,
+      96,
+      176,
+      260,
+      308,
+      104,
+      198,
+      288,
+      352,
+      120,
+      216,
+      320,
+      384,
+      132,
+      240,
+      360,
+      432,
+      144,
+      280,
+      408,
+      480,
+      168,
+      308,
+      448,
+      532,
+      180,
+      338,
+      504,
+      588,
+      196,
+      364,
+      546,
+      650,
+      224,
+      416,
+      600,
+      700,
+      224,
+      442,
+      644,
+      750,
+      252,
+      476,
+      690,
+      816,
+      270,
+      504,
+      750,
+      900,
+      300,
+      560,
+      810,
+      960,
+      312,
+      588,
+      870,
+      1050,
+      336,
+      644,
+      952,
+      1110,
+      360,
+      700,
+      1020,
+      1200,
+      390,
+      728,
+      1050,
+      1260,
+      420,
+      784,
+      1140,
+      1350,
+      450,
+      812,
+      1200,
+      1440,
+      480,
+      868,
+      1290,
+      1530,
+      510,
+      924,
+      1350,
+      1620,
+      540,
+      980,
+      1440,
+      1710,
+      570,
+      1036,
+      1530,
+      1800,
+      570,
+      1064,
+      1590,
+      1890,
+      600,
+      1120,
+      1680,
+      1980,
+      630,
+      1204,
+      1770,
+      2100,
+      660,
+      1260,
+      1860,
+      2220,
+      720,
+      1316,
+      1950,
+      2310,
+      750,
+      1372,
+      2040,
+      2430
+    ];
+    exports.getBlocksCount = function getBlocksCount(version, errorCorrectionLevel) {
+      switch (errorCorrectionLevel) {
+        case ECLevel.L:
+          return EC_BLOCKS_TABLE[(version - 1) * 4 + 0];
+        case ECLevel.M:
+          return EC_BLOCKS_TABLE[(version - 1) * 4 + 1];
+        case ECLevel.Q:
+          return EC_BLOCKS_TABLE[(version - 1) * 4 + 2];
+        case ECLevel.H:
+          return EC_BLOCKS_TABLE[(version - 1) * 4 + 3];
+        default:
+          return void 0;
+      }
+    };
+    exports.getTotalCodewordsCount = function getTotalCodewordsCount(version, errorCorrectionLevel) {
+      switch (errorCorrectionLevel) {
+        case ECLevel.L:
+          return EC_CODEWORDS_TABLE[(version - 1) * 4 + 0];
+        case ECLevel.M:
+          return EC_CODEWORDS_TABLE[(version - 1) * 4 + 1];
+        case ECLevel.Q:
+          return EC_CODEWORDS_TABLE[(version - 1) * 4 + 2];
+        case ECLevel.H:
+          return EC_CODEWORDS_TABLE[(version - 1) * 4 + 3];
+        default:
+          return void 0;
+      }
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/galois-field.js
+var require_galois_field = __commonJS({
+  "node_modules/qrcode/lib/core/galois-field.js"(exports) {
+    var EXP_TABLE = new Uint8Array(512);
+    var LOG_TABLE = new Uint8Array(256);
+    (function initTables() {
+      let x = 1;
+      for (let i = 0; i < 255; i++) {
+        EXP_TABLE[i] = x;
+        LOG_TABLE[x] = i;
+        x <<= 1;
+        if (x & 256) {
+          x ^= 285;
+        }
+      }
+      for (let i = 255; i < 512; i++) {
+        EXP_TABLE[i] = EXP_TABLE[i - 255];
+      }
+    })();
+    exports.log = function log(n) {
+      if (n < 1) throw new Error("log(" + n + ")");
+      return LOG_TABLE[n];
+    };
+    exports.exp = function exp(n) {
+      return EXP_TABLE[n];
+    };
+    exports.mul = function mul(x, y) {
+      if (x === 0 || y === 0) return 0;
+      return EXP_TABLE[LOG_TABLE[x] + LOG_TABLE[y]];
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/polynomial.js
+var require_polynomial = __commonJS({
+  "node_modules/qrcode/lib/core/polynomial.js"(exports) {
+    var GF = require_galois_field();
+    exports.mul = function mul(p1, p2) {
+      const coeff = new Uint8Array(p1.length + p2.length - 1);
+      for (let i = 0; i < p1.length; i++) {
+        for (let j = 0; j < p2.length; j++) {
+          coeff[i + j] ^= GF.mul(p1[i], p2[j]);
+        }
+      }
+      return coeff;
+    };
+    exports.mod = function mod(divident, divisor) {
+      let result = new Uint8Array(divident);
+      while (result.length - divisor.length >= 0) {
+        const coeff = result[0];
+        for (let i = 0; i < divisor.length; i++) {
+          result[i] ^= GF.mul(divisor[i], coeff);
+        }
+        let offset = 0;
+        while (offset < result.length && result[offset] === 0) offset++;
+        result = result.slice(offset);
+      }
+      return result;
+    };
+    exports.generateECPolynomial = function generateECPolynomial(degree) {
+      let poly = new Uint8Array([1]);
+      for (let i = 0; i < degree; i++) {
+        poly = exports.mul(poly, new Uint8Array([1, GF.exp(i)]));
+      }
+      return poly;
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/reed-solomon-encoder.js
+var require_reed_solomon_encoder = __commonJS({
+  "node_modules/qrcode/lib/core/reed-solomon-encoder.js"(exports, module) {
+    var Polynomial = require_polynomial();
+    function ReedSolomonEncoder(degree) {
+      this.genPoly = void 0;
+      this.degree = degree;
+      if (this.degree) this.initialize(this.degree);
+    }
+    ReedSolomonEncoder.prototype.initialize = function initialize(degree) {
+      this.degree = degree;
+      this.genPoly = Polynomial.generateECPolynomial(this.degree);
+    };
+    ReedSolomonEncoder.prototype.encode = function encode(data) {
+      if (!this.genPoly) {
+        throw new Error("Encoder not initialized");
+      }
+      const paddedData = new Uint8Array(data.length + this.degree);
+      paddedData.set(data);
+      const remainder = Polynomial.mod(paddedData, this.genPoly);
+      const start = this.degree - remainder.length;
+      if (start > 0) {
+        const buff = new Uint8Array(this.degree);
+        buff.set(remainder, start);
+        return buff;
+      }
+      return remainder;
+    };
+    module.exports = ReedSolomonEncoder;
+  }
+});
+
+// node_modules/qrcode/lib/core/version-check.js
+var require_version_check = __commonJS({
+  "node_modules/qrcode/lib/core/version-check.js"(exports) {
+    exports.isValid = function isValid(version) {
+      return !isNaN(version) && version >= 1 && version <= 40;
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/regex.js
+var require_regex = __commonJS({
+  "node_modules/qrcode/lib/core/regex.js"(exports) {
+    var numeric = "[0-9]+";
+    var alphanumeric = "[A-Z $%*+\\-./:]+";
+    var kanji = "(?:[u3000-u303F]|[u3040-u309F]|[u30A0-u30FF]|[uFF00-uFFEF]|[u4E00-u9FAF]|[u2605-u2606]|[u2190-u2195]|u203B|[u2010u2015u2018u2019u2025u2026u201Cu201Du2225u2260]|[u0391-u0451]|[u00A7u00A8u00B1u00B4u00D7u00F7])+";
+    kanji = kanji.replace(/u/g, "\\u");
+    var byte = "(?:(?![A-Z0-9 $%*+\\-./:]|" + kanji + ")(?:.|[\r\n]))+";
+    exports.KANJI = new RegExp(kanji, "g");
+    exports.BYTE_KANJI = new RegExp("[^A-Z0-9 $%*+\\-./:]+", "g");
+    exports.BYTE = new RegExp(byte, "g");
+    exports.NUMERIC = new RegExp(numeric, "g");
+    exports.ALPHANUMERIC = new RegExp(alphanumeric, "g");
+    var TEST_KANJI = new RegExp("^" + kanji + "$");
+    var TEST_NUMERIC = new RegExp("^" + numeric + "$");
+    var TEST_ALPHANUMERIC = new RegExp("^[A-Z0-9 $%*+\\-./:]+$");
+    exports.testKanji = function testKanji(str) {
+      return TEST_KANJI.test(str);
+    };
+    exports.testNumeric = function testNumeric(str) {
+      return TEST_NUMERIC.test(str);
+    };
+    exports.testAlphanumeric = function testAlphanumeric(str) {
+      return TEST_ALPHANUMERIC.test(str);
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/mode.js
+var require_mode = __commonJS({
+  "node_modules/qrcode/lib/core/mode.js"(exports) {
+    var VersionCheck = require_version_check();
+    var Regex = require_regex();
+    exports.NUMERIC = {
+      id: "Numeric",
+      bit: 1 << 0,
+      ccBits: [10, 12, 14]
+    };
+    exports.ALPHANUMERIC = {
+      id: "Alphanumeric",
+      bit: 1 << 1,
+      ccBits: [9, 11, 13]
+    };
+    exports.BYTE = {
+      id: "Byte",
+      bit: 1 << 2,
+      ccBits: [8, 16, 16]
+    };
+    exports.KANJI = {
+      id: "Kanji",
+      bit: 1 << 3,
+      ccBits: [8, 10, 12]
+    };
+    exports.MIXED = {
+      bit: -1
+    };
+    exports.getCharCountIndicator = function getCharCountIndicator(mode, version) {
+      if (!mode.ccBits) throw new Error("Invalid mode: " + mode);
+      if (!VersionCheck.isValid(version)) {
+        throw new Error("Invalid version: " + version);
+      }
+      if (version >= 1 && version < 10) return mode.ccBits[0];
+      else if (version < 27) return mode.ccBits[1];
+      return mode.ccBits[2];
+    };
+    exports.getBestModeForData = function getBestModeForData(dataStr) {
+      if (Regex.testNumeric(dataStr)) return exports.NUMERIC;
+      else if (Regex.testAlphanumeric(dataStr)) return exports.ALPHANUMERIC;
+      else if (Regex.testKanji(dataStr)) return exports.KANJI;
+      else return exports.BYTE;
+    };
+    exports.toString = function toString(mode) {
+      if (mode && mode.id) return mode.id;
+      throw new Error("Invalid mode");
+    };
+    exports.isValid = function isValid(mode) {
+      return mode && mode.bit && mode.ccBits;
+    };
+    function fromString(string) {
+      if (typeof string !== "string") {
+        throw new Error("Param is not a string");
+      }
+      const lcStr = string.toLowerCase();
+      switch (lcStr) {
+        case "numeric":
+          return exports.NUMERIC;
+        case "alphanumeric":
+          return exports.ALPHANUMERIC;
+        case "kanji":
+          return exports.KANJI;
+        case "byte":
+          return exports.BYTE;
+        default:
+          throw new Error("Unknown mode: " + string);
+      }
+    }
+    exports.from = function from(value, defaultValue) {
+      if (exports.isValid(value)) {
+        return value;
+      }
+      try {
+        return fromString(value);
+      } catch (e) {
+        return defaultValue;
+      }
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/version.js
+var require_version = __commonJS({
+  "node_modules/qrcode/lib/core/version.js"(exports) {
+    var Utils = require_utils();
+    var ECCode = require_error_correction_code();
+    var ECLevel = require_error_correction_level();
+    var Mode = require_mode();
+    var VersionCheck = require_version_check();
+    var G18 = 1 << 12 | 1 << 11 | 1 << 10 | 1 << 9 | 1 << 8 | 1 << 5 | 1 << 2 | 1 << 0;
+    var G18_BCH = Utils.getBCHDigit(G18);
+    function getBestVersionForDataLength(mode, length, errorCorrectionLevel) {
+      for (let currentVersion = 1; currentVersion <= 40; currentVersion++) {
+        if (length <= exports.getCapacity(currentVersion, errorCorrectionLevel, mode)) {
+          return currentVersion;
+        }
+      }
+      return void 0;
+    }
+    function getReservedBitsCount(mode, version) {
+      return Mode.getCharCountIndicator(mode, version) + 4;
+    }
+    function getTotalBitsFromDataArray(segments, version) {
+      let totalBits = 0;
+      segments.forEach(function(data) {
+        const reservedBits = getReservedBitsCount(data.mode, version);
+        totalBits += reservedBits + data.getBitsLength();
+      });
+      return totalBits;
+    }
+    function getBestVersionForMixedData(segments, errorCorrectionLevel) {
+      for (let currentVersion = 1; currentVersion <= 40; currentVersion++) {
+        const length = getTotalBitsFromDataArray(segments, currentVersion);
+        if (length <= exports.getCapacity(currentVersion, errorCorrectionLevel, Mode.MIXED)) {
+          return currentVersion;
+        }
+      }
+      return void 0;
+    }
+    exports.from = function from(value, defaultValue) {
+      if (VersionCheck.isValid(value)) {
+        return parseInt(value, 10);
+      }
+      return defaultValue;
+    };
+    exports.getCapacity = function getCapacity(version, errorCorrectionLevel, mode) {
+      if (!VersionCheck.isValid(version)) {
+        throw new Error("Invalid QR Code version");
+      }
+      if (typeof mode === "undefined") mode = Mode.BYTE;
+      const totalCodewords = Utils.getSymbolTotalCodewords(version);
+      const ecTotalCodewords = ECCode.getTotalCodewordsCount(version, errorCorrectionLevel);
+      const dataTotalCodewordsBits = (totalCodewords - ecTotalCodewords) * 8;
+      if (mode === Mode.MIXED) return dataTotalCodewordsBits;
+      const usableBits = dataTotalCodewordsBits - getReservedBitsCount(mode, version);
+      switch (mode) {
+        case Mode.NUMERIC:
+          return Math.floor(usableBits / 10 * 3);
+        case Mode.ALPHANUMERIC:
+          return Math.floor(usableBits / 11 * 2);
+        case Mode.KANJI:
+          return Math.floor(usableBits / 13);
+        case Mode.BYTE:
+        default:
+          return Math.floor(usableBits / 8);
+      }
+    };
+    exports.getBestVersionForData = function getBestVersionForData(data, errorCorrectionLevel) {
+      let seg;
+      const ecl = ECLevel.from(errorCorrectionLevel, ECLevel.M);
+      if (Array.isArray(data)) {
+        if (data.length > 1) {
+          return getBestVersionForMixedData(data, ecl);
+        }
+        if (data.length === 0) {
+          return 1;
+        }
+        seg = data[0];
+      } else {
+        seg = data;
+      }
+      return getBestVersionForDataLength(seg.mode, seg.getLength(), ecl);
+    };
+    exports.getEncodedBits = function getEncodedBits(version) {
+      if (!VersionCheck.isValid(version) || version < 7) {
+        throw new Error("Invalid QR Code version");
+      }
+      let d = version << 12;
+      while (Utils.getBCHDigit(d) - G18_BCH >= 0) {
+        d ^= G18 << Utils.getBCHDigit(d) - G18_BCH;
+      }
+      return version << 12 | d;
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/format-info.js
+var require_format_info = __commonJS({
+  "node_modules/qrcode/lib/core/format-info.js"(exports) {
+    var Utils = require_utils();
+    var G15 = 1 << 10 | 1 << 8 | 1 << 5 | 1 << 4 | 1 << 2 | 1 << 1 | 1 << 0;
+    var G15_MASK = 1 << 14 | 1 << 12 | 1 << 10 | 1 << 4 | 1 << 1;
+    var G15_BCH = Utils.getBCHDigit(G15);
+    exports.getEncodedBits = function getEncodedBits(errorCorrectionLevel, mask) {
+      const data = errorCorrectionLevel.bit << 3 | mask;
+      let d = data << 10;
+      while (Utils.getBCHDigit(d) - G15_BCH >= 0) {
+        d ^= G15 << Utils.getBCHDigit(d) - G15_BCH;
+      }
+      return (data << 10 | d) ^ G15_MASK;
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/numeric-data.js
+var require_numeric_data = __commonJS({
+  "node_modules/qrcode/lib/core/numeric-data.js"(exports, module) {
+    var Mode = require_mode();
+    function NumericData(data) {
+      this.mode = Mode.NUMERIC;
+      this.data = data.toString();
+    }
+    NumericData.getBitsLength = function getBitsLength(length) {
+      return 10 * Math.floor(length / 3) + (length % 3 ? length % 3 * 3 + 1 : 0);
+    };
+    NumericData.prototype.getLength = function getLength() {
+      return this.data.length;
+    };
+    NumericData.prototype.getBitsLength = function getBitsLength() {
+      return NumericData.getBitsLength(this.data.length);
+    };
+    NumericData.prototype.write = function write(bitBuffer) {
+      let i, group, value;
+      for (i = 0; i + 3 <= this.data.length; i += 3) {
+        group = this.data.substr(i, 3);
+        value = parseInt(group, 10);
+        bitBuffer.put(value, 10);
+      }
+      const remainingNum = this.data.length - i;
+      if (remainingNum > 0) {
+        group = this.data.substr(i);
+        value = parseInt(group, 10);
+        bitBuffer.put(value, remainingNum * 3 + 1);
+      }
+    };
+    module.exports = NumericData;
+  }
+});
+
+// node_modules/qrcode/lib/core/alphanumeric-data.js
+var require_alphanumeric_data = __commonJS({
+  "node_modules/qrcode/lib/core/alphanumeric-data.js"(exports, module) {
+    var Mode = require_mode();
+    var ALPHA_NUM_CHARS = [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J",
+      "K",
+      "L",
+      "M",
+      "N",
+      "O",
+      "P",
+      "Q",
+      "R",
+      "S",
+      "T",
+      "U",
+      "V",
+      "W",
+      "X",
+      "Y",
+      "Z",
+      " ",
+      "$",
+      "%",
+      "*",
+      "+",
+      "-",
+      ".",
+      "/",
+      ":"
+    ];
+    function AlphanumericData(data) {
+      this.mode = Mode.ALPHANUMERIC;
+      this.data = data;
+    }
+    AlphanumericData.getBitsLength = function getBitsLength(length) {
+      return 11 * Math.floor(length / 2) + 6 * (length % 2);
+    };
+    AlphanumericData.prototype.getLength = function getLength() {
+      return this.data.length;
+    };
+    AlphanumericData.prototype.getBitsLength = function getBitsLength() {
+      return AlphanumericData.getBitsLength(this.data.length);
+    };
+    AlphanumericData.prototype.write = function write(bitBuffer) {
+      let i;
+      for (i = 0; i + 2 <= this.data.length; i += 2) {
+        let value = ALPHA_NUM_CHARS.indexOf(this.data[i]) * 45;
+        value += ALPHA_NUM_CHARS.indexOf(this.data[i + 1]);
+        bitBuffer.put(value, 11);
+      }
+      if (this.data.length % 2) {
+        bitBuffer.put(ALPHA_NUM_CHARS.indexOf(this.data[i]), 6);
+      }
+    };
+    module.exports = AlphanumericData;
+  }
+});
+
+// node_modules/qrcode/lib/core/byte-data.js
+var require_byte_data = __commonJS({
+  "node_modules/qrcode/lib/core/byte-data.js"(exports, module) {
+    var Mode = require_mode();
+    function ByteData(data) {
+      this.mode = Mode.BYTE;
+      if (typeof data === "string") {
+        this.data = new TextEncoder().encode(data);
+      } else {
+        this.data = new Uint8Array(data);
+      }
+    }
+    ByteData.getBitsLength = function getBitsLength(length) {
+      return length * 8;
+    };
+    ByteData.prototype.getLength = function getLength() {
+      return this.data.length;
+    };
+    ByteData.prototype.getBitsLength = function getBitsLength() {
+      return ByteData.getBitsLength(this.data.length);
+    };
+    ByteData.prototype.write = function(bitBuffer) {
+      for (let i = 0, l = this.data.length; i < l; i++) {
+        bitBuffer.put(this.data[i], 8);
+      }
+    };
+    module.exports = ByteData;
+  }
+});
+
+// node_modules/qrcode/lib/core/kanji-data.js
+var require_kanji_data = __commonJS({
+  "node_modules/qrcode/lib/core/kanji-data.js"(exports, module) {
+    var Mode = require_mode();
+    var Utils = require_utils();
+    function KanjiData(data) {
+      this.mode = Mode.KANJI;
+      this.data = data;
+    }
+    KanjiData.getBitsLength = function getBitsLength(length) {
+      return length * 13;
+    };
+    KanjiData.prototype.getLength = function getLength() {
+      return this.data.length;
+    };
+    KanjiData.prototype.getBitsLength = function getBitsLength() {
+      return KanjiData.getBitsLength(this.data.length);
+    };
+    KanjiData.prototype.write = function(bitBuffer) {
+      let i;
+      for (i = 0; i < this.data.length; i++) {
+        let value = Utils.toSJIS(this.data[i]);
+        if (value >= 33088 && value <= 40956) {
+          value -= 33088;
+        } else if (value >= 57408 && value <= 60351) {
+          value -= 49472;
+        } else {
+          throw new Error(
+            "Invalid SJIS character: " + this.data[i] + "\nMake sure your charset is UTF-8"
+          );
+        }
+        value = (value >>> 8 & 255) * 192 + (value & 255);
+        bitBuffer.put(value, 13);
+      }
+    };
+    module.exports = KanjiData;
+  }
+});
+
+// node_modules/dijkstrajs/dijkstra.js
+var require_dijkstra = __commonJS({
+  "node_modules/dijkstrajs/dijkstra.js"(exports, module) {
+    "use strict";
+    var dijkstra = {
+      single_source_shortest_paths: function(graph, s, d) {
+        var predecessors = {};
+        var costs = {};
+        costs[s] = 0;
+        var open3 = dijkstra.PriorityQueue.make();
+        open3.push(s, 0);
+        var closest, u, v, cost_of_s_to_u, adjacent_nodes, cost_of_e, cost_of_s_to_u_plus_cost_of_e, cost_of_s_to_v, first_visit;
+        while (!open3.empty()) {
+          closest = open3.pop();
+          u = closest.value;
+          cost_of_s_to_u = closest.cost;
+          adjacent_nodes = graph[u] || {};
+          for (v in adjacent_nodes) {
+            if (adjacent_nodes.hasOwnProperty(v)) {
+              cost_of_e = adjacent_nodes[v];
+              cost_of_s_to_u_plus_cost_of_e = cost_of_s_to_u + cost_of_e;
+              cost_of_s_to_v = costs[v];
+              first_visit = typeof costs[v] === "undefined";
+              if (first_visit || cost_of_s_to_v > cost_of_s_to_u_plus_cost_of_e) {
+                costs[v] = cost_of_s_to_u_plus_cost_of_e;
+                open3.push(v, cost_of_s_to_u_plus_cost_of_e);
+                predecessors[v] = u;
+              }
+            }
+          }
+        }
+        if (typeof d !== "undefined" && typeof costs[d] === "undefined") {
+          var msg = ["Could not find a path from ", s, " to ", d, "."].join("");
+          throw new Error(msg);
+        }
+        return predecessors;
+      },
+      extract_shortest_path_from_predecessor_list: function(predecessors, d) {
+        var nodes = [];
+        var u = d;
+        var predecessor;
+        while (u) {
+          nodes.push(u);
+          predecessor = predecessors[u];
+          u = predecessors[u];
+        }
+        nodes.reverse();
+        return nodes;
+      },
+      find_path: function(graph, s, d) {
+        var predecessors = dijkstra.single_source_shortest_paths(graph, s, d);
+        return dijkstra.extract_shortest_path_from_predecessor_list(
+          predecessors,
+          d
+        );
+      },
+      /**
+       * A very naive priority queue implementation.
+       */
+      PriorityQueue: {
+        make: function(opts) {
+          var T = dijkstra.PriorityQueue, t = {}, key;
+          opts = opts || {};
+          for (key in T) {
+            if (T.hasOwnProperty(key)) {
+              t[key] = T[key];
+            }
+          }
+          t.queue = [];
+          t.sorter = opts.sorter || T.default_sorter;
+          return t;
+        },
+        default_sorter: function(a, b) {
+          return a.cost - b.cost;
+        },
+        /**
+         * Add a new item to the queue and ensure the highest priority element
+         * is at the front of the queue.
+         */
+        push: function(value, cost) {
+          var item = { value, cost };
+          this.queue.push(item);
+          this.queue.sort(this.sorter);
+        },
+        /**
+         * Return the highest priority element in the queue.
+         */
+        pop: function() {
+          return this.queue.shift();
+        },
+        empty: function() {
+          return this.queue.length === 0;
+        }
+      }
+    };
+    if (typeof module !== "undefined") {
+      module.exports = dijkstra;
+    }
+  }
+});
+
+// node_modules/qrcode/lib/core/segments.js
+var require_segments = __commonJS({
+  "node_modules/qrcode/lib/core/segments.js"(exports) {
+    var Mode = require_mode();
+    var NumericData = require_numeric_data();
+    var AlphanumericData = require_alphanumeric_data();
+    var ByteData = require_byte_data();
+    var KanjiData = require_kanji_data();
+    var Regex = require_regex();
+    var Utils = require_utils();
+    var dijkstra = require_dijkstra();
+    function getStringByteLength(str) {
+      return unescape(encodeURIComponent(str)).length;
+    }
+    function getSegments(regex2, mode, str) {
+      const segments = [];
+      let result;
+      while ((result = regex2.exec(str)) !== null) {
+        segments.push({
+          data: result[0],
+          index: result.index,
+          mode,
+          length: result[0].length
+        });
+      }
+      return segments;
+    }
+    function getSegmentsFromString(dataStr) {
+      const numSegs = getSegments(Regex.NUMERIC, Mode.NUMERIC, dataStr);
+      const alphaNumSegs = getSegments(Regex.ALPHANUMERIC, Mode.ALPHANUMERIC, dataStr);
+      let byteSegs;
+      let kanjiSegs;
+      if (Utils.isKanjiModeEnabled()) {
+        byteSegs = getSegments(Regex.BYTE, Mode.BYTE, dataStr);
+        kanjiSegs = getSegments(Regex.KANJI, Mode.KANJI, dataStr);
+      } else {
+        byteSegs = getSegments(Regex.BYTE_KANJI, Mode.BYTE, dataStr);
+        kanjiSegs = [];
+      }
+      const segs = numSegs.concat(alphaNumSegs, byteSegs, kanjiSegs);
+      return segs.sort(function(s1, s2) {
+        return s1.index - s2.index;
+      }).map(function(obj) {
+        return {
+          data: obj.data,
+          mode: obj.mode,
+          length: obj.length
+        };
+      });
+    }
+    function getSegmentBitsLength(length, mode) {
+      switch (mode) {
+        case Mode.NUMERIC:
+          return NumericData.getBitsLength(length);
+        case Mode.ALPHANUMERIC:
+          return AlphanumericData.getBitsLength(length);
+        case Mode.KANJI:
+          return KanjiData.getBitsLength(length);
+        case Mode.BYTE:
+          return ByteData.getBitsLength(length);
+      }
+    }
+    function mergeSegments(segs) {
+      return segs.reduce(function(acc, curr) {
+        const prevSeg = acc.length - 1 >= 0 ? acc[acc.length - 1] : null;
+        if (prevSeg && prevSeg.mode === curr.mode) {
+          acc[acc.length - 1].data += curr.data;
+          return acc;
+        }
+        acc.push(curr);
+        return acc;
+      }, []);
+    }
+    function buildNodes(segs) {
+      const nodes = [];
+      for (let i = 0; i < segs.length; i++) {
+        const seg = segs[i];
+        switch (seg.mode) {
+          case Mode.NUMERIC:
+            nodes.push([
+              seg,
+              { data: seg.data, mode: Mode.ALPHANUMERIC, length: seg.length },
+              { data: seg.data, mode: Mode.BYTE, length: seg.length }
+            ]);
+            break;
+          case Mode.ALPHANUMERIC:
+            nodes.push([
+              seg,
+              { data: seg.data, mode: Mode.BYTE, length: seg.length }
+            ]);
+            break;
+          case Mode.KANJI:
+            nodes.push([
+              seg,
+              { data: seg.data, mode: Mode.BYTE, length: getStringByteLength(seg.data) }
+            ]);
+            break;
+          case Mode.BYTE:
+            nodes.push([
+              { data: seg.data, mode: Mode.BYTE, length: getStringByteLength(seg.data) }
+            ]);
+        }
+      }
+      return nodes;
+    }
+    function buildGraph(nodes, version) {
+      const table = {};
+      const graph = { start: {} };
+      let prevNodeIds = ["start"];
+      for (let i = 0; i < nodes.length; i++) {
+        const nodeGroup = nodes[i];
+        const currentNodeIds = [];
+        for (let j = 0; j < nodeGroup.length; j++) {
+          const node = nodeGroup[j];
+          const key = "" + i + j;
+          currentNodeIds.push(key);
+          table[key] = { node, lastCount: 0 };
+          graph[key] = {};
+          for (let n = 0; n < prevNodeIds.length; n++) {
+            const prevNodeId = prevNodeIds[n];
+            if (table[prevNodeId] && table[prevNodeId].node.mode === node.mode) {
+              graph[prevNodeId][key] = getSegmentBitsLength(table[prevNodeId].lastCount + node.length, node.mode) - getSegmentBitsLength(table[prevNodeId].lastCount, node.mode);
+              table[prevNodeId].lastCount += node.length;
+            } else {
+              if (table[prevNodeId]) table[prevNodeId].lastCount = node.length;
+              graph[prevNodeId][key] = getSegmentBitsLength(node.length, node.mode) + 4 + Mode.getCharCountIndicator(node.mode, version);
+            }
+          }
+        }
+        prevNodeIds = currentNodeIds;
+      }
+      for (let n = 0; n < prevNodeIds.length; n++) {
+        graph[prevNodeIds[n]].end = 0;
+      }
+      return { map: graph, table };
+    }
+    function buildSingleSegment(data, modesHint) {
+      let mode;
+      const bestMode = Mode.getBestModeForData(data);
+      mode = Mode.from(modesHint, bestMode);
+      if (mode !== Mode.BYTE && mode.bit < bestMode.bit) {
+        throw new Error('"' + data + '" cannot be encoded with mode ' + Mode.toString(mode) + ".\n Suggested mode is: " + Mode.toString(bestMode));
+      }
+      if (mode === Mode.KANJI && !Utils.isKanjiModeEnabled()) {
+        mode = Mode.BYTE;
+      }
+      switch (mode) {
+        case Mode.NUMERIC:
+          return new NumericData(data);
+        case Mode.ALPHANUMERIC:
+          return new AlphanumericData(data);
+        case Mode.KANJI:
+          return new KanjiData(data);
+        case Mode.BYTE:
+          return new ByteData(data);
+      }
+    }
+    exports.fromArray = function fromArray(array) {
+      return array.reduce(function(acc, seg) {
+        if (typeof seg === "string") {
+          acc.push(buildSingleSegment(seg, null));
+        } else if (seg.data) {
+          acc.push(buildSingleSegment(seg.data, seg.mode));
+        }
+        return acc;
+      }, []);
+    };
+    exports.fromString = function fromString(data, version) {
+      const segs = getSegmentsFromString(data, Utils.isKanjiModeEnabled());
+      const nodes = buildNodes(segs);
+      const graph = buildGraph(nodes, version);
+      const path = dijkstra.find_path(graph.map, "start", "end");
+      const optimizedSegs = [];
+      for (let i = 1; i < path.length - 1; i++) {
+        optimizedSegs.push(graph.table[path[i]].node);
+      }
+      return exports.fromArray(mergeSegments(optimizedSegs));
+    };
+    exports.rawSplit = function rawSplit(data) {
+      return exports.fromArray(
+        getSegmentsFromString(data, Utils.isKanjiModeEnabled())
+      );
+    };
+  }
+});
+
+// node_modules/qrcode/lib/core/qrcode.js
+var require_qrcode = __commonJS({
+  "node_modules/qrcode/lib/core/qrcode.js"(exports) {
+    var Utils = require_utils();
+    var ECLevel = require_error_correction_level();
+    var BitBuffer = require_bit_buffer();
+    var BitMatrix = require_bit_matrix();
+    var AlignmentPattern = require_alignment_pattern();
+    var FinderPattern = require_finder_pattern();
+    var MaskPattern = require_mask_pattern();
+    var ECCode = require_error_correction_code();
+    var ReedSolomonEncoder = require_reed_solomon_encoder();
+    var Version = require_version();
+    var FormatInfo = require_format_info();
+    var Mode = require_mode();
+    var Segments = require_segments();
+    function setupFinderPattern(matrix, version) {
+      const size = matrix.size;
+      const pos = FinderPattern.getPositions(version);
+      for (let i = 0; i < pos.length; i++) {
+        const row = pos[i][0];
+        const col = pos[i][1];
+        for (let r = -1; r <= 7; r++) {
+          if (row + r <= -1 || size <= row + r) continue;
+          for (let c = -1; c <= 7; c++) {
+            if (col + c <= -1 || size <= col + c) continue;
+            if (r >= 0 && r <= 6 && (c === 0 || c === 6) || c >= 0 && c <= 6 && (r === 0 || r === 6) || r >= 2 && r <= 4 && c >= 2 && c <= 4) {
+              matrix.set(row + r, col + c, true, true);
+            } else {
+              matrix.set(row + r, col + c, false, true);
+            }
+          }
+        }
+      }
+    }
+    function setupTimingPattern(matrix) {
+      const size = matrix.size;
+      for (let r = 8; r < size - 8; r++) {
+        const value = r % 2 === 0;
+        matrix.set(r, 6, value, true);
+        matrix.set(6, r, value, true);
+      }
+    }
+    function setupAlignmentPattern(matrix, version) {
+      const pos = AlignmentPattern.getPositions(version);
+      for (let i = 0; i < pos.length; i++) {
+        const row = pos[i][0];
+        const col = pos[i][1];
+        for (let r = -2; r <= 2; r++) {
+          for (let c = -2; c <= 2; c++) {
+            if (r === -2 || r === 2 || c === -2 || c === 2 || r === 0 && c === 0) {
+              matrix.set(row + r, col + c, true, true);
+            } else {
+              matrix.set(row + r, col + c, false, true);
+            }
+          }
+        }
+      }
+    }
+    function setupVersionInfo(matrix, version) {
+      const size = matrix.size;
+      const bits = Version.getEncodedBits(version);
+      let row, col, mod;
+      for (let i = 0; i < 18; i++) {
+        row = Math.floor(i / 3);
+        col = i % 3 + size - 8 - 3;
+        mod = (bits >> i & 1) === 1;
+        matrix.set(row, col, mod, true);
+        matrix.set(col, row, mod, true);
+      }
+    }
+    function setupFormatInfo(matrix, errorCorrectionLevel, maskPattern) {
+      const size = matrix.size;
+      const bits = FormatInfo.getEncodedBits(errorCorrectionLevel, maskPattern);
+      let i, mod;
+      for (i = 0; i < 15; i++) {
+        mod = (bits >> i & 1) === 1;
+        if (i < 6) {
+          matrix.set(i, 8, mod, true);
+        } else if (i < 8) {
+          matrix.set(i + 1, 8, mod, true);
+        } else {
+          matrix.set(size - 15 + i, 8, mod, true);
+        }
+        if (i < 8) {
+          matrix.set(8, size - i - 1, mod, true);
+        } else if (i < 9) {
+          matrix.set(8, 15 - i - 1 + 1, mod, true);
+        } else {
+          matrix.set(8, 15 - i - 1, mod, true);
+        }
+      }
+      matrix.set(size - 8, 8, 1, true);
+    }
+    function setupData(matrix, data) {
+      const size = matrix.size;
+      let inc = -1;
+      let row = size - 1;
+      let bitIndex = 7;
+      let byteIndex = 0;
+      for (let col = size - 1; col > 0; col -= 2) {
+        if (col === 6) col--;
+        while (true) {
+          for (let c = 0; c < 2; c++) {
+            if (!matrix.isReserved(row, col - c)) {
+              let dark = false;
+              if (byteIndex < data.length) {
+                dark = (data[byteIndex] >>> bitIndex & 1) === 1;
+              }
+              matrix.set(row, col - c, dark);
+              bitIndex--;
+              if (bitIndex === -1) {
+                byteIndex++;
+                bitIndex = 7;
+              }
+            }
+          }
+          row += inc;
+          if (row < 0 || size <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    }
+    function createData(version, errorCorrectionLevel, segments) {
+      const buffer = new BitBuffer();
+      segments.forEach(function(data) {
+        buffer.put(data.mode.bit, 4);
+        buffer.put(data.getLength(), Mode.getCharCountIndicator(data.mode, version));
+        data.write(buffer);
+      });
+      const totalCodewords = Utils.getSymbolTotalCodewords(version);
+      const ecTotalCodewords = ECCode.getTotalCodewordsCount(version, errorCorrectionLevel);
+      const dataTotalCodewordsBits = (totalCodewords - ecTotalCodewords) * 8;
+      if (buffer.getLengthInBits() + 4 <= dataTotalCodewordsBits) {
+        buffer.put(0, 4);
+      }
+      while (buffer.getLengthInBits() % 8 !== 0) {
+        buffer.putBit(0);
+      }
+      const remainingByte = (dataTotalCodewordsBits - buffer.getLengthInBits()) / 8;
+      for (let i = 0; i < remainingByte; i++) {
+        buffer.put(i % 2 ? 17 : 236, 8);
+      }
+      return createCodewords(buffer, version, errorCorrectionLevel);
+    }
+    function createCodewords(bitBuffer, version, errorCorrectionLevel) {
+      const totalCodewords = Utils.getSymbolTotalCodewords(version);
+      const ecTotalCodewords = ECCode.getTotalCodewordsCount(version, errorCorrectionLevel);
+      const dataTotalCodewords = totalCodewords - ecTotalCodewords;
+      const ecTotalBlocks = ECCode.getBlocksCount(version, errorCorrectionLevel);
+      const blocksInGroup2 = totalCodewords % ecTotalBlocks;
+      const blocksInGroup1 = ecTotalBlocks - blocksInGroup2;
+      const totalCodewordsInGroup1 = Math.floor(totalCodewords / ecTotalBlocks);
+      const dataCodewordsInGroup1 = Math.floor(dataTotalCodewords / ecTotalBlocks);
+      const dataCodewordsInGroup2 = dataCodewordsInGroup1 + 1;
+      const ecCount = totalCodewordsInGroup1 - dataCodewordsInGroup1;
+      const rs = new ReedSolomonEncoder(ecCount);
+      let offset = 0;
+      const dcData = new Array(ecTotalBlocks);
+      const ecData = new Array(ecTotalBlocks);
+      let maxDataSize = 0;
+      const buffer = new Uint8Array(bitBuffer.buffer);
+      for (let b = 0; b < ecTotalBlocks; b++) {
+        const dataSize = b < blocksInGroup1 ? dataCodewordsInGroup1 : dataCodewordsInGroup2;
+        dcData[b] = buffer.slice(offset, offset + dataSize);
+        ecData[b] = rs.encode(dcData[b]);
+        offset += dataSize;
+        maxDataSize = Math.max(maxDataSize, dataSize);
+      }
+      const data = new Uint8Array(totalCodewords);
+      let index = 0;
+      let i, r;
+      for (i = 0; i < maxDataSize; i++) {
+        for (r = 0; r < ecTotalBlocks; r++) {
+          if (i < dcData[r].length) {
+            data[index++] = dcData[r][i];
+          }
+        }
+      }
+      for (i = 0; i < ecCount; i++) {
+        for (r = 0; r < ecTotalBlocks; r++) {
+          data[index++] = ecData[r][i];
+        }
+      }
+      return data;
+    }
+    function createSymbol(data, version, errorCorrectionLevel, maskPattern) {
+      let segments;
+      if (Array.isArray(data)) {
+        segments = Segments.fromArray(data);
+      } else if (typeof data === "string") {
+        let estimatedVersion = version;
+        if (!estimatedVersion) {
+          const rawSegments = Segments.rawSplit(data);
+          estimatedVersion = Version.getBestVersionForData(rawSegments, errorCorrectionLevel);
+        }
+        segments = Segments.fromString(data, estimatedVersion || 40);
+      } else {
+        throw new Error("Invalid data");
+      }
+      const bestVersion = Version.getBestVersionForData(segments, errorCorrectionLevel);
+      if (!bestVersion) {
+        throw new Error("The amount of data is too big to be stored in a QR Code");
+      }
+      if (!version) {
+        version = bestVersion;
+      } else if (version < bestVersion) {
+        throw new Error(
+          "\nThe chosen QR Code version cannot contain this amount of data.\nMinimum version required to store current data is: " + bestVersion + ".\n"
+        );
+      }
+      const dataBits = createData(version, errorCorrectionLevel, segments);
+      const moduleCount = Utils.getSymbolSize(version);
+      const modules = new BitMatrix(moduleCount);
+      setupFinderPattern(modules, version);
+      setupTimingPattern(modules);
+      setupAlignmentPattern(modules, version);
+      setupFormatInfo(modules, errorCorrectionLevel, 0);
+      if (version >= 7) {
+        setupVersionInfo(modules, version);
+      }
+      setupData(modules, dataBits);
+      if (isNaN(maskPattern)) {
+        maskPattern = MaskPattern.getBestMask(
+          modules,
+          setupFormatInfo.bind(null, modules, errorCorrectionLevel)
+        );
+      }
+      MaskPattern.applyMask(maskPattern, modules);
+      setupFormatInfo(modules, errorCorrectionLevel, maskPattern);
+      return {
+        modules,
+        version,
+        errorCorrectionLevel,
+        maskPattern,
+        segments
+      };
+    }
+    exports.create = function create(data, options) {
+      if (typeof data === "undefined" || data === "") {
+        throw new Error("No input text");
+      }
+      let errorCorrectionLevel = ECLevel.M;
+      let version;
+      let mask;
+      if (typeof options !== "undefined") {
+        errorCorrectionLevel = ECLevel.from(options.errorCorrectionLevel, ECLevel.M);
+        version = Version.from(options.version);
+        mask = MaskPattern.from(options.maskPattern);
+        if (options.toSJISFunc) {
+          Utils.setToSJISFunction(options.toSJISFunc);
+        }
+      }
+      return createSymbol(data, version, errorCorrectionLevel, mask);
+    };
+  }
+});
+
 // src/ui/v2.ts
 import { Plugin } from "@opencode/plugin/tui";
 
 // src/ui/index.tsx
-import { memo as _$memo2 } from "@opentui/solid";
 import { createTextNode as _$createTextNode2 } from "@opentui/solid";
-import { insertNode as _$insertNode2 } from "@opentui/solid";
+import { insertNode as _$insertNode3 } from "@opentui/solid";
 import { use as _$use2 } from "@opentui/solid";
-import { effect as _$effect2 } from "@opentui/solid";
-import { insert as _$insert2 } from "@opentui/solid";
-import { setProp as _$setProp2 } from "@opentui/solid";
-import { createElement as _$createElement2 } from "@opentui/solid";
-import { createComponent as _$createComponent2 } from "@opentui/solid";
-import { createEffect as createEffect2, createMemo, createSignal as createSignal2, onCleanup as onCleanup2, onMount, Show as Show2 } from "solid-js";
+import { effect as _$effect3 } from "@opentui/solid";
+import { insert as _$insert3 } from "@opentui/solid";
+import { setProp as _$setProp3 } from "@opentui/solid";
+import { createElement as _$createElement3 } from "@opentui/solid";
+import { memo as _$memo3 } from "@opentui/solid";
+import { createComponent as _$createComponent3 } from "@opentui/solid";
+import { createEffect as createEffect2, createMemo, createSignal as createSignal3, onCleanup as onCleanup2, onMount, Show as Show3 } from "solid-js";
 import { ScrollBoxRenderable } from "@opentui/core";
-import { dirname as dirname4, resolve as resolve3, basename as basename3 } from "node:path";
+import { dirname as dirname5, resolve as resolve4, basename as basename4 } from "node:path";
 import { watch as watch2 } from "node:fs";
 import { access as access4 } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash6 } from "node:crypto";
 
 // node_modules/ansi-regex/index.js
 function ansiRegex({ onlyFirst = false } = {}) {
   const ST = "(?:\\u0007|\\u001B\\u005C|\\u009C)";
   const osc = `(?:(?:\\u001B\\]|\\u009D)[^\\u0007\\u001B\\u009C\\u009D]*${ST})`;
   const csi = "[\\u001B\\u009B][[\\]()#;?]*(?:\\d{1,4}(?:[;:]\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]";
-  const pattern = `${osc}|${csi}`;
-  return new RegExp(pattern, onlyFirst ? void 0 : "g");
+  const pattern2 = `${osc}|${csi}`;
+  return new RegExp(pattern2, onlyFirst ? void 0 : "g");
 }
 
 // node_modules/strip-ansi/index.js
@@ -1345,13 +3153,21 @@ var aad = Buffer.from("opencode-moyu:library:v1");
 var defaultKeyFile = (directory) => resolve(directory, "../keys/library.key");
 var LibraryVault = class {
   #key;
+  #pending;
   constructor(keyFile) {
     this.keyFile = keyFile;
   }
   async key(create = true) {
     if (this.#key) return this.#key;
+    if (!this.#pending) this.#pending = this.loadKey(create).finally(() => {
+      this.#pending = void 0;
+    });
+    return this.#pending;
+  }
+  async loadKey(create) {
+    let key;
     try {
-      this.#key = await readFile(this.keyFile);
+      key = await readFile(this.keyFile);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       if (!create) throw new Error("\u7F3A\u5C11\u8D44\u6599\u5E93\u5BC6\u94A5\uFF0C\u8BF7\u6062\u590D\u539F\u5BC6\u94A5\u6587\u4EF6");
@@ -1361,9 +3177,14 @@ var LibraryVault = class {
       } catch (error2) {
         if (error2.code !== "EEXIST") throw error2;
       }
-      this.#key = await readFile(this.keyFile);
+      key = await readFile(this.keyFile);
     }
-    if (this.#key.length !== 32) throw new Error("\u8D44\u6599\u5E93\u5BC6\u94A5\u957F\u5EA6\u5F02\u5E38");
+    for (let attempt = 0; key.length !== 32 && attempt < 20; attempt++) {
+      await new Promise((resolve5) => setTimeout(resolve5, 10));
+      key = await readFile(this.keyFile);
+    }
+    if (key.length !== 32) throw new Error("\u8D44\u6599\u5E93\u5BC6\u94A5\u957F\u5EA6\u5F02\u5E38");
+    this.#key = key;
     return this.#key;
   }
   async seal(value) {
@@ -1428,9 +3249,9 @@ var LibraryStore = class {
   async writeJob(job) {
     await atomicWrite(this.jobPath(job.id), await this.vault.seal(job));
   }
-  async writePart(id, index, text) {
+  async writePart(id, index, text2) {
     await mkdir2(join(this.internal, "parts", id), { recursive: true });
-    await atomicWrite(this.partPath(id, index), await this.vault.seal({ text }));
+    await atomicWrite(this.partPath(id, index), await this.vault.seal({ text: text2 }));
   }
   async putResource(resource) {
     await this.ready();
@@ -1455,10 +3276,10 @@ var LibraryStore = class {
   async readPart(id, index) {
     return (await this.vault.unseal(await readFile2(this.partPath(id, index)))).text;
   }
-  async writeBook(id, title, text) {
+  async writeBook(id, title, text2) {
     await this.ready();
     const path = join(this.directory, id + ".moyubook");
-    await atomicWrite(path, await this.vault.seal({ schemaVersion: 1, resourceId: id, title, text }));
+    await atomicWrite(path, await this.vault.seal({ schemaVersion: 1, resourceId: id, title, text: text2 }));
     return path;
   }
   async importLocal(book) {
@@ -1531,8 +3352,8 @@ function decodeBook(bytes) {
     return new TextDecoder("gb18030", { fatal: true }).decode(bytes);
   }
 }
-function cleanText(text) {
-  return text.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "").replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\r\n?/g, "\n").replace(/\t/g, "    ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "").replace(/^\uFEFF/, "");
+function cleanText(text2) {
+  return text2.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "").replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\r\n?/g, "\n").replace(/\t/g, "    ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "").replace(/^\uFEFF/, "");
 }
 function chapterIdentity(title) {
   const match = title.normalize("NFKC").match(/^第([零〇一二三四五六七八九十百千万两\d]+)([章节回卷部篇集])(.*)$/u);
@@ -1557,25 +3378,25 @@ function chapterIdentity(title) {
   }
   return `${total}:${match[2]}:${match[3].replace(/\s+/gu, "")}`;
 }
-function chaptersOf(text) {
+function chaptersOf(text2) {
   const chapters = [];
   let offset = 0, headingEnd = 0;
-  for (const line of text.split("\n")) {
+  for (const line of text2.split("\n")) {
     const title = line.trim();
     if (title.length <= 100 && chapterPattern.test(title)) {
       const previous = chapters.at(-1);
-      if (!previous || chapterIdentity(previous.title) !== chapterIdentity(title) || text.slice(headingEnd, offset).trim()) chapters.push({ title, offset });
+      if (!previous || chapterIdentity(previous.title) !== chapterIdentity(title) || text2.slice(headingEnd, offset).trim()) chapters.push({ title, offset });
       headingEnd = offset + line.length;
     }
     offset += line.length + 1;
   }
   return chapters;
 }
-function wrapLines(text, width) {
+function wrapLines(text2, width) {
   const lines = [];
   const widths = /* @__PURE__ */ new Map();
   let line = "", columns = 0, start = 0, offset = 0;
-  for (const paragraph of text.split("\n")) {
+  for (const paragraph of text2.split("\n")) {
     for (const { segment } of segmenter2.segment(paragraph)) {
       let cells = widths.get(segment);
       if (cells === void 0) {
@@ -1613,11 +3434,11 @@ function validSize(width, rows) {
 }
 function createPaginator() {
   let previousText, previousWidth, previousRows, lines, pages;
-  return (text, width = 36, rows = 16) => {
+  return (text2, width = 36, rows = 16) => {
     validSize(width, rows);
-    if (text !== previousText || width !== previousWidth) {
-      lines = wrapLines(text, width);
-      previousText = text;
+    if (text2 !== previousText || width !== previousWidth) {
+      lines = wrapLines(text2, width);
+      previousText = text2;
       previousWidth = width;
       previousRows = void 0;
     }
@@ -1649,9 +3470,9 @@ async function loadBook(input, cwd, { keyFile } = {}) {
   }
   if (![".txt", ".md"].includes(extname(path).toLowerCase())) throw new Error("\u76EE\u524D\u652F\u6301 .txt\u3001.md \u548C\u52A0\u5BC6\u8D44\u6599\u6587\u4EF6");
   if (info.size > 32 * 1024 * 1024) throw new Error("\u6587\u4EF6\u8D85\u8FC7 32 MiB\uFF0C\u8BF7\u6309\u5377\u62C6\u5206");
-  const text = cleanText(decodeBook(await readFile3(path)));
-  if (!text.trim()) throw new Error("\u8FD9\u4E2A\u6587\u4EF6\u6CA1\u6709\u53EF\u9605\u8BFB\u7684\u5185\u5BB9");
-  return { path, title: basename(path, extname(path)), text, chapters: chaptersOf(text) };
+  const text2 = cleanText(decodeBook(await readFile3(path)));
+  if (!text2.trim()) throw new Error("\u8FD9\u4E2A\u6587\u4EF6\u6CA1\u6709\u53EF\u9605\u8BFB\u7684\u5185\u5BB9");
+  return { path, title: basename(path, extname(path)), text: text2, chapters: chaptersOf(text2) };
 }
 async function listBooks(directory, { keyFile } = {}) {
   const entries = await readdir2(directory, { withFileTypes: true });
@@ -1681,7 +3502,7 @@ function sidebarLayout(scrollbox) {
     apply(percent, terminalWidth) {
       if (percent === void 0) return restore();
       const total = docked ? Math.max(1, terminalWidth - (frame.screenX ?? frame.x ?? 0)) : terminalWidth;
-      const max = Math.max(36, Math.min(Math.floor(total * 0.6), total - 44));
+      const max = Math.max(36, Math.min(Math.floor(total * 0.75), total - 44));
       const width = Math.max(36, Math.min(max, Math.round(total * percent / 100)));
       for (const item of targets) {
         if (item.node.isDestroyed) continue;
@@ -1693,7 +3514,7 @@ function sidebarLayout(scrollbox) {
   };
 }
 function sidebarDock(reader, viewport, changed = () => {
-}) {
+}, scrollbox) {
   const container = reader.parent;
   if (!container?.getChildren().includes(reader)) return;
   const original = container.minHeight ?? null;
@@ -1704,13 +3525,25 @@ function sidebarDock(reader, viewport, changed = () => {
   };
   container.onSizeChange = resized;
   let minimum;
+  const hiddenCards = /* @__PURE__ */ new Map();
+  function cardsToCollapse() {
+    const inside = container.getChildren().filter((node) => node !== reader);
+    const siblings = scrollbox?.parent?.getChildren() ?? [];
+    const position = siblings.indexOf(scrollbox);
+    return [.../* @__PURE__ */ new Set([...inside, ...position >= 0 ? siblings.slice(position + 1) : []])];
+  }
+  function restoreCards() {
+    for (const [node, visible] of hiddenCards) if (!node.isDestroyed && node.visible === false) node.visible = visible;
+    hiddenCards.clear();
+  }
   function restore() {
+    restoreCards();
     if (minimum !== void 0 && !container.isDestroyed) container.minHeight = original;
     if (!container.isDestroyed && container.onSizeChange === resized) container.onSizeChange = previous;
     minimum = void 0;
   }
   return {
-    measure(active) {
+    measure(active, expanded = false) {
       if (!active || reader.isDestroyed || viewport.isDestroyed || container.isDestroyed) {
         restore();
         return 0;
@@ -1719,11 +3552,27 @@ function sidebarDock(reader, viewport, changed = () => {
         minimum = viewport.height;
         container.minHeight = minimum;
       }
+      if (!expanded) restoreCards();
+      else for (const node of cardsToCollapse()) {
+        if (node.isDestroyed || node.visible === false) continue;
+        if (!hiddenCards.has(node)) hiddenCards.set(node, node.visible !== false);
+        node.visible = false;
+      }
       const cards = container.getChildren().filter((node) => node !== reader && !node.isDestroyed && node.visible !== false && node.height > 0);
       return cards.reduce((rows, node) => rows + node.height + 1, 0);
     },
     restore
   };
+}
+
+// src/ui/video-size.mjs
+var VIDEO_SCALE_PRESETS = Object.freeze([25, 50, 75, 100, 125, 150, 175, 200]);
+function scaledVideoSize(width, height, requested = 100) {
+  if (!Number.isFinite(width) || width <= 0 || width > 75 || !Number.isFinite(height) || height <= 0 || height > 100) throw new Error("\u89C6\u9891\u57FA\u51C6\u5C3A\u5BF8\u65E0\u6548");
+  if (!Number.isFinite(requested)) throw new Error("\u8BF7\u8F93\u5165\u6709\u6548\u7684\u7F29\u653E\u767E\u5206\u6BD4");
+  const maximum = Math.min(200, Math.floor(Math.min(75 / width, 100 / height) * 100 + 1e-8));
+  const percent = Math.max(25, Math.min(maximum, Math.round(requested)));
+  return { percent, maximum, width: width * percent / 100, height: height * percent / 100 };
 }
 
 // src/ui/video.tsx
@@ -1867,10 +3716,10 @@ var FrameQueue = class {
       frame = Buffer.allocUnsafe(size);
       let written = 0;
       while (written < size) {
-        const chunk = this.chunks[this.head], count = Math.min(size - written, chunk.length - this.offset);
-        chunk.copy(frame, written, this.offset, this.offset + count);
-        written += count;
-        this.offset += count;
+        const chunk = this.chunks[this.head], count2 = Math.min(size - written, chunk.length - this.offset);
+        chunk.copy(frame, written, this.offset, this.offset + count2);
+        written += count2;
+        this.offset += count2;
         if (this.offset === chunk.length) {
           this.chunks[this.head++] = void 0;
           this.offset = 0;
@@ -1894,7 +3743,8 @@ var PixelPlayer = class {
   constructor({ onFrame = (_frame, _size) => {
   }, onState = (_state) => {
   }, onError = (_error) => {
-  }, binary = mediaBinary, launch = launchMedia, frameSize = pixelSize } = {}) {
+  }, binary = mediaBinary, launch = launchMedia, frameSize = pixelSize, beforePlay = async (_signal) => {
+  } } = {}) {
     this.onFrame = onFrame;
     this.onState = onState;
     this.onError = onError;
@@ -1910,6 +3760,8 @@ var PixelPlayer = class {
     this.disposed = false;
     this.frameSize = frameSize;
     this.scaleFilter = "neighbor";
+    this.beforePlay = beforePlay;
+    this.stopping = Promise.resolve();
   }
   emit() {
     this.onState({ position: this.position, playing: this.playing, muted: this.muted, loading: this.loading || false });
@@ -1935,10 +3787,15 @@ var PixelPlayer = class {
     }
   }
   stop() {
+    this.playAbort?.abort();
     ++this.generation;
     clearTimeout(this.timer);
-    stopMedia(this.decoder);
-    stopMedia(this.audio);
+    const stopping = [this.decoder, this.audio].filter((child) => child && child.exitCode === null && !child.signalCode).map((child) => new Promise((resolve5) => {
+      child.once("close", resolve5);
+      stopMedia(child);
+    }));
+    this.stopping = Promise.all([this.stopping, ...stopping]).then(() => {
+    });
     this.decoder = void 0;
     this.audio = void 0;
     this.loading = false;
@@ -1947,6 +3804,10 @@ var PixelPlayer = class {
     this.stop();
     this.playing = false;
     this.emit();
+  }
+  async pauseAndWait() {
+    this.pause();
+    await this.stopping;
   }
   play() {
     if (this.position >= (this.video?.duration || Infinity) - 0.05) this.position = 0;
@@ -1970,11 +3831,15 @@ var PixelPlayer = class {
   async start(playing) {
     this.stop();
     if (!this.video || this.disposed) return;
-    const token = this.generation, video = this.video, start = this.position;
+    const token = this.generation, video = this.video, start = this.position, abort = this.playAbort = new AbortController();
     this.playing = playing;
     this.loading = true;
     this.emit();
     try {
+      await this.stopping;
+      if (token !== this.generation || this.disposed) return;
+      if (playing) await this.beforePlay(abort.signal);
+      if (token !== this.generation || this.disposed) return;
       const binary = await this.binary("ffmpeg"), path = await nativeMediaPath(binary, video.path);
       if (token !== this.generation || this.disposed) return;
       const size = this.frameSize(video.width, video.height, this.columns, this.rows), frameBytes = size.width * size.height * 3;
@@ -2086,9 +3951,9 @@ function imageProtocol(core, renderer) {
 function imageFrameSize(width, height, columns, rows, renderer, protocol) {
   const cellWidth = renderer.resolution?.width / renderer.width || 8;
   const cellHeight = renderer.resolution?.height / renderer.height || 16;
-  const maxWidth = Math.min(1280, Math.max(2, columns * (protocol === "blocks" ? 4 : cellWidth)));
-  const maxHeight = Math.min(1280, Math.max(2, rows * (protocol === "blocks" ? 8 : cellHeight)));
-  const scale = Math.min(1, maxWidth / width, maxHeight / height, Math.sqrt(921600 / (width * height)));
+  const maxWidth = Math.min(1920, Math.max(2, columns * (protocol === "blocks" ? 4 : cellWidth)));
+  const maxHeight = Math.min(1920, Math.max(2, rows * (protocol === "blocks" ? 8 : cellHeight)));
+  const scale = Math.min(1, maxWidth / width, maxHeight / height, Math.sqrt(2073600 / (width * height)));
   return { width: Math.max(2, Math.floor(width * scale / 2) * 2), height: Math.max(2, Math.floor(height * scale / 2) * 2) };
 }
 var InlineImage = class {
@@ -2174,6 +4039,19 @@ import { promisify as promisify2 } from "node:util";
 // src/media/settings.mjs
 import { readFile as readFile4, unlink as unlink2, mkdir as mkdir3 } from "node:fs/promises";
 import { join as join3 } from "node:path";
+
+// src/media/video-quality.mjs
+var VIDEO_QUALITIES = Object.freeze([480, 720, 1080]);
+var DEFAULT_VIDEO_QUALITY = 1080;
+function videoQuality(value = DEFAULT_VIDEO_QUALITY) {
+  if (!VIDEO_QUALITIES.includes(value)) throw new Error("\u8BF7\u9009\u62E9 480p\u3001720p \u6216 1080p \u4E0B\u8F7D\u6E05\u6670\u5EA6");
+  return value;
+}
+function videoFormatArgs(quality = DEFAULT_VIDEO_QUALITY) {
+  return ["--format", "bv*+ba/bv*", "--format-sort", `res:${videoQuality(quality)},vcodec:h264,acodec:m4a`];
+}
+
+// src/media/settings.mjs
 var MediaSettings = class {
   constructor(library) {
     this.library = library;
@@ -2202,6 +4080,21 @@ var MediaSettings = class {
       if (error.code !== "ENOENT") throw error;
     });
     return this.status();
+  }
+  async downloadQuality() {
+    try {
+      const settings = await this.library.vault.unseal(await readFile4(join3(this.library.internal, "settings", "video.enc")));
+      return videoQuality(settings.downloadQuality);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    return DEFAULT_VIDEO_QUALITY;
+  }
+  async saveDownloadQuality(input) {
+    const downloadQuality = videoQuality(input);
+    await mkdir3(join3(this.library.internal, "settings"), { recursive: true, mode: 448 });
+    await atomicWrite(join3(this.library.internal, "settings", "video.enc"), await this.library.vault.seal({ downloadQuality }));
+    return downloadQuality;
   }
 };
 
@@ -2316,7 +4209,9 @@ function httpUrl(input) {
   return url;
 }
 function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, timeoutMs = 15e3, useProxy = true, maxRedirects = 4 } = {}) {
-  return async function readPage(input, { signal, headers = {} } = {}) {
+  return async function readPage(input, { signal, headers = {}, method = "GET", body, asBytes = false, redirect = "follow" } = {}) {
+    if (!["GET", "POST"].includes(method)) throw new Error("\u4E0D\u652F\u6301\u7684 HTTP \u8BF7\u6C42\u65B9\u5F0F");
+    if (!["follow", "manual"].includes(redirect)) throw new Error("\u4E0D\u652F\u6301\u7684\u91CD\u5B9A\u5411\u5904\u7406\u65B9\u5F0F");
     let url = httpUrl(input);
     const initialOrigin = url.origin;
     for (let redirects = 0; redirects <= maxRedirects; redirects++) {
@@ -2334,8 +4229,9 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
       });
       const proxy = !useProxy || bypass ? void 0 : url.protocol === "https:" ? process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy : process.env.HTTP_PROXY || process.env.http_proxy;
       const agent = proxy ? new import_https_proxy_agent.HttpsProxyAgent(proxy) : void 0;
-      const result = await new Promise((resolve4, reject) => {
-        const request = (url.protocol === "https:" ? https : http).get(url, {
+      const result = await new Promise((resolve5, reject) => {
+        const request = (url.protocol === "https:" ? https : http).request(url, {
+          method,
           signal,
           agent,
           lookup: (_host, options, callback) => options?.all ? callback(null, [pinned]) : callback(null, pinned.address, pinned.family),
@@ -2345,7 +4241,7 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
             const status = response.statusCode ?? 0;
             if ([301, 302, 303, 307, 308].includes(status) && response.headers.location) {
               response.resume();
-              resolve4({ redirect: response.headers.location });
+              resolve5({ url: url.href, redirect: response.headers.location, status, cookies: response.headers["set-cookie"] ?? [] });
               return;
             }
             if (status < 200 || status >= 300) {
@@ -2353,7 +4249,7 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
               throw new Error(`\u6765\u6E90\u8FD4\u56DE HTTP ${status}\uFF1B\u505C\u6B62\u6293\u53D6`);
             }
             const contentType = String(response.headers["content-type"] ?? "text/html");
-            if (!/^(text\/|application\/(xhtml\+xml|xml|json))/i.test(contentType)) {
+            if (!asBytes && !/^(text\/|application\/(xhtml\+xml|xml|json))/i.test(contentType)) {
               response.resume();
               throw new Error(`\u5F53\u524D\u6587\u5B57\u6765\u6E90\u4E0D\u652F\u6301\uFF1A${contentType}`);
             }
@@ -2370,9 +4266,14 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
               chunks.push(chunk);
             }
             const bytes = Buffer.concat(chunks);
+            const cookies = response.headers["set-cookie"] ?? [];
+            if (asBytes) {
+              resolve5({ url: url.href, bytes, contentType, cookies });
+              return;
+            }
             const declared = contentType.match(/charset\s*=\s*["']?([^\s;"']+)/i)?.[1] ?? bytes.subarray(0, 4096).toString("latin1").match(/charset\s*=\s*["']?([\w-]+)/i)?.[1];
-            const text = declared ? new TextDecoder(declared).decode(bytes) : decodeBook(bytes);
-            resolve4({ url: url.href, text, contentType });
+            const text2 = declared ? new TextDecoder(declared).decode(bytes) : decodeBook(bytes);
+            resolve5({ url: url.href, text: text2, contentType, cookies });
           } catch (error) {
             reject(error);
           }
@@ -2381,9 +4282,13 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
         const deadline = setTimeout(() => request.destroy(new Error("\u6765\u6E90\u8BF7\u6C42\u8D85\u8FC7\u603B\u65F6\u9650")), timeoutMs);
         request.on("close", () => clearTimeout(deadline));
         request.on("error", reject);
+        request.end(body);
       });
       if (result.redirect) {
-        url = httpUrl(new URL(result.redirect, url).href);
+        if (redirect === "manual") return result;
+        const next = httpUrl(new URL(result.redirect, url).href);
+        if (method !== "GET" && next.origin !== url.origin) throw new Error("\u4E0D\u80FD\u5C06\u767B\u5F55\u8BF7\u6C42\u91CD\u5B9A\u5411\u5230\u5176\u4ED6\u7AD9\u70B9");
+        url = next;
         continue;
       }
       return result;
@@ -2485,7 +4390,7 @@ function createVideoPlatforms({ settings, read = createHttpClient({ maxBytes: 10
 
 // src/services/video-ingestion.mjs
 var execute2 = promisify2(execFile2);
-var VIDEO_FORMAT_ARGS = Object.freeze(["--format", "bv*+ba/bv*", "--format-sort", "res:480,vcodec:h264,acodec:m4a"]);
+var VIDEO_FORMAT_ARGS = Object.freeze(videoFormatArgs());
 async function downloaderBinary() {
   const paths = process.env.MOYU_YTDLP ? [process.env.MOYU_YTDLP] : [
     join5(homedir3(), ".local/share/opencode-moyu/media/bin", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp"),
@@ -2511,14 +4416,14 @@ function downloadFailure(message, platform) {
   if (/requested format is not available/i.test(message)) return "\u6765\u6E90\u672A\u63D0\u4F9B\u5F53\u524D\u53EF\u4E0B\u8F7D\u7684\u89C6\u9891\u683C\u5F0F\uFF0C\u672A\u5165\u5E93";
   return "\u89C6\u9891\u6765\u6E90\u83B7\u53D6\u5931\u8D25\uFF1A" + safeError(message);
 }
-async function downloadVideo(url, directory, { signal, onProgress = (_value) => {
+async function downloadVideo(url, directory, { signal, quality, onProgress = (_value) => {
 }, binary = downloaderBinary, launch = spawn2 } = {}) {
   const target = videoUrl(url);
   signal?.throwIfAborted();
   const executable = await binary(), ffmpeg = await mediaBinary("ffmpeg");
   signal?.throwIfAborted();
-  const args = ["--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-playlist", "--playlist-items", "1", "--no-remote-components", "--js-runtimes", "node", "--socket-timeout", "15", "--retries", "0", "--extractor-retries", "0", "--fragment-retries", "0", "--abort-on-unavailable-fragments", "--concurrent-fragments", "1", "--match-filters", "!is_live & duration <= 3600", "--max-filesize", String(MAX_VIDEO_BYTES), ...VIDEO_FORMAT_ARGS, "--merge-output-format", "mp4/mkv", "--ffmpeg-location", dirname3(ffmpeg), "--no-mtime", "--newline", "--progress", "--progress-template", "download:MOYU_PROGRESS:%(progress._percent_str)s", "--print", "before_dl:MOYU_META:%(title)j", "--no-simulate", "--paths", directory, "--output", "video.%(ext)s", "--", target.url];
-  return new Promise((resolve4, reject) => {
+  const args = ["--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-playlist", "--playlist-items", "1", "--no-remote-components", "--js-runtimes", "node", "--socket-timeout", "15", "--retries", "0", "--extractor-retries", "0", "--fragment-retries", "0", "--abort-on-unavailable-fragments", "--concurrent-fragments", "1", "--match-filters", "!is_live & duration <= 3600", "--max-filesize", String(MAX_VIDEO_BYTES), ...videoFormatArgs(quality), "--merge-output-format", "mp4/mkv", "--ffmpeg-location", dirname3(ffmpeg), "--no-mtime", "--newline", "--progress", "--progress-template", "download:MOYU_PROGRESS:%(progress._percent_str)s", "--print", "before_dl:MOYU_META:%(title)j", "--no-simulate", "--paths", directory, "--output", "video.%(ext)s", "--", target.url];
+  return new Promise((resolve5, reject) => {
     const child = launch(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" });
     let stderr = "", partial = "", title = "", failure, finished = false;
     const terminate = (error) => {
@@ -2576,18 +4481,18 @@ async function downloadVideo(url, directory, { signal, onProgress = (_value) => 
         checking = false;
       }
     }, 500);
-    const clean = () => {
+    const clean2 = () => {
       finished = true;
       clearTimeout(deadline);
       clearInterval(quota);
       signal?.removeEventListener("abort", abort);
     };
     child.once("error", (error) => {
-      clean();
+      clean2();
       reject(new Error("\u4E0B\u8F7D\u5668\u65E0\u6CD5\u542F\u52A8\uFF1A" + safeError(error.message)));
     });
     child.once("close", async (code) => {
-      clean();
+      clean2();
       if (failure) return reject(failure);
       if (code !== 0) return reject(new Error(downloadFailure(stderr || "\u4E0B\u8F7D\u5668\u9000\u51FA " + code, target.platform)));
       try {
@@ -2595,7 +4500,7 @@ async function downloadVideo(url, directory, { signal, onProgress = (_value) => 
         if (names.length !== 1) throw new Error("\u672A\u53D6\u5F97\u5B8C\u6574\u89C6\u9891\uFF0C\u53EF\u80FD\u53D7\u767B\u5F55\u3001\u65F6\u957F\u3001\u5927\u5C0F\u6216\u683C\u5F0F\u9650\u5236");
         const path = join5(directory, names[0]);
         if ((await stat4(path)).size > MAX_VIDEO_BYTES) throw new Error("\u89C6\u9891\u8D85\u8FC7 256 MiB \u9650\u5236");
-        resolve4({ path, title });
+        resolve5({ path, title });
       } catch (error) {
         reject(error);
       }
@@ -2618,16 +4523,18 @@ function createVideoIngestion({ directory, keyFile, read, download = downloadVid
       }
     }
   }
-  async function importVideo({ url, signal, onProgress = (_value) => {
+  async function importVideo({ url, signal, quality = void 0, onProgress = (_value) => {
   } }) {
-    const target = videoUrl(url), id = stableId("video:" + target.url);
-    return store.withJobLock(id, async () => {
+    const target = videoUrl(url);
+    quality = videoQuality(quality ?? await settings.downloadQuality());
+    const lockId = stableId("video:" + target.url), id = stableId("video:" + target.url + ":" + quality);
+    return store.withJobLock(lockId, async () => {
       signal?.throwIfAborted();
-      const existing = (await store.resources()).find((item) => item.id === id);
-      if (existing) {
+      const existing = (await store.resources()).filter((item) => item.kind === "video" && item.source.url === target.url && item.metadata.managedMedia && Math.max(item.metadata.downloadQuality ?? 480, Math.min(item.metadata.width || 0, item.metadata.height || 0)) >= quality).sort((a, b) => Math.min(b.metadata.width, b.metadata.height) - Math.min(a.metadata.width, a.metadata.height));
+      for (const resource of existing) {
         try {
-          await access2(cache.path(id));
-          return { resource: existing, cached: true };
+          await access2(cache.path(resource.id));
+          return { resource, cached: true };
         } catch (error) {
           if (error.code !== "ENOENT") throw error;
         }
@@ -2645,14 +4552,14 @@ function createVideoIngestion({ directory, keyFile, read, download = downloadVid
             signal?.throwIfAborted();
           }
         }
-        const media = await download(target.url, work, { signal, onProgress });
+        const media = await download(target.url, work, { signal, quality, onProgress });
         signal?.throwIfAborted();
         const info = await inspectVideo(media.path);
         signal?.throwIfAborted();
         onProgress({ phase: "encrypting", percent: 99 });
         const path = await cache.seal(id, media.path);
         signal?.throwIfAborted();
-        const resource = { schemaVersion: 1, id, kind: "video", title: media.title || details?.title || info.title, source: { adapter: target.platform, url: target.url }, assets: [{ role: "media", mime: "application/x-moyu-video", path }], metadata: { author: details?.author, description: details?.description, views: details?.views, metadataFetched: Boolean(details), width: info.width, height: info.height, duration: info.duration, hasAudio: info.hasAudio, managedMedia: true, extension: extname3(media.path) }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+        const resource = { schemaVersion: 1, id, kind: "video", title: media.title || details?.title || info.title, source: { adapter: target.platform, url: target.url }, assets: [{ role: "media", mime: "application/x-moyu-video", path }], metadata: { author: details?.author, description: details?.description, views: details?.views, metadataFetched: Boolean(details), width: info.width, height: info.height, duration: info.duration, hasAudio: info.hasAudio, managedMedia: true, downloadQuality: quality, extension: extname3(media.path) }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
         await store.putResource(resource);
         return { resource, cached: false };
       } catch (error) {
@@ -2689,6 +4596,7 @@ function createVideoReader(api, library, settings) {
   const [presentation, setPresentation] = createSignal(api.kv.get(prefix + "presentation", "auto"));
   const [protocol, setProtocol] = createSignal(imageProtocol(OpenTui, api.renderer));
   const [sourceProgress, setSourceProgress] = createSignal("");
+  const [downloadQuality, setDownloadQuality] = createSignal(DEFAULT_VIDEO_QUALITY);
   let sourceAbort;
   const inline = new InlineImage(OpenTui, api.renderer, (cause) => {
     setPresentation("pixel");
@@ -2703,6 +4611,9 @@ function createVideoReader(api, library, settings) {
     directory: library.directory,
     keyFile: library.vault.keyFile
   });
+  void sources.settings.downloadQuality().then((value) => {
+    if (!api.lifecycle.signal.aborted) setDownloadQuality(value);
+  }).catch(showError);
   let downloadAbort;
   let loadAbort;
   let downloadTask;
@@ -2715,6 +4626,9 @@ function createVideoReader(api, library, settings) {
     return colors.get(value);
   }
   const player = new PixelPlayer({
+    beforePlay: async (signal) => {
+      await settings.beforePlay?.(signal);
+    },
     frameSize: (width, height, columns, rows) => useImage() ? imageFrameSize(width, height, columns, rows, api.renderer, protocol()) : pixelSize(width, height, columns, rows),
     onFrame: (bytes, size) => {
       if (useImage()) {
@@ -2731,7 +4645,12 @@ function createVideoReader(api, library, settings) {
         bg: color(run.bg)
       })));
     },
-    onState: setState,
+    onState: (next) => {
+      const stopped = state().playing && !next.playing;
+      setState(next);
+      if (stopped) void settings.releasePlayback?.(player.stopping.then(() => {
+      })).catch(showError);
+    },
     onError: (message) => {
       setError(message);
       api.ui.toast({
@@ -2911,7 +4830,9 @@ function createVideoReader(api, library, settings) {
   function promptUrl() {
     settings.dialog(() => _$createComponent(api.ui.DialogPrompt, {
       title: "\u5BFC\u5165 B \u7AD9 / YouTube \u89C6\u9891",
-      placeholder: "\u5B8C\u6574\u89C6\u9891\u94FE\u63A5\u6216 BV \u53F7\uFF0C\u4F18\u5148 480p / 256 MiB / 60 \u5206\u949F",
+      get placeholder() {
+        return `\u5B8C\u6574\u89C6\u9891\u94FE\u63A5\u6216 BV \u53F7\uFF0C\u4F18\u5148 ${downloadQuality()}p / 256 MiB / 60 \u5206\u949F`;
+      },
       get onCancel() {
         return settings.close;
       },
@@ -3058,6 +4979,38 @@ function createVideoReader(api, library, settings) {
       }
     }));
   }
+  async function downloadQualityMenu() {
+    try {
+      const current = await sources.settings.downloadQuality();
+      if (api.lifecycle.signal.aborted) return;
+      setDownloadQuality(current);
+      settings.dialog(() => _$createComponent(api.ui.DialogSelect, {
+        title: "\u89C6\u9891\u4E0B\u8F7D\u6E05\u6670\u5EA6",
+        placeholder: "\u6765\u6E90\u652F\u6301\u65F6\u4F18\u5148\u6240\u9009\u6E05\u6670\u5EA6\uFF0C\u65E7\u89C6\u9891\u9700\u91CD\u65B0\u5BFC\u5165\uFF1B\u6BCF\u4E2A\u89C6\u9891\u6700\u591A 256 MiB",
+        current,
+        get options() {
+          return [...VIDEO_QUALITIES].reverse().map((value) => ({
+            title: `${value}p${value === 1080 ? " \u9AD8\u6E05\uFF08\u63A8\u8350\uFF09" : value === 720 ? " \u9AD8\u6E05" : " \u6D41\u7545"}`,
+            value,
+            description: value === 1080 ? "\u4F18\u5148\u4E0B\u8F7D\u66F4\u6E05\u6670\u7684\u6E90\u89C6\u9891\uFF0C\u5B9E\u9645\u4EE5\u6765\u6E90\u63D0\u4F9B\u4E3A\u51C6" : value === 720 ? "\u517C\u987E\u6E05\u6670\u5EA6\u3001\u4E0B\u8F7D\u65F6\u95F4\u4E0E\u6587\u4EF6\u5927\u5C0F" : "\u8282\u7701\u7A7A\u95F4\uFF0C\u9002\u5408\u8F83\u6162\u7F51\u7EDC"
+          }));
+        },
+        onSelect: (item) => {
+          settings.close();
+          void sources.settings.saveDownloadQuality(item.value).then((value) => {
+            if (api.lifecycle.signal.aborted) return;
+            setDownloadQuality(value);
+            api.ui.toast({
+              message: `\u4E0B\u8F7D\u6E05\u6670\u5EA6\u5DF2\u8BBE\u4E3A ${value}p\uFF0C\u91CD\u65B0\u5BFC\u5165\u540C\u4E00\u94FE\u63A5\u53EF\u83B7\u53D6\u9AD8\u6E05\u526F\u672C`,
+              variant: "info"
+            });
+          }).catch(showError);
+        }
+      }));
+    } catch (cause) {
+      showError(cause);
+    }
+  }
   async function sourceSettings() {
     try {
       const status = await sources.settings.status();
@@ -3139,10 +5092,18 @@ function createVideoReader(api, library, settings) {
             title: "\u6D4F\u89C8 B \u7AD9\u70ED\u95E8\u2026",
             value: "popular",
             description: "\u76F4\u63A5\u9009\u89C6\u9891\uFF0C\u65E0\u9700\u94FE\u63A5\u6216 API Key"
-          }, {
+          }, ...settings.collect ? [{
+            title: "\u8BA9\u5F53\u524D\u6A21\u578B\u641C\u7D22 / \u91C7\u96C6\u89C6\u9891\u2026",
+            value: "collect",
+            description: "\u652F\u6301\u70ED\u95E8\u3001\u5173\u952E\u8BCD\u641C\u7D22\u3001\u89C6\u9891\u94FE\u63A5\u548C\u4E0B\u8F7D\u6E05\u6670\u5EA6"
+          }] : [], {
             title: "\u4FA7\u680F\u89C6\u9891\u753B\u8D28\u2026",
             value: "quality",
             description: qualityLabel()
+          }, {
+            title: "\u89C6\u9891\u4E0B\u8F7D\u6E05\u6670\u5EA6\u2026",
+            value: "download-quality",
+            description: `\u4F18\u5148 ${downloadQuality()}p \xB7 \u65E7\u89C6\u9891\u53EF\u91CD\u65B0\u5BFC\u5165\u5347\u7EA7`
           }, {
             title: "\u89C6\u9891\u6765\u6E90\u8BBE\u7F6E\u2026",
             value: "settings",
@@ -3150,7 +5111,7 @@ function createVideoReader(api, library, settings) {
           }, ...resources.map((item) => ({
             title: item.title,
             value: item.id,
-            description: mediaTime(item.metadata.duration) + (item.metadata.managedMedia ? " \xB7 " + item.source.adapter + " \xB7 \u52A0\u5BC6\u7F13\u5B58" : " \xB7 \u672C\u5730\u6587\u4EF6")
+            description: `${mediaTime(item.metadata.duration)} \xB7 ${Math.round(item.metadata.width)}\xD7${Math.round(item.metadata.height)}` + (item.metadata.managedMedia ? " \xB7 " + item.source.adapter + " \xB7 \u52A0\u5BC6\u7F13\u5B58" : " \xB7 \u672C\u5730\u6587\u4EF6")
           }))];
         },
         onSelect: (item) => {
@@ -3159,7 +5120,9 @@ function createVideoReader(api, library, settings) {
           else if (item.value === "url") promptUrl();
           else if (item.value === "search") searchPlatform();
           else if (item.value === "popular") popular();
+          else if (item.value === "collect") settings.collect?.();
           else if (item.value === "quality") quality();
+          else if (item.value === "download-quality") void downloadQualityMenu();
           else if (item.value === "settings") void sourceSettings();
           else void load("", resources.find((saved) => saved.id === item.value));
         }
@@ -3339,7 +5302,7 @@ function createVideoReader(api, library, settings) {
             _$setProp(_el$8, "wrapMode", "none");
             _$insert(_el$8, (() => {
               var _c$ = _$memo(() => !!error());
-              return () => _c$() ? "\u64AD\u653E\u5F02\u5E38\uFF0C\u53EF\u91CD\u65B0\u6253\u5F00\u89C6\u9891" : _$memo(() => !!!video())() ? `${qualityLabel()} \xB7 \u9ED8\u8BA4\u9759\u97F3` : _$memo(() => !!state().loading)() ? "\u6B63\u5728\u89E3\u7801\u2026" : `${state().playing ? "\u64AD\u653E\u4E2D" : "\u5DF2\u6682\u505C"} \xB7 ${qualityLabel()}`;
+              return () => _c$() ? "\u64AD\u653E\u5F02\u5E38\uFF0C\u53EF\u91CD\u65B0\u6253\u5F00\u89C6\u9891" : _$memo(() => !!!video())() ? `${qualityLabel()} \xB7 \u9ED8\u8BA4\u9759\u97F3` : _$memo(() => !!state().loading)() ? "\u6B63\u5728\u89E3\u7801\u2026" : `${state().playing ? "\u64AD\u653E\u4E2D" : "\u5DF2\u6682\u505C"} \xB7 ${Math.round(video().width)}\xD7${Math.round(video().height)} \xB7 ${qualityLabel()}`;
             })());
             return _el$8;
           })();
@@ -3458,12 +5421,20 @@ function createVideoReader(api, library, settings) {
         action: () => seek(10)
       }), null);
       _$setProp(_el$7, "height", 1);
+      _$setProp(_el$7, "flexDirection", "row");
+      _$setProp(_el$7, "gap", 1);
       _$insert(_el$7, _$createComponent(Button, {
         get label() {
-          return `[\u753B\u8D28\uFF1A${qualityLabel()}]`;
+          return `[\u663E\u793A\uFF1A${qualityLabel()}]`;
         },
         action: quality
-      }));
+      }), null);
+      _$insert(_el$7, _$createComponent(Button, {
+        get label() {
+          return `[\u4E0B\u8F7D${downloadQuality()}p]`;
+        },
+        action: () => void downloadQualityMenu()
+      }), null);
       _$effect((_p$) => {
         var _v$ = 4 + props.gap, _v$2 = props.gap;
         _v$ !== _p$.e && (_p$.e = _$setProp(_el$4, "height", _v$, _p$.e));
@@ -3481,6 +5452,7 @@ function createVideoReader(api, library, settings) {
     shelf,
     remove,
     pause,
+    pauseAndWait: () => player.pauseAndWait(),
     restore,
     dispose,
     jump,
@@ -3490,35 +5462,2680 @@ function createVideoReader(api, library, settings) {
   };
 }
 
+// src/ui/music.tsx
+import { insertNode as _$insertNode2 } from "@opentui/solid";
+import { effect as _$effect2 } from "@opentui/solid";
+import { insert as _$insert2 } from "@opentui/solid";
+import { memo as _$memo2 } from "@opentui/solid";
+import { setProp as _$setProp2 } from "@opentui/solid";
+import { createElement as _$createElement2 } from "@opentui/solid";
+import { createComponent as _$createComponent2 } from "@opentui/solid";
+import { createSignal as createSignal2, For, Show as Show2 } from "solid-js";
+
+// src/music/service.mjs
+import { writeFile as writeFile4 } from "node:fs/promises";
+import { join as join9 } from "node:path";
+
+// src/music/providers.mjs
+import { createCipheriv as createCipheriv3, createHash as createHash4, randomBytes as randomBytes5 } from "node:crypto";
+
+// src/music/qq-login.mjs
+import { randomBytes as randomBytes3 } from "node:crypto";
+var loginOrigin = "https://ssl.ptlogin2.qq.com";
+var musicOrigin = "https://y.qq.com/";
+var redirectUri = musicOrigin + "portal/wx_redirect.html?login_type=1&surl=https://y.qq.com/";
+var paramsUrl = (base, params) => {
+  const url = new URL(base);
+  url.search = new URLSearchParams(params).toString();
+  return url.href;
+};
+function qqHash(value, seed = 0) {
+  let hash = seed;
+  for (const char of value) hash = hash * 33 + char.charCodeAt(0) | 0;
+  return hash & 2147483647;
+}
+function parseQQCallback(text2) {
+  const match = /^\s*ptuiCB\s*\(([^]*)\)\s*;?\s*$/.exec(text2);
+  if (!match || text2.length > 16384) throw new Error("QQ\u626B\u7801\u54CD\u5E94\u683C\u5F0F\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u4E8C\u7EF4\u7801");
+  const args = [], pattern2 = /\s*'((?:\\.|[^'\\])*)'\s*(,|$)/gy;
+  let offset = 0;
+  while (offset < match[1].length) {
+    pattern2.lastIndex = offset;
+    const item = pattern2.exec(match[1]);
+    if (!item || args.length >= 8) throw new Error("QQ\u626B\u7801\u54CD\u5E94\u683C\u5F0F\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u4E8C\u7EF4\u7801");
+    args.push(item[1].replace(/\\(?:x([\da-f]{2})|u([\da-f]{4})|(['"\\/])|([nrt]))/gi, (_all, hex, unicode, literal, control) => hex || unicode ? String.fromCharCode(parseInt(hex || unicode, 16)) : literal || { n: "\n", r: "\r", t: "	" }[control]));
+    offset = pattern2.lastIndex;
+    if (!item[2]) break;
+    if (offset === match[1].length) throw new Error("QQ\u626B\u7801\u54CD\u5E94\u683C\u5F0F\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u4E8C\u7EF4\u7801");
+  }
+  if (args.length < 3 || !/^\d{1,6}$/.test(args[0])) throw new Error("QQ\u626B\u7801\u54CD\u5E94\u683C\u5F0F\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u4E8C\u7EF4\u7801");
+  return { code: Number(args[0]), callback: args[2], nickname: args[5] || "" };
+}
+function qqResponseCookies(headers = [], target) {
+  const jar = /* @__PURE__ */ new Map(), values = /* @__PURE__ */ Object.create(null), destination = target ? new URL(target) : void 0;
+  for (const header of headers) for (const cookie of header.split(/,(?=\s*[\w-]+=)/)) {
+    const match = /^\s*([\w-]+)=([^;]*)/.exec(cookie);
+    if (!match || /[\x00-\x20\x7f-\uffff]/.test(match[2])) continue;
+    const domain = /;\s*domain=([^;]+)/i.exec(cookie)?.[1].trim().replace(/^\./, "").toLowerCase() || "";
+    const path = /;\s*path=([^;]+)/i.exec(cookie)?.[1].trim() || "/";
+    const expires = /;\s*expires=([^;]+)/i.exec(cookie)?.[1];
+    const maxAge = /;\s*max-age=([^;]+)/i.exec(cookie)?.[1];
+    const key = `${match[1]}
+${domain}
+${path}`;
+    if (!match[2] || maxAge !== void 0 && Number(maxAge) <= 0 || expires && Date.parse(expires) <= Date.now()) {
+      jar.delete(key);
+      continue;
+    }
+    jar.set(key, { name: match[1], value: match[2], domain, path });
+  }
+  const candidates = [...jar.values()].filter((item) => !destination || (!item.domain || destination.hostname === item.domain || destination.hostname.endsWith("." + item.domain)) && (destination.pathname === item.path || destination.pathname.startsWith(item.path.endsWith("/") ? item.path : item.path + "/")));
+  candidates.sort((a, b) => a.domain.length - b.domain.length || a.path.length - b.path.length);
+  for (const item of candidates) values[item.name] = item.value;
+  return values;
+}
+var bodyText = (response) => response.text ?? response.bytes?.toString("utf8") ?? "";
+var safeText = (value) => String(value || "").replace(/[\x00-\x1f\x7f-\x9f]/g, "").slice(0, 80);
+function createQQLogin(request) {
+  async function read(url, options = {}) {
+    const response = await request(url, { ...options, asBytes: true, redirect: "manual", headers: { "User-Agent": "Mozilla/5.0", Referer: "https://xui.ptlogin2.qq.com/", ...options.headers } });
+    options.signal?.throwIfAborted();
+    return response;
+  }
+  async function begin({ signal } = {}) {
+    const response = await read(paramsUrl(loginOrigin + "/ptqrshow", { appid: "716027609", e: "2", l: "M", s: "3", d: "72", v: "4", t: String(Math.random()), daid: "383", pt_3rd_aid: "100497308" }), { signal });
+    const cookies = qqResponseCookies(response.cookies), bytes = response.bytes;
+    if (!cookies.qrsig || !bytes || bytes.length > 1024 * 1024 || bytes.length < 8 || !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error("QQ\u672A\u8FD4\u56DE\u6709\u6548\u4E8C\u7EF4\u7801\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+    return { platform: "qq", qrsig: cookies.qrsig, state: randomBytes3(18).toString("hex"), image: "data:image/png;base64," + bytes.toString("base64") };
+  }
+  async function authorize(session, callback, signal, onProgress) {
+    let url;
+    try {
+      url = new URL(callback);
+    } catch {
+      throw new Error("QQ\u6388\u6743\u5730\u5740\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    }
+    if (url.protocol !== "https:" || url.port || url.username || url.password || !["ssl.ptlogin2.graph.qq.com", "ssl.ptlogin2.qq.com", "ptlogin2.qq.com", "ptlogin2.music.qq.com"].includes(url.hostname) || url.pathname !== "/check_sig") throw new Error("QQ\u6388\u6743\u5730\u5740\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    const uin = url.searchParams.get("uin"), sig = url.searchParams.get("ptsigx");
+    if (!/^\d{5,20}$/.test(uin || "") || !sig || sig.length > 512 || /[^\x21-\x7e]/.test(sig)) throw new Error("QQ\u6388\u6743\u53C2\u6570\u4E0D\u5B8C\u6574\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    const checked2 = await read(paramsUrl("https://ssl.ptlogin2.graph.qq.com/check_sig", { uin, ptsigx: sig, pttype: "1", service: "ptqrlogin", nodirect: "0", s_url: "https://graph.qq.com/oauth2.0/login_jump", ptlang: "2052", ptredirect: "100", aid: "716027609", daid: "383", j_later: "0", low_login_hour: "0", regmaster: "0", pt_login_type: "3", pt_aid: "0", pt_aaid: "16", pt_light: "0", pt_3rd_aid: "100497308" }), { signal });
+    const sso = qqResponseCookies(checked2.cookies, "https://graph.qq.com/oauth2.0/authorize");
+    if (!sso.p_skey) throw new Error("QQ\u6388\u6743\u5C1A\u672A\u5B8C\u6210\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801\u5E76\u5728\u624B\u673A\u786E\u8BA4");
+    const gtk = qqHash(sso.p_skey, 5381);
+    const cookie = Object.entries(sso).map(([key, value]) => `${key}=${value}`).join("; ");
+    const authorization = await read("https://graph.qq.com/oauth2.0/authorize", { signal, method: "POST", body: new URLSearchParams({ response_type: "code", client_id: "100497308", redirect_uri: redirectUri, scope: "get_user_info", state: session.state, switch: "", from_ptlogin: "1", src: "1", update_auth: "1", openapi: "1010_1030", g_tk: String(gtk), auth_time: String(Date.now()), ui: session.state }).toString(), headers: { Cookie: cookie, "Content-Type": "application/x-www-form-urlencoded", Referer: "https://graph.qq.com/" } });
+    let location;
+    try {
+      location = new URL(authorization.redirect);
+    } catch {
+      throw new Error("QQ\u6388\u6743\u672A\u8FD4\u56DE\u767B\u5F55\u7ED3\u679C\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    }
+    if (location.origin === "https://graph.qq.com" && location.pathname === "/oauth2.0/show") throw new Error("QQ\u6388\u6743\u672A\u5B8C\u6210\uFF0C\u5E73\u53F0\u8FD4\u56DE\u4E86\u767B\u5F55\u9875\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    const code = location.searchParams.get("code");
+    if (location.origin !== "https://y.qq.com" || location.pathname !== "/portal/wx_redirect.html" || location.searchParams.get("state") !== session.state || !/^[\w-]{8,512}$/.test(code || "")) throw new Error("QQ\u6388\u6743\u7ED3\u679C\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    onProgress("exchanging");
+    const result = await read("https://u.y.qq.com/cgi-bin/musicu.fcg", { signal, method: "POST", body: JSON.stringify({ comm: { ct: 24, cv: 4747474, platform: "yqq.json", format: "json", g_tk: gtk, tmeLoginType: 2 }, req: { module: "QQConnectLogin.LoginServer", method: "QQLogin", param: { code } } }), headers: { "Content-Type": "application/json", Referer: musicOrigin } });
+    let data;
+    try {
+      data = JSON.parse(bodyText(result));
+    } catch {
+      throw new Error("QQ\u97F3\u4E50\u6388\u6743\u7ED3\u679C\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    }
+    const info = data.req?.data, cookies = qqResponseCookies(result.cookies);
+    if (data.code || data.req?.code) throw new Error(`QQ\u97F3\u4E50\u62D2\u7EDD\u4E86\u672C\u6B21\u6388\u6743${Number.isInteger(data.req?.code) ? `\uFF08${data.req.code}\uFF09` : ""}\uFF0C\u8BF7\u5728\u5B98\u65B9\u5BA2\u6237\u7AEF\u68C0\u67E5\u8D26\u53F7\u72B6\u6001`);
+    const musicid = String(info?.str_musicid || info?.musicid || cookies.uin?.replace(/^o/, "") || ""), musickey = info?.musickey || cookies.qqmusic_key || cookies.qm_keyst;
+    if (!/^\d{5,24}$/.test(musicid) || typeof musickey !== "string" || !/^[\x21-\x3a\x3c-\x7e]{1,8192}$/.test(musickey)) throw new Error("QQ\u97F3\u4E50\u672A\u8FD4\u56DE\u5B8C\u6574\u767B\u5F55\u6001\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    return { cookie: `uin=${musicid}; qqmusic_key=${musickey}`, nickname: safeText(info?.nick || info?.nickname) };
+  }
+  async function check(session, { signal, onProgress = (_status) => {
+  } } = {}) {
+    const response = await read(paramsUrl(loginOrigin + "/ptqrlogin", { u1: "https://graph.qq.com/oauth2.0/login_jump", ptqrtoken: String(qqHash(session.qrsig)), ptredirect: "0", h: "1", t: "1", g: "1", from_ui: "1", ptlang: "2052", action: `0-0-${Date.now()}`, js_ver: "20102616", js_type: "1", pt_uistyle: "40", aid: "716027609", daid: "383", pt_3rd_aid: "100497308", has_onekey: "1" }), { signal, headers: { Cookie: `qrsig=${session.qrsig}` } });
+    const result = parseQQCallback(bodyText(response));
+    if (result.code === 66) return { status: "waiting" };
+    if (result.code === 67) return { status: "scanned" };
+    if (result.code === 65) return { status: "expired" };
+    if (result.code !== 0) return { status: "failed" };
+    onProgress("authorizing");
+    const account = await authorize(session, result.callback, signal, onProgress);
+    return { status: "authorized", ...account, nickname: account.nickname || safeText(result.nickname) };
+  }
+  return { begin, check };
+}
+
+// src/music/playlists.mjs
+import { createHash as createHash3, randomBytes as randomBytes4 } from "node:crypto";
+var locations = {
+  netease: (id) => `https://music.163.com/#/playlist?id=${id}`,
+  qq: (id) => id === "liked" ? void 0 : `https://y.qq.com/n/ryqq/playlist/${id}`,
+  kugou: (id) => /^\d+$/.test(id) ? `https://www.kugou.com/yy/special/single/${id}.html` : void 0
+};
+var text = (value) => String(value ?? "").replace(/<[^>]*>/g, "").replace(/&#(x[\da-f]+|\d+);/gi, (_s, code) => {
+  const n = code[0].toLowerCase() === "x" ? parseInt(code.slice(1), 16) : Number(code);
+  return n > 0 && n <= 1114111 ? String.fromCodePoint(n) : "";
+}).replace(/&amp;/g, "&").replace(/[\x00-\x1f\x7f-\x9f]/g, " ").trim().slice(0, 180);
+var count = (value) => value !== void 0 && value !== null && Number.isFinite(Number(value)) && Number(value) >= 0 ? Math.min(1e7, Math.trunc(Number(value))) : void 0;
+var playlistKey = (playlist) => playlist.platform + ":" + playlist.id;
+function musicPlaylist(input) {
+  const platform = input?.platform, id = String(input?.id ?? "");
+  const liked = platform === "qq" && id === "liked";
+  if (!Object.hasOwn(locations, platform) || !liked && !(platform === "kugou" ? /^[\w-]{1,120}$/ : /^[1-9]\d{0,23}$/).test(id)) throw new Error("\u65E0\u6548\u6B4C\u5355\u5E73\u53F0\u6216 ID");
+  if (platform === "qq" && !liked && !Number.isSafeInteger(Number(id))) throw new Error("\u65E0\u6548\u6B4C\u5355 ID");
+  const legacyId = platform === "kugou" && /^[1-9]\d{0,23}$/.test(String(input.legacyId ?? "")) ? String(input.legacyId) : void 0;
+  return { platform, id, title: liked ? "\u6211\u559C\u6B22" : text(input.title) || "\u6B4C\u5355 " + id, creator: text(input.creator), count: count(input.count), legacyId, sourceUrl: locations[platform](legacyId || id) };
+}
+function playlistTarget(input, fallback = "qq") {
+  const value = String(input).trim();
+  if (!/^https?:\/\//i.test(value)) {
+    const prefixed = /^(netease|qq|kugou)\s*[:：]\s*(.+)$/i.exec(value);
+    return musicPlaylist({ platform: prefixed?.[1].toLowerCase() || fallback, id: prefixed?.[2] || value });
+  }
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("\u6B4C\u5355\u94FE\u63A5\u683C\u5F0F\u4E0D\u6B63\u786E");
+  }
+  if (url.username || url.password || url.port) throw new Error("\u4E0D\u652F\u6301\u6B64\u6B4C\u5355\u94FE\u63A5");
+  if (url.hostname === "music.163.com") {
+    const query = url.hash.startsWith("#/") ? new URL("https://music.163.com/" + url.hash.slice(2)) : url;
+    if (/\/(?:m\/)?playlist(?:\/|$)/.test(query.pathname)) return musicPlaylist({ platform: "netease", id: query.searchParams.get("id") || query.pathname.match(/playlist\/(\d+)/)?.[1] });
+  }
+  if (["y.qq.com", "i.y.qq.com"].includes(url.hostname)) return musicPlaylist({ platform: "qq", id: url.pathname.match(/\/playlist\/(\d+)/)?.[1] || (/taoge/.test(url.pathname) ? url.searchParams.get("id") || url.searchParams.get("disstid") : void 0) });
+  if (["www.kugou.com", "m.kugou.com"].includes(url.hostname)) return musicPlaylist({ platform: "kugou", id: url.pathname.match(/\/(?:songlist|plist\/list)\/([\w-]+)/)?.[1] || url.pathname.match(/\/special\/single\/(\d+)\.html/)?.[1] });
+  throw new Error("\u8BF7\u4F7F\u7528 QQ\u97F3\u4E50\u3001\u7F51\u6613\u4E91\u6216\u9177\u72D7\u7684\u5B8C\u6574\u6B4C\u5355\u94FE\u63A5\uFF0C\u4E5F\u53EF\u8F93\u5165 \u5E73\u53F0:\u6B4C\u5355ID");
+}
+function pageOptions(page = 1, limit = 20) {
+  if (!Number.isInteger(page) || page < 1 || page > 500 || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("\u6B4C\u5355\u5206\u9875\u8303\u56F4\u4E0D\u6B63\u786E");
+  return { page, limit, offset: (page - 1) * limit };
+}
+function listPage(list, map, options, total, more) {
+  if (!Array.isArray(list)) throw new Error("\u5E73\u53F0\u672A\u8FD4\u56DE\u6B4C\u5355\u5217\u8868\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+  const playlists = list.slice(0, options.limit).flatMap((item) => {
+    try {
+      return [musicPlaylist(map(item))];
+    } catch {
+      return [];
+    }
+  });
+  return { playlists, page: options.page, limit: options.limit, total: count(total), hasMore: more !== void 0 ? Boolean(more) : count(total) !== void 0 ? options.offset + list.length < Number(total) : list.length >= options.limit };
+}
+function checked(data, key) {
+  const result = key ? data[key] : data;
+  const denied = (code) => code !== void 0 && ![0, 200].includes(Number(code));
+  if (denied(data.code) || key && !result || denied(result?.code)) throw new Error("\u5E73\u53F0\u62D2\u7EDD\u4E86\u97F3\u4E50\u67E5\u8BE2\uFF0C\u8BF7\u68C0\u67E5\u767B\u5F55\u72B6\u6001\u6216\u8D44\u6E90\u53EF\u89C1\u6027");
+  return key ? result.data : result;
+}
+function createPlaylistProviders({ json, netease, parseSongs, normalizeTrack, cookies, page: readPage }) {
+  const kgMid = randomBytes4(16).toString("hex");
+  async function qq(module, method, param, cookie, signal, comm = {}) {
+    const values = cookies(cookie), uin = (values.uin || values.wxuin || "0").replace(/^o/, ""), key = values.qqmusic_key || values.qm_keyst || "";
+    let gtk = 5381;
+    for (const c of key) gtk = gtk * 33 + c.charCodeAt(0) & 2147483647;
+    const { data } = await json("https://u.y.qq.com/cgi-bin/musicu.fcg", { signal, method: "POST", body: JSON.stringify({ comm: { ct: 24, cv: 4747474, uin, authst: key, g_tk: gtk, tmeLoginType: 2, format: "json", ...comm }, req: { module, method, param } }), headers: { Cookie: cookie, Referer: "https://y.qq.com/", "Content-Type": "application/json" } });
+    return checked(data, "req");
+  }
+  async function kg(path, params, body, router, cookie, signal) {
+    const values = cookies(cookie), query = { dfid: values.dfid || "-", mid: values.mid || values.kg_mid || kgMid, uuid: "-", appid: 1005, clientver: 20489, clienttime: Math.floor(Date.now() / 1e3), ...values.token ? { token: values.token, userid: values.userid || 0 } : {}, ...params };
+    const payload = body ? JSON.stringify(body) : "", salt = "OIlwieks28dk2k092lksi2UIkp";
+    query.signature = createHash3("md5").update(salt + Object.keys(query).sort().map((key) => `${key}=${query[key]}`).join("") + payload + salt).digest("hex");
+    const url = new URL("https://gateway.kugou.com" + path);
+    url.search = new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)])).toString();
+    const { data } = await json(url.href, { signal, method: body ? "POST" : "GET", body: payload || void 0, headers: { "Content-Type": "application/json", ...router ? { "x-router": router } : {} } });
+    if (data.status !== 1 || data.error_code) throw new Error("\u9177\u72D7\u62D2\u7EDD\u4E86\u6B4C\u5355\u67E5\u8BE2\uFF0C\u8BF7\u68C0\u67E5\u767B\u5F55\u72B6\u6001\u6216\u6B4C\u5355\u53EF\u89C1\u6027");
+    return data.data;
+  }
+  async function qqMine(cookie, signal, offset, limit) {
+    const values = cookies(cookie), uin = (values.uin || values.wxuin || "").replace(/^o/, "");
+    if (!uin || !(values.qqmusic_key || values.qm_keyst)) throw new Error("\u8BF7\u5148\u767B\u5F55 QQ\u97F3\u4E50");
+    const url = new URL("https://c.y.qq.com/rsc/fcgi-bin/fcg_user_created_diss");
+    url.search = new URLSearchParams({ ct: "24", cv: "4747474", format: "json", platform: "yqq.json", uin, hostuin: uin, sin: String(offset), size: String(limit) }).toString();
+    const { data } = await json(url.href, { signal, headers: { Cookie: cookie, Referer: "https://y.qq.com/" } });
+    return checked(data).data;
+  }
+  async function playlists(platform, { mode = "search", query = "", collection = "created", page = 1, limit = 5, cookie = "", signal } = {}) {
+    const options = pageOptions(page, limit), values = cookies(cookie);
+    if (!["search", "mine"].includes(mode) || !["created", "favorite"].includes(collection)) throw new Error("\u65E0\u6548\u6B4C\u5355\u67E5\u8BE2\u65B9\u5F0F");
+    if (mode === "search" && (!query.trim() || query.length > 120)) throw new Error("\u8BF7\u8F93\u5165 1\u2013120 \u5B57\u7684\u6B4C\u5355\u540D\u79F0");
+    if (platform === "qq") {
+      if (mode === "search") {
+        const data2 = await qq("music.search.SearchCgiService", "DoSearchForQQMusicDesktop", { grp: 1, num_per_page: limit, page_num: page, query, search_type: 3 }, cookie, signal, { ct: 19, cv: 1859 });
+        return listPage(data2.body?.songlist?.list, (item) => ({ platform, id: item.dissid, title: item.dissname, creator: item.creator?.name, count: item.song_count }), options, data2.meta?.sum);
+      }
+      const rawLimit = page === 1 ? limit - 1 : limit, rawOffset = Math.max(0, options.offset - 1);
+      const mine = await qqMine(cookie, signal, collection === "favorite" ? 0 : rawOffset, collection === "favorite" ? 1 : Math.max(1, rawLimit));
+      if (collection === "favorite") {
+        if (!mine?.encrypt_uin) throw new Error("QQ\u97F3\u4E50\u767B\u5F55\u6001\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+        const data2 = await qq("music.musicasset.PlaylistFavRead", "CgiGetPlaylistFavInfo", { uin: mine.encrypt_uin, offset: options.offset, size: limit }, cookie, signal);
+        return listPage(data2.v_list, (item) => ({ platform, id: item.tid ?? item.id, title: item.title, creator: item.nickname, count: item.songnum }), options, data2.total, data2.hasmore);
+      }
+      const result = listPage(mine?.disslist?.slice(0, rawLimit), (item) => ({ platform, id: item.tid, title: item.diss_name, count: item.song_cnt }), { ...options, offset: rawOffset, limit: rawLimit }, mine?.totoal ?? mine?.total);
+      if (page === 1) result.playlists.unshift(musicPlaylist({ platform, id: "liked" }));
+      return { ...result, limit };
+    }
+    if (platform === "netease") {
+      if (mode === "search") {
+        const url = new URL("https://music.163.com/api/search/get/web");
+        url.search = new URLSearchParams({ s: query, type: "1000", offset: String(options.offset), limit: String(limit) }).toString();
+        const { data: data3 } = await json(url.href, { signal, headers: { Cookie: cookie, Referer: "https://music.163.com/" } });
+        checked(data3);
+        return listPage(data3.result?.playlists ?? [], (item) => ({ platform, id: item.id, title: item.name, creator: item.creator?.nickname, count: item.trackCount }), options, data3.result?.playlistCount ?? 0);
+      }
+      if (!values.MUSIC_U) throw new Error("\u8BF7\u5148\u767B\u5F55\u7F51\u6613\u4E91");
+      const account = checked((await netease("nuser/account/get", {}, cookie, signal)).data);
+      if (!account.account?.id) throw new Error("\u7F51\u6613\u4E91\u767B\u5F55\u6001\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+      const data2 = checked((await netease("user/playlist", { uid: account.account.id, offset: options.offset, limit }, cookie, signal)).data);
+      const list = data2.playlist?.filter((item) => collection === "favorite" ? item.subscribed : !item.subscribed);
+      return listPage(list, (item) => ({ platform, id: item.id, title: item.name, creator: item.creator?.nickname, count: item.trackCount }), options, void 0, data2.more);
+    }
+    if (platform !== "kugou") throw new Error("\u4E0D\u652F\u6301\u7684\u6B4C\u5355\u5E73\u53F0");
+    if (mode === "search") {
+      const data2 = await kg("/v1/search/special", { albumhide: 0, iscorrection: 1, keyword: query, nocollect: 0, page, pagesize: limit, platform: "AndroidFilter" }, void 0, "complexsearch.kugou.com", cookie, signal);
+      return listPage(data2.lists, (item) => ({ platform, id: item.gid || item.specialid, legacyId: item.specialid, title: item.specialname, creator: item.nickname, count: item.song_count }), options, data2.total);
+    }
+    if (!values.userid || !values.token) throw new Error("\u8BF7\u5148\u767B\u5F55\u9177\u72D7");
+    if (collection === "favorite") throw new Error("\u9177\u72D7\u76EE\u524D\u8FD4\u56DE\u521B\u5EFA\u548C\u6536\u85CF\u7684\u5408\u5E76\u5217\u8868\uFF0C\u8BF7\u9009\u62E9\u201C\u6211\u7684\u6B4C\u5355\u201D");
+    const data = await kg("/v7/get_all_list", { plat: 1, userid: Number(values.userid) }, { userid: values.userid, token: values.token, total_ver: 979, type: 2, page, pagesize: limit }, "cloudlist.service.kugou.com", cookie, signal);
+    return listPage(data.info ?? data.list ?? data.lists, (item) => ({ platform, id: item.global_collection_id || item.gid, title: item.name || item.list_name, count: item.count ?? item.songcount }), options, data.total);
+  }
+  async function playlist(platform, id, { page = 1, limit = 20, cookie = "", signal } = {}) {
+    const initial = musicPlaylist({ platform, id }), options = pageOptions(page, limit);
+    if (platform === "kugou" && /^\d+$/.test(id)) {
+      const response = await readPage(initial.sourceUrl, { signal, asBytes: true });
+      const html = (response.text ?? response.bytes.toString("utf8")).replace(/\\"/g, '"');
+      const globalId = /["']global_collection_id["']\s*:\s*["'](collection_[\w-]+)["']/.exec(html)?.[1];
+      if (!globalId) throw new Error("\u672A\u89E3\u6790\u5230\u9177\u72D7\u6B4C\u5355\uFF0C\u8BF7\u5728\u6B4C\u5355\u641C\u7D22\u4E2D\u6309\u540D\u79F0\u9009\u62E9");
+      const result = await playlist(platform, globalId, { page, limit, cookie, signal });
+      return { ...result, info: musicPlaylist({ ...result.info, legacyId: id }) };
+    }
+    let info, tracks, total, hasMore, rawCount;
+    if (platform === "qq") {
+      const liked = id === "liked", mine = liked ? await qqMine(cookie, signal, 0, 1) : void 0;
+      if (liked && !mine?.encrypt_uin) throw new Error("QQ\u97F3\u4E50\u767B\u5F55\u6001\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+      const data = await qq("music.srfDissInfo.DissInfo", "CgiGetDiss", { disstid: liked ? 0 : Number(id), dirid: liked ? 201 : 0, tag: liked, song_begin: options.offset, song_num: limit, userinfo: liked, orderlist: true, onlysonglist: false, ...liked ? { enc_host_uin: mine.encrypt_uin } : {} }, cookie, signal);
+      if (data.code || !Array.isArray(data.songlist)) throw new Error("QQ\u97F3\u4E50\u672A\u8FD4\u56DE\u6B4C\u66F2\uFF0C\u8BF7\u68C0\u67E5\u6B4C\u5355\u53EF\u89C1\u6027");
+      info = { ...initial, title: data.dirinfo?.title || data.dirinfo?.dissname, creator: data.dirinfo?.creator?.nick, count: data.total_song_num };
+      rawCount = data.songlist.length;
+      tracks = parseSongs(platform, { data: { song: { list: data.songlist.slice(0, limit) } } });
+      total = data.total_song_num;
+      hasMore = Boolean(data.hasmore);
+    } else if (platform === "netease") {
+      const data = checked((await netease("v3/playlist/detail", { id, n: 1e3, s: 0 }, cookie, signal)).data), source = data.playlist;
+      if (!source || !Array.isArray(source.trackIds)) throw new Error("\u7F51\u6613\u4E91\u672A\u8FD4\u56DE\u6B4C\u66F2\uFF0C\u8BF7\u68C0\u67E5\u6B4C\u5355\u53EF\u89C1\u6027");
+      info = { ...initial, title: source.name, creator: source.creator?.nickname, count: source.trackCount };
+      const ids = source.trackIds.slice(options.offset, options.offset + limit).map((track) => ({ id: track.id }));
+      const songs = ids.length ? checked((await netease("v3/song/detail", { c: JSON.stringify(ids) }, cookie, signal)).data).songs : [];
+      rawCount = ids.length;
+      tracks = parseSongs(platform, { result: { songs } });
+      total = source.trackCount ?? source.trackIds.length;
+      hasMore = options.offset + ids.length < source.trackIds.length;
+    } else {
+      const data = await kg("/pubsongs/v2/get_other_list_file_nofilt", { area_code: 1, begin_idx: options.offset, plat: 1, type: 1, mode: 1, personal_switch: 1, extend_fields: "abtags,hot_cmt,popularization", pagesize: limit, global_collection_id: id }, void 0, void 0, cookie, signal);
+      if (!Array.isArray(data.songs)) throw new Error("\u9177\u72D7\u672A\u8FD4\u56DE\u6B4C\u66F2\uFF0C\u8BF7\u68C0\u67E5\u6B4C\u5355\u53EF\u89C1\u6027");
+      let detail = data.list_info || {};
+      if (!detail.name && !detail.specialname) {
+        const metadata = await kg("/v3/get_list_info", {}, { data: [{ global_collection_id: id }], userid: Number(cookies(cookie).userid || 0), token: cookies(cookie).token || "" }, "pubsongs.kugou.com", cookie, signal);
+        detail = Array.isArray(metadata) ? metadata[0] || {} : metadata;
+      }
+      info = { ...initial, title: detail.name || detail.list_name || detail.specialname, creator: detail.nickname || detail.username, count: data.count };
+      rawCount = data.songs.length;
+      total = data.count;
+      hasMore = options.offset + rawCount < Number(total);
+      tracks = data.songs.slice(0, limit).flatMap((song) => {
+        try {
+          const parts = String(song.name || "").split(" - "), artist = song.singerinfo?.map((item) => item.name).join(" / ") || (parts.length > 1 ? parts.shift() : "");
+          if (parts.length > 1 && parts[0] === song.singerinfo?.[0]?.name) parts.shift();
+          return [normalizeTrack({ platform, id: song.hash, title: parts.join(" - "), artist, album: song.albuminfo?.name, albumId: song.album_id, duration: song.timelen / 1e3 })];
+        } catch {
+          return [];
+        }
+      });
+    }
+    return { info: musicPlaylist(info), tracks, page, limit, total: count(total), hasMore, unavailable: Math.max(0, Math.min(rawCount, limit) - tracks.length) };
+  }
+  async function radio({ limit = 5, exclude = [], cookie = "", signal } = {}) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10) throw new Error("\u63A8\u8350\u6570\u91CF\u5E94\u4E3A 1\u201310 \u9996");
+    const values = cookies(cookie);
+    if (!(values.uin || values.wxuin) || !(values.qqmusic_key || values.qm_keyst)) throw new Error("\u8BF7\u5148\u767B\u5F55 QQ\u97F3\u4E50\uFF0C\u518D\u542C\u79C1\u4EBA\u7535\u53F0");
+    const data = await qq("music.radioProxy.MbTrackRadioSvr", "get_radio_track", { id: 99, num: limit, from: 0, scene: 0, song_ids: [] }, cookie, signal);
+    if (!Array.isArray(data.tracks)) throw new Error("QQ\u97F3\u4E50\u6682\u672A\u8FD4\u56DE\u4E2A\u6027\u63A8\u8350\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+    const seen = new Set(exclude.slice(-100)), raw = data.tracks.slice(0, limit);
+    const tracks = parseSongs("qq", { data: { song: { list: raw } } }).filter((track) => {
+      if (seen.has(track.id)) return false;
+      seen.add(track.id);
+      return true;
+    });
+    return { tracks };
+  }
+  return { playlists, playlist, radio };
+}
+
+// src/music/providers.mjs
+var MUSIC_PLATFORMS = Object.freeze([
+  { id: "netease", name: "\u7F51\u6613\u4E91", qr: true, home: "https://music.163.com/" },
+  { id: "qq", name: "QQ\u97F3\u4E50", qr: true, home: "https://y.qq.com/" },
+  { id: "kugou", name: "\u9177\u72D7", qr: true, home: "https://www.kugou.com/" }
+]);
+function musicPlatform(id) {
+  const platform = MUSIC_PLATFORMS.find((item) => item.id === id);
+  if (!platform) throw new Error("\u4E0D\u652F\u6301\u7684\u97F3\u4E50\u5E73\u53F0");
+  return platform;
+}
+var trackKey = (track) => track.platform + ":" + track.id;
+var clean = (value) => String(value ?? "").replace(/<[^>]*>/g, "").replace(/&(?:amp|lt|gt|quot|#39);/g, (s) => ({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" })[s]).replace(/[\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 180).trim();
+function musicTrack(input) {
+  const platform = musicPlatform(input?.platform).id, id = String(input.id ?? "");
+  if (!(platform === "netease" ? /^\d{1,24}$/ : platform === "kugou" ? /^[a-f0-9]{32}$/i : /^[a-z0-9]{1,40}$/i).test(id)) throw new Error("\u65E0\u6548\u6B4C\u66F2 ID");
+  const duration = Number(input.duration);
+  return {
+    platform,
+    id,
+    title: clean(input.title) || "\u672A\u77E5\u6B4C\u66F2",
+    artist: clean(input.artist) || "\u672A\u77E5\u6B4C\u624B",
+    album: clean(input.album),
+    duration: Number.isFinite(duration) && duration > 0 ? Math.min(duration, 86400) : 0,
+    albumId: /^\d{1,24}$/.test(String(input.albumId)) ? String(input.albumId) : "",
+    mediaId: /^[a-z0-9]{1,40}$/i.test(input.mediaId ?? "") ? input.mediaId : "",
+    sourceUrl: platform === "netease" ? `https://music.163.com/#/song?id=${id}` : platform === "qq" ? `https://y.qq.com/n/ryqq/songDetail/${id}` : `https://www.kugou.com/song/#hash=${id}`
+  };
+}
+function parseSearch(platform, data) {
+  const list = platform === "netease" ? data.result?.songs : platform === "qq" ? data.data?.song?.list : data.data?.lists;
+  if (!Array.isArray(list)) throw new Error("\u641C\u7D22\u63A5\u53E3\u672A\u8FD4\u56DE\u6B4C\u66F2\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+  return list.flatMap((song) => {
+    try {
+      return [musicTrack(platform === "netease" ? { platform, id: song.id, title: song.name, artist: (song.ar ?? song.artists ?? []).map((s) => s.name).join(" / "), album: (song.al ?? song.album)?.name, duration: (song.dt ?? song.duration) / 1e3 } : platform === "qq" ? { platform, id: song.mid ?? song.songmid, title: song.name ?? song.songname, artist: (song.singer ?? []).map((s) => s.name).join(" / "), album: song.album?.name ?? song.albumname, duration: song.interval, mediaId: song.file?.media_mid ?? song.media_mid } : { platform, id: song.FileHash, title: song.SongName, artist: song.SingerName, album: song.AlbumName, albumId: song.AlbumID, duration: song.Duration })];
+    } catch {
+      return [];
+    }
+  });
+}
+function cookieValues(cookie = "") {
+  return Object.fromEntries(cookie.split(";").map((s) => s.trim()).filter(Boolean).map((s) => {
+    const at = s.indexOf("=");
+    return [s.slice(0, at), s.slice(at + 1)];
+  }).filter(([key]) => /^[\w-]+$/.test(key)));
+}
+var md5 = (text2) => createHash4("md5").update(text2).digest("hex");
+function neteaseForm(payload, secret = randomBytes5(12).toString("base64")) {
+  const encrypt = (text2, key) => {
+    const cipher = createCipheriv3("aes-128-cbc", key, "0102030405060708");
+    return Buffer.concat([cipher.update(text2), cipher.final()]).toString("base64");
+  };
+  const modulus = BigInt("0x00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7");
+  let value = BigInt("0x" + Buffer.from(secret).reverse().toString("hex")), exponent = 65537n, encoded = 1n;
+  while (exponent) {
+    if (exponent & 1n) encoded = encoded * value % modulus;
+    value = value * value % modulus;
+    exponent >>= 1n;
+  }
+  return new URLSearchParams({ params: encrypt(encrypt(JSON.stringify(payload), "0CoJUm6Qyw8W8jud"), secret), encSecKey: encoded.toString(16).padStart(256, "0") }).toString();
+}
+function kugouSignature(params) {
+  const salt = "NVPh5oo715z5DIWAeQlhMDsWXXQV4hwt";
+  return md5(salt + Object.keys(params).map((key) => `${key}=${params[key]}`).sort().join("") + salt);
+}
+var urlWith = (base, params) => {
+  const url = new URL(base);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, String(value));
+  return url.href;
+};
+function playResult(url, preview = false, duration) {
+  if (!url) throw new Error("\u5E73\u53F0\u672A\u63D0\u4F9B\u64AD\u653E\u5730\u5740\uFF0C\u8BF7\u68C0\u67E5\u767B\u5F55\u3001\u4F1A\u5458\u6216\u5730\u533A\u6743\u9650");
+  return { url: httpUrl(url).href, preview: Boolean(preview), duration: Number(duration) || 0 };
+}
+function createMusicProviders({ request = createHttpClient() } = {}) {
+  const kugouMid = randomBytes5(16).toString("hex");
+  const qqLogin = createQQLogin(request);
+  async function json(url, options = {}) {
+    const result = await request(url, { ...options, asBytes: true, headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json,text/plain,*/*", ...options.headers } });
+    let data;
+    try {
+      data = JSON.parse(result.text ?? result.bytes.toString("utf8"));
+    } catch {
+      throw new Error("\u5E73\u53F0\u8FD4\u56DE\u4E86\u975E JSON \u54CD\u5E94\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+    }
+    return { data, cookies: result.cookies || [] };
+  }
+  const netease = (path, payload, cookie = "", signal) => json("https://music.163.com/weapi/" + path, { method: "POST", body: neteaseForm({ ...payload, csrf_token: cookieValues(cookie).__csrf || "" }), signal, headers: { Referer: "https://music.163.com/", Cookie: cookie, "Content-Type": "application/x-www-form-urlencoded" } });
+  async function kugou(path, params, session, signal) {
+    const query = { dfid: "-", mid: session.mid, uuid: "-", appid: 1005, clientver: 20489, clienttime: Math.floor(Date.now() / 1e3), ...params };
+    query.signature = kugouSignature(query);
+    return json(urlWith("https://login-user.kugou.com" + path, query), { signal, headers: { Referer: "https://h5.kugou.com/", mid: session.mid } });
+  }
+  async function search(platform, query, { limit = 8, cookie = "", signal } = {}) {
+    musicPlatform(platform);
+    if (!String(query).trim() || query.length > 120) throw new Error("\u8BF7\u8F93\u5165 1\u2013120 \u5B57\u7684\u6B4C\u66F2\u6216\u6B4C\u624B\u540D\u79F0");
+    limit = Math.max(1, Math.min(30, Math.trunc(Number(limit)) || 8));
+    const url = platform === "netease" ? urlWith("https://music.163.com/api/search/get/web", { s: query, type: 1, limit, offset: 0 }) : platform === "qq" ? urlWith("https://c.y.qq.com/soso/fcgi-bin/client_search_cp", { w: query, format: "json", p: 1, n: limit }) : urlWith("https://songsearch.kugou.com/song_search_v2", { keyword: query, page: 1, pagesize: limit });
+    const { data } = await json(url, { signal, headers: { Cookie: cookie, Referer: musicPlatform(platform).home } });
+    return parseSearch(platform, data).slice(0, limit);
+  }
+  async function resolve5(input, { cookie = "", signal } = {}) {
+    const track = musicTrack(input), values = cookieValues(cookie);
+    if (track.platform === "netease") {
+      const { data: data2 } = await netease("song/enhance/player/url/v1", { ids: JSON.stringify([track.id]), level: "higher", encodeType: "mp3" }, cookie, signal);
+      const item = data2.data?.[0];
+      return playResult(item?.url, item?.freeTrialInfo, item?.freeTrialInfo ? (item.freeTrialInfo.end - item.freeTrialInfo.start) / 1e3 : item?.time / 1e3);
+    }
+    if (track.platform === "qq") {
+      const uin = (values.uin || values.wxuin || "0").replace(/^o/, ""), key = values.qqmusic_key || values.qm_keyst || "";
+      let gtk = 5381;
+      for (const c of key) gtk = gtk + (gtk << 5) + c.charCodeAt(0) & 2147483647;
+      const payload = { comm: { uin, authst: key, g_tk: gtk, ct: 24, cv: 0, format: "json" }, req_1: { module: "vkey.GetVkeyServer", method: "CgiGetVkey", param: { guid: "10000", songmid: [track.id], songtype: [0], uin, loginflag: cookie ? 1 : 0, platform: "20", filename: [`M500${track.mediaId || track.id}.mp3`] } } };
+      const { data: data2 } = await json("https://u.y.qq.com/cgi-bin/musicu.fcg", { signal, method: "POST", body: JSON.stringify(payload), headers: { Cookie: cookie, Referer: "https://y.qq.com/", "Content-Type": "application/json" } });
+      const result = data2.req_1?.data, item = result?.midurlinfo?.[0];
+      return playResult(item?.purl ? new URL(item.purl, result.sip?.[0] || "https://isure.stream.qqmusic.qq.com/").href : "");
+    }
+    const mid = values.mid || values.kg_mid || kugouMid, hash = track.id.toLowerCase(), userid = values.userid || 0;
+    const params = {
+      dfid: values.dfid || "-",
+      mid,
+      uuid: "-",
+      appid: 1005,
+      clientver: 11430,
+      clienttime: Math.floor(Date.now() / 1e3),
+      album_id: Number(track.albumId || 0),
+      area_code: 1,
+      hash,
+      version: 11430,
+      quality: 128,
+      album_audio_id: 0,
+      behavior: "play",
+      pid: 2,
+      cmd: 26,
+      pidversion: 3001,
+      IsFreePart: 0,
+      cdnBackup: 1,
+      module: "",
+      page_id: 151369488,
+      ppage_id: "463467626,350369493,788954147",
+      ...values.token ? { token: values.token, userid } : {},
+      key: md5(`${hash}57ae12eb6890223e355ccfcb74edf70d1005${mid}${userid}`)
+    };
+    const salt = "OIlwieks28dk2k092lksi2UIkp";
+    params.signature = md5(salt + Object.keys(params).sort().map((key) => `${key}=${params[key]}`).join("") + salt);
+    const { data } = await json(urlWith("https://gateway.kugou.com/v5/url", params), { signal, headers: { "x-router": "trackercdn.kugou.com", mid, dfid: params.dfid } });
+    if (data["SSA-CODE"] || data.data?.["SSA-CODE"] || data.error_code === 30020) throw new Error("\u9177\u72D7\u8981\u6C42\u989D\u5916\u9A8C\u8BC1\uFF0C\u8BF7\u5148\u5728\u5B98\u65B9 App \u5B8C\u6210\u9A8C\u8BC1\u540E\u91CD\u8BD5");
+    return playResult(Array.isArray(data.url) ? data.url[0] : data.url, data.is_free_part, data.timeLength);
+  }
+  async function beginLogin(platform, { signal } = {}) {
+    musicPlatform(platform);
+    if (platform === "qq") return qqLogin.begin({ signal });
+    if (platform === "netease") {
+      const { data: data2 } = await netease("login/qrcode/unikey", { type: 3 }, "", signal);
+      const key2 = data2.unikey ?? data2.data?.unikey;
+      if (!key2) throw new Error("\u7F51\u6613\u4E91\u672A\u8FD4\u56DE\u626B\u7801\u51ED\u636E\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+      return { platform, key: key2, url: urlWith("https://music.163.com/login", { codekey: key2 }) };
+    }
+    const session = { platform, mid: randomBytes5(16).toString("hex") };
+    const { data } = await kugou("/v2/qrcode", { appid: 1001, type: 1, plat: 4, srcappid: 2919, qrcode_txt: "https://h5.kugou.com/apps/loginQRCode/html/index.html?appid=1005&" }, session, signal);
+    const key = data.data?.qrcode;
+    if (!key) throw new Error("\u9177\u72D7\u672A\u8FD4\u56DE\u626B\u7801\u51ED\u636E\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+    return { ...session, key, url: urlWith("https://h5.kugou.com/apps/loginQRCode/html/index.html", { qrcode: key }) };
+  }
+  async function checkLogin(session, { signal, onProgress = (_status) => {
+  } } = {}) {
+    if (session.platform === "qq") return qqLogin.check(session, { signal, onProgress });
+    if (session.platform === "netease") {
+      const { data: data2, cookies } = await netease("login/qrcode/client/login", { key: session.key, type: 3 }, "", signal);
+      if (data2.code === 803) {
+        const cookie = cookies.map((c) => c.split(";")[0]).join("; ");
+        if (!cookieValues(cookie).MUSIC_U) throw new Error("\u626B\u7801\u5B8C\u6210\u4F46\u5E73\u53F0\u672A\u8FD4\u56DE\u6709\u6548\u767B\u5F55\u6001");
+        return { status: "authorized", cookie };
+      }
+      return { status: data2.code === 800 ? "expired" : data2.code === 802 ? "scanned" : data2.code === 801 ? "waiting" : "failed" };
+    }
+    musicPlatform(session.platform);
+    const { data } = await kugou("/v2/get_userinfo_qrcode", { plat: 4, appid: 1005, srcappid: 2919, qrcode: session.key, dev: "Web" }, session, signal);
+    const info = data.data;
+    if (Number(info?.status) === 4) {
+      if (!info.token || !info.userid) throw new Error("\u626B\u7801\u5B8C\u6210\u4F46\u5E73\u53F0\u672A\u8FD4\u56DE\u6709\u6548\u767B\u5F55\u6001");
+      return { status: "authorized", cookie: `token=${info.token}; userid=${info.userid}; mid=${session.mid}`, nickname: clean(info.nickname) };
+    }
+    return { status: Number(info?.status) === 0 ? "expired" : Number(info?.status) === 2 ? "scanned" : Number(info?.status) === 1 ? "waiting" : "failed" };
+  }
+  return { search, resolve: resolve5, beginLogin, checkLogin, ...createPlaylistProviders({ json, netease, parseSongs: parseSearch, normalizeTrack: musicTrack, cookies: cookieValues, page: request }) };
+}
+
+// src/music/settings.mjs
+import { readFile as readFile5, mkdir as mkdir6, unlink as unlink3 } from "node:fs/promises";
+import { join as join7 } from "node:path";
+function normalizeMusicCookie(platform, input) {
+  musicPlatform(platform);
+  if (typeof input !== "string" || input.length > 16384 || /[\x00-\x1f\x7f]/.test(input)) throw new Error("\u767B\u5F55\u6001\u683C\u5F0F\u4E0D\u6B63\u786E\uFF0C\u8BF7\u7C98\u8D34\u5355\u884C Cookie");
+  const values = cookieValues(input.trim().replace(/^cookie:\s*/i, ""));
+  const required = platform === "netease" ? values.MUSIC_U : platform === "qq" ? (values.uin || values.wxuin) && (values.qqmusic_key || values.qm_keyst) : values.token && values.userid;
+  if (!required) throw new Error(platform === "netease" ? "\u9700\u8981\u7F51\u6613\u4E91\u7F51\u9875\u767B\u5F55\u540E\u7684 MUSIC_U" : platform === "qq" ? "\u9700\u8981 QQ\u97F3\u4E50\u7684 uin\uFF08\u6216 wxuin\uFF09\u548C qqmusic_key\uFF08\u6216 qm_keyst\uFF09" : "\u9700\u8981\u9177\u72D7\u767B\u5F55\u540E\u7684 userid \u548C token");
+  const allowed = platform === "netease" ? ["MUSIC_U", "__csrf", "NMTID", "MUSIC_A"] : platform === "qq" ? ["uin", "wxuin", "qqmusic_key", "qm_keyst", "qqmusic_fromtag"] : ["userid", "token", "mid", "kg_mid", "dfid"];
+  return allowed.filter((key) => values[key]).map((key) => `${key}=${values[key]}`).join("; ");
+}
+var MusicSettings = class {
+  constructor(library) {
+    this.library = library;
+    this.directory = join7(library.internal, "settings");
+  }
+  path(name) {
+    return join7(this.directory, `music-${name}.enc`);
+  }
+  async read(name, fallback) {
+    try {
+      return await this.library.vault.unseal(await readFile5(this.path(name)));
+    } catch (error) {
+      if (error.code === "ENOENT") return fallback;
+      throw error;
+    }
+  }
+  async write(name, value) {
+    await mkdir6(this.directory, { recursive: true, mode: 448 });
+    await atomicWrite(this.path(name), await this.library.vault.seal(value));
+  }
+  async cookie(platform) {
+    musicPlatform(platform);
+    return (await this.read(platform, {})).cookie || "";
+  }
+  async account(platform) {
+    musicPlatform(platform);
+    const value = await this.read(platform, {});
+    return { platform, configured: Boolean(value.cookie), method: value.method || "", nickname: value.nickname || "", savedAt: value.savedAt || "" };
+  }
+  async saveAccount(platform, input, { method = "cookie", nickname = "" } = {}) {
+    const cookie = normalizeMusicCookie(platform, input);
+    await this.write(platform, { cookie, method, nickname: String(nickname).replace(/[\x00-\x1f\x7f-\x9f]/g, "").slice(0, 80), savedAt: (/* @__PURE__ */ new Date()).toISOString() });
+    return this.account(platform);
+  }
+  async logout(platform) {
+    musicPlatform(platform);
+    await unlink3(this.path(platform)).catch((error) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+    return this.account(platform);
+  }
+  async player() {
+    const value = await this.read("player", {});
+    const queue = (Array.isArray(value.queue) ? value.queue : []).slice(0, 100).flatMap((track) => {
+      try {
+        return [musicTrack(track)];
+      } catch {
+        return [];
+      }
+    });
+    return { queue, currentKey: queue.some((track) => trackKey(track) === value.currentKey) ? value.currentKey : "", volume: Number.isFinite(value.volume) ? Math.max(0, Math.min(100, value.volume)) : 50, repeat: value.repeat === "one" ? "one" : "all" };
+  }
+  savePlayer(value) {
+    return this.write("player", { queue: value.queue.slice(0, 100).map(musicTrack), currentKey: value.currentKey, volume: value.volume, repeat: value.repeat });
+  }
+};
+
+// src/music/temp.mjs
+import { mkdtemp as mkdtemp2, readdir as readdir6, rm as rm4 } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join as join8, resolve as resolve3, dirname as dirname4, basename as basename3 } from "node:path";
+var pattern = /^moyu-music-(?:audio|login)-(\d+)-[\w-]+$/;
+function createMusicTemp(kind) {
+  if (!["audio", "login"].includes(kind)) throw new Error("\u65E0\u6548\u97F3\u4E50\u7F13\u5B58\u7C7B\u578B");
+  return mkdtemp2(join8(tmpdir(), `moyu-music-${kind}-${process.pid}-`));
+}
+async function removeMusicTemp(path) {
+  const absolute = resolve3(path);
+  if (dirname4(absolute) !== resolve3(tmpdir()) || !pattern.test(basename3(absolute))) throw new Error("\u97F3\u4E50\u7F13\u5B58\u8DEF\u5F84\u8D8A\u754C");
+  await rm4(absolute, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 });
+}
+async function cleanupMusicTemps() {
+  for (const entry of await readdir6(tmpdir(), { withFileTypes: true })) {
+    const match = pattern.exec(entry.name);
+    if (!entry.isDirectory() || !match) continue;
+    try {
+      process.kill(Number(match[1]), 0);
+      continue;
+    } catch (error) {
+      if (error.code !== "ESRCH") continue;
+    }
+    await removeMusicTemp(join8(tmpdir(), entry.name));
+  }
+}
+
+// src/music/service.mjs
+var MusicService = class {
+  constructor(library, { providers = createMusicProviders(), download = createHttpClient({ maxBytes: 64 * 1024 * 1024, timeoutMs: 6e4 }), accountCoordinator = (
+    /** @type {any} */
+    void 0
+  ) } = {}) {
+    this.settings = new MusicSettings(library);
+    this.providers = providers;
+    this.download = download;
+    this.accountWrites = /* @__PURE__ */ new Map();
+    this.accountCoordinator = accountCoordinator;
+  }
+  /** @param {string} query @param {{platform?: string, limit?: number, signal?: AbortSignal}} options */
+  async search(query, { platform = "all", limit = 8, signal } = {}) {
+    const selected = platform === "all" ? MUSIC_PLATFORMS : [musicPlatform(platform)];
+    const results = await Promise.allSettled(selected.map(async (source) => this.providers.search(source.id, query.trim(), { limit, cookie: await this.settings.cookie(source.id), signal })));
+    signal?.throwIfAborted();
+    const tracks = [], errors = [], batches = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === "fulfilled") batches.push(result.value);
+      else errors.push({ platform: selected[i].id, message: result.reason instanceof Error ? result.reason.message : "\u5E73\u53F0\u6682\u4E0D\u53EF\u7528" });
+    }
+    for (let index = 0; index < Math.max(0, ...batches.map((batch) => batch.length)); index++) for (const batch of batches) if (batch[index]) tracks.push(batch[index]);
+    return { tracks, errors };
+  }
+  async prepare(input, { signal } = {}) {
+    const track = musicTrack(input), cookie = await this.settings.cookie(track.platform);
+    const source = await this.providers.resolve(track, { cookie, signal });
+    signal?.throwIfAborted();
+    const result = await this.download(source.url, { signal, asBytes: true, headers: { Referer: musicPlatform(track.platform).home } });
+    signal?.throwIfAborted();
+    const directory = await createMusicTemp("audio");
+    try {
+      const path = join9(directory, "track.audio");
+      await writeFile4(path, result.bytes, { mode: 384, signal });
+      signal?.throwIfAborted();
+      return { path, track, preview: source.preview, release: () => removeMusicTemp(directory) };
+    } catch (error) {
+      await removeMusicTemp(directory);
+      throw error;
+    }
+  }
+  /** @param {{mode?: string, query?: string, platform?: string, collection?: string, page?: number, limit?: number, signal?: AbortSignal}} options */
+  async playlists({ mode = "search", query = "", platform = "all", collection = "created", page = 1, limit = 5, signal } = {}) {
+    let selected = platform === "all" ? MUSIC_PLATFORMS : [musicPlatform(platform)];
+    if (mode === "mine" && platform === "all") {
+      const configured = await Promise.all(selected.map((item) => this.settings.account(item.id)));
+      selected = selected.filter((item, index) => configured[index].configured);
+      if (!selected.length) throw new Error("\u8BF7\u5148\u5728 /music \u7684\u8D26\u53F7\u83DC\u5355\u767B\u5F55\u97F3\u4E50\u5E73\u53F0");
+    }
+    const results = await Promise.allSettled(selected.map(async (item) => this.providers.playlists(item.id, { mode, query, collection, page, limit, cookie: await this.settings.cookie(item.id), signal })));
+    signal?.throwIfAborted();
+    const playlists = [], errors = [], pages = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === "fulfilled") pages.push(result.value);
+      else errors.push({ platform: selected[i].id, message: result.reason instanceof Error ? result.reason.message : "\u5E73\u53F0\u6B4C\u5355\u6682\u4E0D\u53EF\u7528" });
+    }
+    for (let index = 0; index < Math.max(0, ...pages.map((batch) => batch.playlists.length)); index++) for (const batch of pages) if (batch.playlists[index]) playlists.push(batch.playlists[index]);
+    return { playlists, errors, page, limit, hasMore: pages.some((item) => item.hasMore) };
+  }
+  /** @param {string} platform @param {string} id @param {{page?: number, limit?: number, signal?: AbortSignal}} options */
+  async playlist(platform, id, { page = 1, limit = 20, signal } = {}) {
+    musicPlaylist({ platform, id });
+    const result = await this.providers.playlist(platform, id, { page, limit, signal, cookie: await this.settings.cookie(platform) });
+    signal?.throwIfAborted();
+    return result;
+  }
+  /** @param {{limit?: number, exclude?: string[], signal?: AbortSignal}} options */
+  async radio({ limit = 5, exclude = [], signal } = {}) {
+    const result = await this.providers.radio({ limit, exclude, signal, cookie: await this.settings.cookie("qq") });
+    signal?.throwIfAborted();
+    return result;
+  }
+  accountWrite(platform, operation) {
+    const pending = (this.accountWrites.get(platform) || Promise.resolve()).catch(() => {
+    }).then(operation);
+    this.accountWrites.set(platform, pending);
+    void pending.finally(() => {
+      if (this.accountWrites.get(platform) === pending) this.accountWrites.delete(platform);
+    }).catch(() => {
+    });
+    return pending;
+  }
+  saveAccount(platform, cookie, options) {
+    return this.accountWrite(platform, () => this.accountCoordinator ? this.accountCoordinator.saveAccount(platform, cookie, options) : this.settings.saveAccount(platform, cookie, options));
+  }
+  logout(platform) {
+    return this.accountWrite(platform, () => this.accountCoordinator ? this.accountCoordinator.logout(platform) : this.settings.logout(platform));
+  }
+  /** Cancelling before a scan completes can never save a late login response. */
+  /** @param {string} platform @param {{signal?: AbortSignal, onSession?: (session: any) => Promise<void>, onStatus?: (status: string) => void, intervalMs?: number, expiresMs?: number}} options */
+  async login(platform, { signal, onSession = async (_session) => {
+  }, onStatus = (_status) => {
+  }, intervalMs = 2500, expiresMs = 18e4 } = {}) {
+    signal?.throwIfAborted();
+    const expectedVersion = await this.accountCoordinator?.accountVersion(platform);
+    const session = await this.providers.beginLogin(platform, { signal });
+    signal?.throwIfAborted();
+    await onSession(session);
+    const deadline = Date.now() + expiresMs;
+    while (Date.now() < deadline) {
+      signal?.throwIfAborted();
+      const state = await this.providers.checkLogin(session, { signal, onProgress: onStatus });
+      signal?.throwIfAborted();
+      if (state.status === "authorized") return this.accountWrite(platform, async () => {
+        signal?.throwIfAborted();
+        const options = { method: "qr", nickname: state.nickname };
+        return this.accountCoordinator ? this.accountCoordinator.saveAccount(platform, state.cookie, { ...options, expectedVersion, signal }) : this.settings.saveAccount(platform, state.cookie, options);
+      });
+      if (state.status === "expired" || state.status === "failed") throw new Error(state.status === "expired" ? "\u4E8C\u7EF4\u7801\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801" : "\u5E73\u53F0\u62D2\u7EDD\u4E86\u626B\u7801\u8BF7\u6C42\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+      onStatus(state.status);
+      await new Promise((resolve5, reject) => {
+        const abort = () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        };
+        const timer = setTimeout(() => {
+          signal?.removeEventListener("abort", abort);
+          resolve5();
+        }, intervalMs);
+        signal?.addEventListener("abort", abort, { once: true });
+        if (signal?.aborted) abort();
+      });
+    }
+    throw new Error("\u4E8C\u7EF4\u7801\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+  }
+};
+
+// src/music/login.mjs
+var import_qrcode = __toESM(require_qrcode(), 1);
+import { writeFile as writeFile5 } from "node:fs/promises";
+import { join as join10 } from "node:path";
+import { spawn as spawn3 } from "node:child_process";
+import { pathToFileURL } from "node:url";
+function musicQRCode(url) {
+  const { modules } = import_qrcode.default.create(url, { errorCorrectionLevel: "M" });
+  const size = modules.size, commands = [];
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (modules.data[y * size + x]) commands.push(`M${x + 4} ${y + 4}h1v1h-1z`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size + 8} ${size + 8}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="white"/><path fill="black" d="${commands.join("")}"/></svg>`;
+  return "data:image/svg+xml;base64," + Buffer.from(svg).toString("base64");
+}
+function openMusicPage(target) {
+  const command = process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open";
+  const args = process.platform === "win32" ? ["url.dll,FileProtocolHandler", target] : [target];
+  return new Promise((resolve5, reject) => {
+    const child = spawn3(command, args, { stdio: "ignore", windowsHide: true });
+    child.once("error", () => reject(new Error("\u65E0\u6CD5\u6253\u5F00\u9ED8\u8BA4\u6D4F\u89C8\u5668\uFF0C\u8BF7\u68C0\u67E5\u7CFB\u7EDF\u7684\u6D4F\u89C8\u5668\u8BBE\u7F6E")));
+    child.once("spawn", () => {
+      child.unref();
+      resolve5();
+    });
+  });
+}
+async function musicLoginPage(session) {
+  const name = musicPlatform(session.platform).name;
+  const directory = await createMusicTemp("login");
+  try {
+    const image = session.image || musicQRCode(session.url);
+    if (session.image && (session.image.length > 2 * 1024 * 1024 || !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(session.image))) throw new Error("\u767B\u5F55\u4E8C\u7EF4\u7801\u683C\u5F0F\u4E0D\u6B63\u786E");
+    const scanner = session.platform === "qq" ? "\u624B\u673A QQ" : name + "\u624B\u673A App";
+    const path = join10(directory, "login.html");
+    await writeFile5(path, `<!doctype html><html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
+<title>${name} \xB7 \u6478\u9C7C\u97F3\u4E50</title>
+<style>body{margin:0;background:#101820;color:#e8edef;font:18px system-ui;display:grid;min-height:100vh;place-items:center}main{text-align:center;padding:28px}img{width:300px;max-width:80vw;image-rendering:pixelated;border-radius:16px}p{color:#acbec7;line-height:1.8;max-width:440px}h1{font-size:26px}</style>
+<main><h1>${name} \xB7 \u626B\u7801\u767B\u5F55</h1><img alt="\u767B\u5F55\u4E8C\u7EF4\u7801" src="${image}">
+<p>\u8BF7\u7528${scanner}\u626B\u7801\u5E76\u786E\u8BA4\u3002<br>\u5B8C\u6210\u540E\u8FD4\u56DE OpenCode \u67E5\u770B\u8D26\u53F7\u72B6\u6001\u3002<br>\u626B\u7801\u7B49\u5F85\u6700\u591A 3 \u5206\u949F\uFF0C\u53D6\u6D88\u540E\u8F6F\u4EF6\u4E0D\u518D\u63A5\u6536\u767B\u5F55\u3002</p></main></html>`, { mode: 384 });
+    return { url: pathToFileURL(path).href, release: () => removeMusicTemp(directory) };
+  } catch (error) {
+    await removeMusicTemp(directory);
+    throw error;
+  }
+}
+
+// src/ui/music.tsx
+function createMusicReader(api, library, controller, settings) {
+  const service = new MusicService(library, {
+    accountCoordinator: controller
+  });
+  const [state, setState] = createSignal2({
+    queue: [],
+    current: void 0,
+    radio: false,
+    playing: false,
+    position: 0,
+    duration: 0,
+    volume: 50,
+    repeat: "all",
+    busy: false,
+    error: "",
+    preview: false
+  });
+  const [platform, setPlatform] = createSignal2("all");
+  const [results, setResults] = createSignal2([]);
+  const [searching, setSearching] = createSignal2(false);
+  const [searchError, setSearchError] = createSignal2("");
+  const [accounts, setAccounts] = createSignal2({});
+  const [loginStatus, setLoginStatus] = createSignal2("");
+  const [loginBusy, setLoginBusy] = createSignal2(false);
+  const [playlistBusy, setPlaylistBusy] = createSignal2(false);
+  const [playlistNotice, setPlaylistNotice] = createSignal2("");
+  let playlistAbort;
+  let lastPlaylistList;
+  let lastPlaylist;
+  let searchAbort, loginAbort, loginPlatform = "";
+  const loginTasks = /* @__PURE__ */ new Set();
+  function toast(message, error = false) {
+    if (!api.lifecycle.signal.aborted) api.ui.toast({
+      title: "\u6478\u9C7C\u97F3\u4E50",
+      message,
+      variant: error ? "error" : "info"
+    });
+  }
+  function failed(error) {
+    toast(error instanceof Error ? error.message : "\u97F3\u4E50\u64CD\u4F5C\u5931\u8D25", true);
+  }
+  let previousError = "";
+  const unsubscribe = controller.subscribe((value) => {
+    if (api.lifecycle.signal.aborted) return;
+    setState(value);
+    if (value.error && value.error !== previousError) toast(value.error, true);
+    previousError = value.error;
+  });
+  async function refreshAccounts() {
+    const values = await Promise.all(MUSIC_PLATFORMS.map((source) => service.settings.account(source.id)));
+    if (!api.lifecycle.signal.aborted) setAccounts(Object.fromEntries(values.map((item) => [item.platform, item])));
+  }
+  const ready = Promise.all([cleanupMusicTemps(), controller.ready, refreshAccounts()]).catch(failed);
+  function choosePlatform(next) {
+    searchAbort?.abort();
+    searchAbort = void 0;
+    setSearching(false);
+    setResults([]);
+    setSearchError("");
+    setPlatform(next);
+    playlistAbort?.abort();
+    playlistAbort = void 0;
+    setPlaylistBusy(false);
+    setPlaylistNotice("");
+    lastPlaylistList = void 0;
+    lastPlaylist = void 0;
+  }
+  function action(track) {
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      get title() {
+        return track.title;
+      },
+      get options() {
+        return [{
+          title: "\u7ACB\u5373\u64AD\u653E",
+          value: "play",
+          description: `${musicPlatform(track.platform).name} \xB7 ${track.artist}`
+        }, {
+          title: "\u52A0\u5165\u64AD\u653E\u961F\u5217",
+          value: "add",
+          description: "\u4FDD\u7559\u5F53\u524D\u64AD\u653E\uFF0C\u6700\u591A 100 \u9996"
+        }, {
+          title: "\u6253\u5F00\u5E73\u53F0\u6B4C\u66F2\u9875",
+          value: "source",
+          description: "\u5728\u9ED8\u8BA4\u6D4F\u89C8\u5668\u6253\u5F00"
+        }];
+      },
+      onSelect: (item) => {
+        settings.close();
+        try {
+          if (item.value === "source") {
+            void openMusicPage(track.sourceUrl).catch(failed);
+            return;
+          }
+          void controller.add(track).then(() => item.value === "play" ? controller.play(trackKey(track)) : toast("\u5DF2\u52A0\u5165\u64AD\u653E\u961F\u5217")).catch(failed);
+        } catch (error) {
+          failed(error);
+        }
+      }
+    }));
+  }
+  function showResults() {
+    if (!results().length) {
+      promptSearch();
+      return;
+    }
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      get title() {
+        return `\u97F3\u4E50\u641C\u7D22 \xB7 ${results().length} \u9996`;
+      },
+      placeholder: "\u8F93\u5165\u6B4C\u540D\u6216\u6B4C\u624B\u8FC7\u6EE4\uFF0C\u9009\u62E9\u540E\u53EF\u64AD\u653E\u6216\u52A0\u5165\u961F\u5217",
+      get options() {
+        return results().map((track) => ({
+          title: `[${musicPlatform(track.platform).name}] ${track.title}`,
+          value: trackKey(track),
+          description: `${track.artist} \xB7 ${track.album} \xB7 ${mediaTime(track.duration)}`
+        }));
+      },
+      onSelect: (item) => {
+        settings.close();
+        const track = results().find((track2) => trackKey(track2) === item.value);
+        if (track) action(track);
+      }
+    }));
+  }
+  async function search(query) {
+    searchAbort?.abort();
+    const abort = searchAbort = new AbortController();
+    setSearching(true);
+    setSearchError("");
+    try {
+      const result = await service.search(query, {
+        platform: platform(),
+        signal: abort.signal
+      });
+      if (abort.signal.aborted || api.lifecycle.signal.aborted) return;
+      setResults(result.tracks);
+      setSearchError(result.errors.map((item) => `${musicPlatform(item.platform).name}\uFF1A${item.message}`).join("\uFF1B"));
+      if (result.tracks.length && settings.active() && settings.canDialog()) showResults();
+      else toast(result.tracks.length ? "\u641C\u7D22\u5B8C\u6210\uFF0C\u70B9\u51FB\u300C\u7ED3\u679C\u300D\u67E5\u770B" : result.errors.length ? "\u641C\u7D22\u5931\u8D25\uFF0C\u64AD\u653E\u533A\u663E\u793A\u4E86\u5404\u5E73\u53F0\u539F\u56E0" : "\u6CA1\u6709\u627E\u5230\u6B4C\u66F2", !result.tracks.length);
+    } catch (error) {
+      if (!abort.signal.aborted) failed(error);
+    } finally {
+      if (searchAbort === abort) {
+        searchAbort = void 0;
+        setSearching(false);
+      }
+    }
+  }
+  function promptSearch() {
+    setPlaylistNotice("");
+    settings.dialog(() => _$createComponent2(api.ui.DialogPrompt, {
+      get title() {
+        return `\u641C\u7D22\u97F3\u4E50 \xB7 ${platform() === "all" ? "\u5168\u90E8\u5E73\u53F0" : musicPlatform(platform()).name}`;
+      },
+      placeholder: "\u8F93\u5165\u6B4C\u66F2\u540D\u3001\u6B4C\u624B\u6216\u4E13\u8F91\u540D",
+      get onCancel() {
+        return settings.close;
+      },
+      onConfirm: (query) => {
+        settings.close();
+        if (query.trim()) void search(query.trim());
+      }
+    }));
+  }
+  function queue() {
+    if (!state().queue.length) return promptSearch();
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      get title() {
+        return `\u64AD\u653E\u961F\u5217 \xB7 ${state().queue.length} \u9996`;
+      },
+      get options() {
+        return state().queue.map((track) => ({
+          title: `${state().current && trackKey(track) === trackKey(state().current) ? "\u266A " : ""}${track.title}`,
+          value: trackKey(track),
+          description: `${musicPlatform(track.platform).name} \xB7 ${track.artist}`
+        }));
+      },
+      onSelect: (item) => {
+        settings.close();
+        const track = state().queue.find((track2) => trackKey(track2) === item.value);
+        if (track) action(track);
+      }
+    }));
+  }
+  function cancelPlaylistQuery() {
+    playlistAbort?.abort();
+    playlistAbort = void 0;
+    setPlaylistBusy(false);
+    setPlaylistNotice("\u6B4C\u5355\u67E5\u8BE2\u5DF2\u53D6\u6D88");
+  }
+  async function queryPlaylist(work) {
+    playlistAbort?.abort();
+    const abort = playlistAbort = new AbortController();
+    setPlaylistBusy(true);
+    setPlaylistNotice("\u6B63\u5728\u67E5\u8BE2\u6B4C\u5355\u2026");
+    try {
+      await work(abort.signal);
+    } catch (error) {
+      if (!abort.signal.aborted && !api.lifecycle.signal.aborted) {
+        setPlaylistNotice(error instanceof Error ? error.message : "\u6B4C\u5355\u67E5\u8BE2\u5931\u8D25");
+        failed(error);
+      }
+    } finally {
+      if (playlistAbort === abort) {
+        playlistAbort = void 0;
+        setPlaylistBusy(false);
+      }
+    }
+  }
+  function showPlaylistList() {
+    const saved = lastPlaylistList;
+    if (!saved) return playlistMenu();
+    const {
+      data,
+      query
+    } = saved;
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      get title() {
+        return `${query.mode === "mine" ? query.collection === "favorite" ? "\u6536\u85CF\u6B4C\u5355" : "\u6211\u7684\u6B4C\u5355" : "\u6B4C\u5355\u641C\u7D22"} \xB7 \u7B2C ${data.page} \u9875`;
+      },
+      placeholder: "\u9009\u62E9\u6B4C\u5355\u67E5\u770B\u6B4C\u66F2\uFF0C\u8F93\u5165\u540D\u79F0\u53EF\u8FC7\u6EE4\u672C\u9875",
+      get options() {
+        return [...data.playlists.map((item) => ({
+          title: `[${musicPlatform(item.platform).name}] ${item.title}`,
+          value: playlistKey(item),
+          description: `${item.count === void 0 ? "\u6B4C\u66F2\u6570\u672A\u77E5" : item.count + " \u9996"}${item.creator ? " \xB7 " + item.creator : ""}`
+        })), ...data.page > 1 ? [{
+          title: "\u2039 \u4E0A\u4E00\u9875",
+          value: "@prev",
+          description: "\u67E5\u8BE2\u4E0A\u4E00\u9875\u6B4C\u5355"
+        }] : [], ...data.hasMore ? [{
+          title: "\u4E0B\u4E00\u9875 \u203A",
+          value: "@next",
+          description: "\u7EE7\u7EED\u67E5\u8BE2\u6B4C\u5355"
+        }] : [], {
+          title: "\u8FD4\u56DE\u6B4C\u5355\u83DC\u5355",
+          value: "@menu",
+          description: "\u6211\u7684\u6B4C\u5355\u3001\u6536\u85CF\u3001\u641C\u7D22\u6216\u94FE\u63A5"
+        }];
+      },
+      onSelect: (item) => {
+        settings.close();
+        if (item.value === "@menu") return playlistMenu();
+        if (item.value === "@prev" || item.value === "@next") return loadPlaylistList(query, data.page + (item.value === "@prev" ? -1 : 1));
+        const selected = data.playlists.find((playlist) => playlistKey(playlist) === item.value);
+        if (selected) loadPlaylist(selected);
+      }
+    }));
+  }
+  function loadPlaylistList(query, page = 1) {
+    void queryPlaylist(async (signal) => {
+      const data = await service.playlists({
+        ...query,
+        page,
+        limit: 10,
+        signal
+      });
+      if (signal.aborted || api.lifecycle.signal.aborted) return;
+      lastPlaylistList = {
+        query,
+        data
+      };
+      lastPlaylist = void 0;
+      const errors = data.errors.map((item) => `${musicPlatform(item.platform).name}\uFF1A${item.message}`).join("\uFF1B");
+      setPlaylistNotice(errors || `\u6B4C\u5355\u7B2C ${page} \u9875 \xB7 ${data.playlists.length} \u4E2A`);
+      if (!data.playlists.length && !data.hasMore) {
+        toast(errors || "\u6CA1\u6709\u627E\u5230\u6B4C\u5355", Boolean(errors));
+        return;
+      }
+      if (settings.active() && settings.canDialog()) showPlaylistList();
+      else toast("\u6B4C\u5355\u5DF2\u52A0\u8F7D\uFF0C\u70B9\u51FB\u300C\u6B4C\u5355\u300D\u7EE7\u7EED\u67E5\u770B");
+    });
+  }
+  function showPlaylist() {
+    const data = lastPlaylist;
+    if (!data) return playlistMenu();
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      get title() {
+        return `${data.info.title} \xB7 \u7B2C ${data.page} \u9875`;
+      },
+      get placeholder() {
+        return `\u672C\u9875 ${data.tracks.length} \u9996${data.total === void 0 ? "" : " / \u5171 " + data.total + " \u9996"}\uFF0C\u9009\u62E9\u6B4C\u66F2\u53EF\u64AD\u653E\u6216\u52A0\u5165\u961F\u5217`;
+      },
+      get options() {
+        return [...data.tracks.length ? [{
+          title: "\uFF0B \u672C\u9875\u6B4C\u66F2\u52A0\u5165\u961F\u5217",
+          value: "@add",
+          description: `\u52A0\u5165\u672C\u9875 ${data.tracks.length} \u9996\uFF0C\u6309\u6B4C\u66F2\u53BB\u91CD\uFF0C\u4FDD\u7559\u5F53\u524D\u64AD\u653E`
+        }] : [], ...data.tracks.map((track) => ({
+          title: track.title,
+          value: trackKey(track),
+          description: `${track.artist} \xB7 ${mediaTime(track.duration)}`
+        })), ...data.page > 1 ? [{
+          title: "\u2039 \u4E0A\u4E00\u9875\u6B4C\u66F2",
+          value: "@prev",
+          description: "\u6BCF\u9875 20 \u9996"
+        }] : [], ...data.hasMore ? [{
+          title: "\u4E0B\u4E00\u9875\u6B4C\u66F2 \u203A",
+          value: "@next",
+          description: "\u7EE7\u7EED\u67E5\u770B\uFF0C\u6BCF\u9875 20 \u9996"
+        }] : [], {
+          title: "\u8FD4\u56DE\u6B4C\u5355\u5217\u8868",
+          value: "@back",
+          description: "\u4FDD\u7559\u5F53\u524D\u67E5\u8BE2\u548C\u9875\u7801"
+        }];
+      },
+      onSelect: (item) => {
+        settings.close();
+        if (item.value === "@back") return lastPlaylistList ? showPlaylistList() : playlistMenu();
+        if (item.value === "@prev" || item.value === "@next") return loadPlaylist(data.info, data.page + (item.value === "@prev" ? -1 : 1));
+        if (item.value === "@add") {
+          void controller.addMany(data.tracks).then((added) => toast(`\u5DF2\u52A0\u5165 ${added.added} \u9996${added.duplicates ? "\uFF0C\u8DF3\u8FC7 " + added.duplicates + " \u9996\u91CD\u590D\u6B4C\u66F2" : ""}`)).catch(failed);
+          return;
+        }
+        const track = data.tracks.find((track2) => trackKey(track2) === item.value);
+        if (track) action(track);
+      }
+    }));
+  }
+  function loadPlaylist(playlist, page = 1) {
+    void queryPlaylist(async (signal) => {
+      const data = await service.playlist(playlist.platform, playlist.id, {
+        page,
+        limit: 20,
+        signal
+      });
+      if (signal.aborted || api.lifecycle.signal.aborted) return;
+      if (playlist.legacyId) data.info = musicPlaylist({
+        ...data.info,
+        legacyId: playlist.legacyId
+      });
+      lastPlaylist = data;
+      setPlaylistNotice(`${data.info.title} \xB7 \u7B2C ${page} \u9875${data.unavailable ? " \xB7 " + data.unavailable + " \u9996\u6682\u4E0D\u53EF\u7528" : ""}`);
+      if (settings.active() && settings.canDialog()) showPlaylist();
+      else toast("\u6B4C\u5355\u6B4C\u66F2\u5DF2\u52A0\u8F7D\uFF0C\u70B9\u51FB\u300C\u6B4C\u5355\u300D\u7EE7\u7EED\u67E5\u770B");
+    });
+  }
+  function playlistMenu() {
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      title: "\u97F3\u4E50\u6B4C\u5355",
+      get options() {
+        return [...["all", "qq"].includes(platform()) ? [{
+          title: "\u6211\u559C\u6B22 \xB7 QQ\u97F3\u4E50",
+          value: "liked",
+          description: "\u767B\u5F55\u8D26\u53F7\u7684\u7231\u5FC3\u6B4C\u66F2\uFF0C\u652F\u6301\u5206\u9875"
+        }] : [], {
+          title: "\u6211\u7684\u6B4C\u5355",
+          value: "mine",
+          description: "\u4F7F\u7528\u5DF2\u767B\u5F55\u8D26\u53F7\uFF0C\u6309\u5F53\u524D\u5E73\u53F0\u7B5B\u9009"
+        }, {
+          title: "\u6211\u6536\u85CF\u7684\u6B4C\u5355",
+          value: "favorite",
+          description: "QQ\u97F3\u4E50 / \u7F51\u6613\u4E91\u6536\u85CF\u6B4C\u5355"
+        }, {
+          title: "\u641C\u7D22\u6B4C\u5355",
+          value: "search",
+          description: "\u6309\u540D\u79F0\u641C\u7D22\uFF0C\u652F\u6301\u5168\u90E8\u6216\u5355\u4E2A\u5E73\u53F0"
+        }, {
+          title: "\u6253\u5F00\u6B4C\u5355\u94FE\u63A5 / ID",
+          value: "link",
+          description: "\u5B8C\u6574\u94FE\u63A5\uFF0C\u6216 qq:123\u3001netease:123\u3001kugou:ID"
+        }, ...lastPlaylist || lastPlaylistList ? [{
+          title: "\u7EE7\u7EED\u67E5\u770B\u4E0A\u6B21\u6B4C\u5355",
+          value: "resume",
+          description: "\u8FD4\u56DE\u4E0A\u6B21\u5217\u8868\u6216\u6B4C\u66F2\u9875"
+        }] : [], ...playlistBusy() ? [{
+          title: "\u53D6\u6D88\u6B4C\u5355\u67E5\u8BE2",
+          value: "cancel",
+          description: "\u505C\u6B62\u5F53\u524D\u67E5\u8BE2"
+        }] : []];
+      },
+      onSelect: (item) => {
+        settings.close();
+        if (item.value === "liked") return loadPlaylist(musicPlaylist({
+          platform: "qq",
+          id: "liked"
+        }));
+        if (item.value === "cancel") return cancelPlaylistQuery();
+        if (item.value === "resume") return lastPlaylist ? showPlaylist() : showPlaylistList();
+        if (item.value === "mine" || item.value === "favorite") return loadPlaylistList({
+          mode: "mine",
+          platform: platform(),
+          collection: item.value === "favorite" ? "favorite" : "created"
+        });
+        if (item.value === "search") settings.dialog(() => _$createComponent2(api.ui.DialogPrompt, {
+          title: "\u641C\u7D22\u6B4C\u5355",
+          placeholder: "\u8F93\u5165\u6B4C\u5355\u540D\u79F0\uFF0C\u4F8B\u5982 \u901A\u52E4\u3001\u8F7B\u97F3\u4E50",
+          get onCancel() {
+            return settings.close;
+          },
+          onConfirm: (query) => {
+            settings.close();
+            if (query.trim()) loadPlaylistList({
+              mode: "search",
+              query: query.trim(),
+              platform: platform()
+            });
+          }
+        }));
+        else settings.dialog(() => _$createComponent2(api.ui.DialogPrompt, {
+          title: "\u6253\u5F00\u6B4C\u5355",
+          placeholder: "\u8F93\u5165\u5B8C\u6574\u6B4C\u5355\u94FE\u63A5\uFF0C\u6216 \u5E73\u53F0:\u6B4C\u5355ID",
+          get onCancel() {
+            return settings.close;
+          },
+          onConfirm: (value) => {
+            settings.close();
+            try {
+              loadPlaylist(playlistTarget(value, platform() === "all" ? "qq" : platform()));
+            } catch (error) {
+              failed(error);
+            }
+          }
+        }));
+      }
+    }));
+  }
+  function radioMenu() {
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      title: "QQ\u97F3\u4E50\u79C1\u4EBA\u7535\u53F0",
+      get options() {
+        return [{
+          title: state().radio ? "\u91CD\u65B0\u5F00\u59CB\u79C1\u4EBA\u7535\u53F0" : "\u5F00\u59CB\u79C1\u4EBA\u7535\u53F0",
+          value: "start",
+          description: "\u4F7F\u7528 QQ \u4E2A\u6027\u63A8\u8350\u7ACB\u5373\u64AD\u653E\uFF0C\u4E0B\u4E00\u9996\u7EE7\u7EED\u5237\u6B4C"
+        }, ...state().radio ? [{
+          title: "\u9000\u51FA\u79C1\u4EBA\u7535\u53F0",
+          value: "stop",
+          description: "\u505C\u6B62\u7535\u53F0\uFF0C\u8FD4\u56DE\u539F\u64AD\u653E\u961F\u5217\u5E76\u4FDD\u6301\u6682\u505C"
+        }] : [], {
+          title: "\u6211\u559C\u6B22",
+          value: "liked",
+          description: "\u67E5\u770B QQ \u97F3\u4E50\u7231\u5FC3\u6B4C\u66F2"
+        }];
+      },
+      onSelect: (item) => {
+        settings.close();
+        if (item.value === "liked") return loadPlaylist(musicPlaylist({
+          platform: "qq",
+          id: "liked"
+        }));
+        if (item.value === "stop") {
+          void controller.stopRadio().catch(failed);
+          return;
+        }
+        setPlaylistNotice("");
+        setSearchError("");
+        void controller.startRadio().catch(failed);
+      }
+    }));
+  }
+  function remove() {
+    if (!state().queue.length) return;
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      title: "\u6574\u7406\u97F3\u4E50\u961F\u5217",
+      get options() {
+        return [{
+          title: "\u79FB\u9664\u961F\u5217\u5F53\u524D\u6B4C\u66F2",
+          value: "remove",
+          description: state().queue.find((track) => trackKey(track) === controller.currentKey)?.title || "\u672A\u9009\u62E9\u6B4C\u66F2"
+        }, {
+          title: "\u6E05\u7A7A\u64AD\u653E\u961F\u5217",
+          value: "clear",
+          description: "\u505C\u6B62\u64AD\u653E\u5E76\u6E05\u7A7A\u961F\u5217"
+        }];
+      },
+      onSelect: (item) => {
+        settings.close();
+        if (item.value === "remove") void controller.remove().catch(failed);
+        else settings.dialog(() => _$createComponent2(api.ui.DialogConfirm, {
+          title: "\u6E05\u7A7A\u64AD\u653E\u961F\u5217",
+          message: "\u505C\u6B62\u97F3\u4E50\u5E76\u79FB\u9664\u961F\u5217\u91CC\u7684\u5168\u90E8\u6B4C\u66F2\uFF1F\u5E73\u53F0\u8D26\u53F7\u548C\u6536\u85CF\u4E0D\u53D7\u5F71\u54CD\u3002",
+          get onCancel() {
+            return settings.close;
+          },
+          onConfirm: () => {
+            settings.close();
+            void controller.clear().catch(failed);
+          }
+        }));
+      }
+    }));
+  }
+  function cancelLogin() {
+    loginAbort?.abort();
+    loginAbort = void 0;
+    loginPlatform = "";
+    setLoginBusy(false);
+    setLoginStatus("");
+  }
+  function startLogin(source) {
+    cancelLogin();
+    const abort = loginAbort = new AbortController();
+    loginPlatform = source;
+    setLoginBusy(true);
+    setLoginStatus(`${musicPlatform(source).name}\uFF1A\u6B63\u5728\u751F\u6210\u4E8C\u7EF4\u7801\u2026`);
+    const task = (async () => {
+      let page;
+      try {
+        await service.login(source, {
+          signal: abort.signal,
+          onSession: async (session) => {
+            page = await musicLoginPage(session);
+            abort.signal.throwIfAborted();
+            await openMusicPage(page.url);
+          },
+          onStatus: (status) => {
+            if (abort.signal.aborted) return;
+            const message = status === "authorizing" ? "\u624B\u673A\u5DF2\u786E\u8BA4\uFF0C\u6B63\u5728\u83B7\u53D6\u6388\u6743\u2026" : status === "exchanging" ? "\u6B63\u5728\u6362\u53D6 QQ\u97F3\u4E50\u767B\u5F55\u6001\u2026" : status === "scanned" ? "\u5DF2\u626B\u7801\uFF0C\u8BF7\u5728\u624B\u673A\u786E\u8BA4" : source === "qq" ? "\u8BF7\u7528\u624B\u673A QQ \u626B\u63CF\u6D4F\u89C8\u5668\u91CC\u7684\u4E8C\u7EF4\u7801" : "\u8BF7\u7528\u624B\u673A App \u626B\u63CF\u6D4F\u89C8\u5668\u91CC\u7684\u4E8C\u7EF4\u7801";
+            setLoginStatus(`${musicPlatform(source).name}\uFF1A${message}`);
+          }
+        });
+        if (abort.signal.aborted) return;
+        await refreshAccounts();
+        setLoginStatus(`${musicPlatform(source).name}\uFF1A\u767B\u5F55\u6210\u529F\uFF0C\u767B\u5F55\u6001\u5DF2\u52A0\u5BC6\u4FDD\u5B58`);
+        toast(`${musicPlatform(source).name}\u767B\u5F55\u6001\u5DF2\u52A0\u5BC6\u4FDD\u5B58`);
+      } catch (error) {
+        if (!abort.signal.aborted && !api.lifecycle.signal.aborted) {
+          setLoginStatus(`${musicPlatform(source).name}\u767B\u5F55\u5931\u8D25\uFF1A${error instanceof Error ? error.message : "\u8BF7\u91CD\u65B0\u626B\u7801"}`);
+          failed(error);
+        }
+      } finally {
+        await page?.release().catch(() => {
+        });
+        if (loginAbort === abort) {
+          loginAbort = void 0;
+          loginPlatform = "";
+          setLoginBusy(false);
+        }
+      }
+    })();
+    loginTasks.add(task);
+    void task.finally(() => loginTasks.delete(task)).catch(() => {
+    });
+  }
+  function importCookie(source) {
+    settings.dialog(() => _$createComponent2(api.ui.DialogPrompt, {
+      get title() {
+        return `${musicPlatform(source).name} \xB7 \u5BFC\u5165\u7F51\u9875\u767B\u5F55\u6001`;
+      },
+      placeholder: "\u7C98\u8D34 Cookie\uFF0C\u4EC5\u5728\u672C\u5730\u52A0\u5BC6\u4FDD\u5B58\uFF0C\u4E0D\u4F1A\u53D1\u9001\u5230\u6A21\u578B\u804A\u5929",
+      get onCancel() {
+        return settings.close;
+      },
+      onConfirm: (cookie) => {
+        settings.close();
+        if (loginPlatform === source) cancelLogin();
+        void service.saveAccount(source, cookie).then(refreshAccounts).then(() => toast("\u767B\u5F55\u6001\u5DF2\u5BFC\u5165\uFF0C\u5B9E\u9645\u64AD\u653E\u6743\u9650\u53CA\u6709\u6548\u671F\u7531\u5E73\u53F0\u51B3\u5B9A")).catch(failed);
+      }
+    }));
+  }
+  function accountMenu(source) {
+    const current = accounts()[source];
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      get title() {
+        return `${musicPlatform(source).name} \xB7 ${current?.configured ? current.method === "qr" ? "\u5DF2\u626B\u7801\u4FDD\u5B58" : "\u5DF2\u5BFC\u5165\u767B\u5F55\u6001" : "\u672A\u767B\u5F55"}`;
+      },
+      get options() {
+        return [...musicPlatform(source).qr ? [{
+          title: source === "qq" ? "\u624B\u673A QQ \u626B\u7801\u767B\u5F55" : "\u624B\u673A App \u626B\u7801\u767B\u5F55",
+          value: "qr",
+          description: "\u5728\u9ED8\u8BA4\u6D4F\u89C8\u5668\u663E\u793A\u4E8C\u7EF4\u7801\uFF0C\u786E\u8BA4\u540E\u81EA\u52A8\u4FDD\u5B58"
+        }] : [], {
+          title: "\u5BFC\u5165\u7F51\u9875\u767B\u5F55\u6001",
+          value: "cookie",
+          description: "\u5728\u5E73\u53F0\u5B98\u7F51\u767B\u5F55\u540E\u590D\u5236\u8BF7\u6C42\u4E2D\u7684 Cookie"
+        }, {
+          title: "\u6253\u5F00\u5E73\u53F0\u5B98\u7F51",
+          value: "home",
+          description: "\u4F7F\u7528\u9ED8\u8BA4\u6D4F\u89C8\u5668"
+        }, ...loginPlatform === source ? [{
+          title: "\u53D6\u6D88\u672C\u6B21\u626B\u7801",
+          value: "cancel",
+          description: "\u505C\u6B62\u63A5\u6536\u8FD9\u6B21\u626B\u7801\u7684\u767B\u5F55\u7ED3\u679C"
+        }] : [], ...current?.configured ? [{
+          title: "\u9000\u51FA\u672C\u5730\u8D26\u53F7",
+          value: "logout",
+          description: "\u5220\u9664\u6B64\u5904\u4FDD\u5B58\u7684\u767B\u5F55\u6001\uFF0C\u4FDD\u7559\u5E73\u53F0\u8D26\u53F7"
+        }] : []];
+      },
+      onSelect: (item) => {
+        settings.close();
+        if (item.value === "qr") startLogin(source);
+        else if (item.value === "cookie") importCookie(source);
+        else if (item.value === "home") void openMusicPage(musicPlatform(source).home).catch(failed);
+        else if (item.value === "cancel") cancelLogin();
+        else settings.dialog(() => _$createComponent2(api.ui.DialogConfirm, {
+          get title() {
+            return `\u9000\u51FA${musicPlatform(source).name}`;
+          },
+          message: "\u5220\u9664\u672C\u5730\u4FDD\u5B58\u7684\u767B\u5F55\u6001\uFF1F\u4F7F\u7528\u8BE5\u5E73\u53F0\u64AD\u653E\u4E2D\u7684\u97F3\u4E50\u4F1A\u6682\u505C\u3002",
+          get onCancel() {
+            return settings.close;
+          },
+          onConfirm: () => {
+            settings.close();
+            if (loginPlatform === source) cancelLogin();
+            if (state().current?.platform === source) void controller.pause();
+            void service.logout(source).then(refreshAccounts).then(() => toast("\u5DF2\u5220\u9664\u672C\u5730\u767B\u5F55\u6001")).catch(failed);
+          }
+        }));
+      }
+    }));
+  }
+  async function accountsMenu() {
+    try {
+      await refreshAccounts();
+    } catch (error) {
+      failed(error);
+      return;
+    }
+    if (api.lifecycle.signal.aborted) return;
+    settings.dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      title: "\u97F3\u4E50\u8D26\u53F7 \xB7 \u5404\u5E73\u53F0\u72EC\u7ACB\u767B\u5F55",
+      get options() {
+        return MUSIC_PLATFORMS.map((source) => ({
+          title: source.name,
+          value: source.id,
+          description: accounts()[source.id]?.configured ? `${accounts()[source.id].method === "qr" ? "\u5DF2\u626B\u7801\u4FDD\u5B58" : "\u5DF2\u5BFC\u5165\u767B\u5F55\u6001"}${accounts()[source.id].nickname ? " \xB7 " + accounts()[source.id].nickname : ""}` : source.id === "qq" ? "\u672A\u767B\u5F55 \xB7 \u652F\u6301\u624B\u673A QQ \u626B\u7801" : "\u672A\u767B\u5F55 \xB7 \u652F\u6301 App \u626B\u7801\u6216 Cookie"
+        }));
+      },
+      onSelect: (item) => {
+        settings.close();
+        accountMenu(item.value);
+      }
+    }));
+  }
+  function View(props) {
+    const Button = props.Button, theme = () => api.theme.current;
+    const visibleQueue = () => state().queue.slice(0, Math.max(0, settings.rows() - 11));
+    return (() => {
+      var _el$ = _$createElement2("box"), _el$2 = _$createElement2("box"), _el$5 = _$createElement2("text"), _el$6 = _$createElement2("box");
+      _$insertNode2(_el$, _el$2);
+      _$insertNode2(_el$, _el$5);
+      _$insertNode2(_el$, _el$6);
+      _$setProp2(_el$, "flexShrink", 0);
+      _$setProp2(_el$2, "flexShrink", 0);
+      _$setProp2(_el$2, "height", 1);
+      _$setProp2(_el$2, "flexDirection", "row");
+      _$setProp2(_el$2, "gap", 1);
+      _$insert2(_el$2, _$createComponent2(Button, {
+        label: "[\u5168\u90E8]",
+        action: () => choosePlatform("all"),
+        get muted() {
+          return platform() !== "all";
+        }
+      }), null);
+      _$insert2(_el$2, _$createComponent2(For, {
+        each: MUSIC_PLATFORMS,
+        children: (source) => _$createComponent2(Button, {
+          get label() {
+            return `[${source.id === "netease" ? "\u7F51\u6613" : source.id === "qq" ? "QQ" : "\u9177\u72D7"}]`;
+          },
+          action: () => choosePlatform(source.id),
+          get muted() {
+            return platform() !== source.id;
+          }
+        })
+      }), null);
+      _$insert2(_el$2, _$createComponent2(Button, {
+        get label() {
+          return playlistBusy() ? "[\u6B4C\u5355\u2026]" : "[\u6B4C\u5355]";
+        },
+        action: playlistMenu
+      }), null);
+      _$insert2(_el$, _$createComponent2(Show2, {
+        get when() {
+          return settings.rows() >= 7;
+        },
+        get children() {
+          return [(() => {
+            var _el$3 = _$createElement2("text");
+            _$setProp2(_el$3, "height", 1);
+            _$setProp2(_el$3, "wrapMode", "none");
+            _$insert2(_el$3, () => state().current?.title || (state().radio ? "QQ\u79C1\u4EBA\u7535\u53F0" : "\u641C\u4E00\u9996\u559C\u6B22\u7684\u6B4C"));
+            _$effect2((_$p) => _$setProp2(_el$3, "fg", theme().text, _$p));
+            return _el$3;
+          })(), (() => {
+            var _el$4 = _$createElement2("text");
+            _$setProp2(_el$4, "height", 1);
+            _$setProp2(_el$4, "wrapMode", "none");
+            _$insert2(_el$4, (() => {
+              var _c$ = _$memo2(() => !!state().radio);
+              return () => _c$() ? `QQ\u79C1\u4EBA\u7535\u53F0${state().current ? " \xB7 " + state().current.artist : " \xB7 \u6B63\u5728\u83B7\u53D6\u63A8\u8350"}${state().preview ? " \xB7 \u8BD5\u542C" : ""}` : _$memo2(() => !!state().current)() ? `${musicPlatform(state().current.platform).name} \xB7 ${state().current.artist}${state().preview ? " \xB7 \u8BD5\u542C" : ""}` : "\u7F51\u6613\u4E91 / QQ\u97F3\u4E50 / \u9177\u72D7";
+            })());
+            _$effect2((_$p) => _$setProp2(_el$4, "fg", theme().textMuted, _$p));
+            return _el$4;
+          })()];
+        }
+      }), _el$5);
+      _$setProp2(_el$5, "height", 1);
+      _$setProp2(_el$5, "wrapMode", "none");
+      _$insert2(_el$5, (() => {
+        var _c$2 = _$memo2(() => !!state().busy);
+        return () => _c$2() ? "\u6B63\u5728\u52A0\u8F7D\u97F3\u9891\u2026" : `${mediaTime(state().position)} / ${mediaTime(state().duration || state().current?.duration || 0)} \xB7 \u97F3\u91CF ${state().volume}%`;
+      })());
+      _$setProp2(_el$6, "flexShrink", 0);
+      _$setProp2(_el$6, "height", 1);
+      _$setProp2(_el$6, "flexDirection", "row");
+      _$setProp2(_el$6, "gap", 1);
+      _$insert2(_el$6, _$createComponent2(Button, {
+        label: "[\u4E0A\u4E00\u9996]",
+        action: () => controller.next(-1)
+      }), null);
+      _$insert2(_el$6, _$createComponent2(Button, {
+        get label() {
+          return _$memo2(() => !!state().busy)() ? "[\u53D6\u6D88]" : state().playing ? "[\u6682\u505C]" : "[\u64AD\u653E]";
+        },
+        action: () => state().radio || state().queue.length ? controller.toggle() : promptSearch()
+      }), null);
+      _$insert2(_el$6, _$createComponent2(Button, {
+        label: "[\u4E0B\u4E00\u9996]",
+        action: () => controller.next(1)
+      }), null);
+      _$insert2(_el$, _$createComponent2(Show2, {
+        get when() {
+          return settings.rows() >= 6;
+        },
+        get children() {
+          var _el$7 = _$createElement2("box");
+          _$setProp2(_el$7, "flexShrink", 0);
+          _$setProp2(_el$7, "height", 1);
+          _$setProp2(_el$7, "flexDirection", "row");
+          _$setProp2(_el$7, "gap", 1);
+          _$insert2(_el$7, _$createComponent2(Button, {
+            label: "[\u221210s]",
+            action: () => controller.seek(-10)
+          }), null);
+          _$insert2(_el$7, _$createComponent2(Button, {
+            label: "[+10s]",
+            action: () => controller.seek(10)
+          }), null);
+          _$insert2(_el$7, _$createComponent2(Button, {
+            label: "[\u97F3\u2212]",
+            action: () => controller.volume(state().volume - 10)
+          }), null);
+          _$insert2(_el$7, _$createComponent2(Button, {
+            label: "[\u97F3+]",
+            action: () => controller.volume(state().volume + 10)
+          }), null);
+          return _el$7;
+        }
+      }), null);
+      _$insert2(_el$, _$createComponent2(Show2, {
+        get when() {
+          return settings.rows() >= 9;
+        },
+        get children() {
+          return [(() => {
+            var _el$8 = _$createElement2("box");
+            _$setProp2(_el$8, "flexShrink", 0);
+            _$setProp2(_el$8, "height", 1);
+            _$setProp2(_el$8, "flexDirection", "row");
+            _$setProp2(_el$8, "gap", 1);
+            _$insert2(_el$8, _$createComponent2(Button, {
+              get label() {
+                return _$memo2(() => !!state().radio)() ? "[\u79C1\u4EBA\u7535\u53F0]" : state().repeat === "one" ? "[\u5355\u66F2\u5FAA\u73AF]" : "[\u5217\u8868\u5FAA\u73AF]";
+              },
+              action: () => state().radio ? radioMenu() : controller.cycleRepeat()
+            }), null);
+            _$insert2(_el$8, _$createComponent2(Button, {
+              label: "[\u6574\u7406\u961F\u5217]",
+              action: remove
+            }), null);
+            _$insert2(_el$8, _$createComponent2(Button, {
+              get label() {
+                return state().radio ? "[\u9000\u51FA\u7535\u53F0]" : "[QQ\u7535\u53F0]";
+              },
+              action: () => state().radio ? controller.stopRadio() : radioMenu()
+            }), null);
+            return _el$8;
+          })(), (() => {
+            var _el$9 = _$createElement2("text");
+            _$setProp2(_el$9, "height", 2);
+            _$setProp2(_el$9, "wrapMode", "word");
+            _$insert2(_el$9, () => (loginBusy() ? loginStatus() : "") || playlistNotice() || state().error || (searching() ? "\u6B63\u5728\u641C\u7D22\u97F3\u4E50\u2026" : searchError()) || loginStatus() || "\u5168\u5C40\u5171\u4EAB\u64AD\u653E\uFF1B\u5C0F\u8BF4\u53EF\u4F34\u968F\u97F3\u4E50\uFF0C\u89C6\u9891\u4F18\u5148\u3002");
+            _$effect2((_$p) => _$setProp2(_el$9, "fg", theme().textMuted, _$p));
+            return _el$9;
+          })(), _$createComponent2(Show2, {
+            get when() {
+              return loginBusy();
+            },
+            get children() {
+              return _$createComponent2(Button, {
+                label: "[\u53D6\u6D88\u626B\u7801]",
+                action: cancelLogin
+              });
+            }
+          }), _$createComponent2(Show2, {
+            get when() {
+              return playlistBusy();
+            },
+            get children() {
+              return _$createComponent2(Button, {
+                label: "[\u53D6\u6D88\u6B4C\u5355\u67E5\u8BE2]",
+                action: cancelPlaylistQuery
+              });
+            }
+          })];
+        }
+      }), null);
+      _$insert2(_el$, _$createComponent2(For, {
+        get each() {
+          return visibleQueue();
+        },
+        children: (track) => (() => {
+          var _el$0 = _$createElement2("box");
+          _$setProp2(_el$0, "height", 1);
+          _$setProp2(_el$0, "flexShrink", 0);
+          _$insert2(_el$0, _$createComponent2(Button, {
+            get label() {
+              return `${state().current && trackKey(track) === trackKey(state().current) ? "\u266A " : "  "}${track.title} \xB7 ${musicPlatform(track.platform).name}`;
+            },
+            action: () => action(track),
+            get muted() {
+              return _$memo2(() => !!state().current)() && trackKey(track) !== trackKey(state().current);
+            }
+          }));
+          return _el$0;
+        })()
+      }), null);
+      _$effect2((_p$) => {
+        var _v$ = settings.rows(), _v$2 = settings.rows(), _v$3 = theme().textMuted;
+        _v$ !== _p$.e && (_p$.e = _$setProp2(_el$, "height", _v$, _p$.e));
+        _v$2 !== _p$.t && (_p$.t = _$setProp2(_el$, "minHeight", _v$2, _p$.t));
+        _v$3 !== _p$.a && (_p$.a = _$setProp2(_el$5, "fg", _v$3, _p$.a));
+        return _p$;
+      }, {
+        e: void 0,
+        t: void 0,
+        a: void 0
+      });
+      return _el$;
+    })();
+  }
+  function jump() {
+    if (!state().current || !state().duration) return;
+    settings.dialog(() => _$createComponent2(api.ui.DialogPrompt, {
+      title: "\u8DF3\u8F6C\u97F3\u4E50 \xB7 \u8F93\u5165\u79D2\u6570",
+      get placeholder() {
+        return `0\u2013${Math.floor(state().duration)}`;
+      },
+      get onCancel() {
+        return settings.close;
+      },
+      onConfirm: (value) => {
+        settings.close();
+        const seconds = Number(value);
+        if (!Number.isFinite(seconds) || seconds < 0 || seconds > state().duration) {
+          toast("\u8BF7\u8F93\u5165\u97F3\u9891\u65F6\u957F\u8303\u56F4\u5185\u7684\u79D2\u6570", true);
+          return;
+        }
+        void controller.seek(seconds - state().position);
+      }
+    }));
+  }
+  return {
+    ready,
+    View,
+    search: promptSearch,
+    results: showResults,
+    queue,
+    playlists: playlistMenu,
+    accounts: accountsMenu,
+    login: startLogin,
+    state,
+    pause: () => controller.pause(),
+    seek: (delta) => controller.seek(delta),
+    jump,
+    remove,
+    async dispose() {
+      unsubscribe();
+      searchAbort?.abort();
+      playlistAbort?.abort();
+      cancelLogin();
+      await Promise.allSettled([...loginTasks]);
+      await Promise.allSettled([...service.accountWrites.values()]);
+    }
+  };
+}
+
+// src/runtime/media-client.mjs
+import { createConnection } from "node:net";
+import { randomUUID as randomUUID4 } from "node:crypto";
+
+// src/runtime/channel.mjs
+import { createHash as createHash5 } from "node:crypto";
+import { realpath as realpath3, mkdir as mkdir7 } from "node:fs/promises";
+import { join as join11 } from "node:path";
+import { tmpdir as tmpdir2 } from "node:os";
+var MAX_FRAME = 512 * 1024;
+async function runtimeAddress(library) {
+  await library.ready();
+  const directory = await realpath3(library.directory), key = await library.vault.key();
+  const identity = process.platform === "win32" ? directory.toLowerCase() : directory;
+  const scope = createHash5("sha256").update(identity).update(key).digest("hex").slice(0, 32);
+  if (process.platform === "win32") return { path: "\\\\.\\pipe\\opencode-moyu-" + scope, scope };
+  if (process.platform === "linux") return { path: "\0opencode-moyu-" + scope, scope };
+  const folder = join11(tmpdir2(), `moyu-${process.getuid?.() ?? "user"}-${scope}`);
+  await mkdir7(folder, { recursive: true, mode: 448 });
+  return { path: join11(folder, "media.sock"), scope };
+}
+function channel(socket, vault, receive, failed) {
+  let buffer = "", reads = Promise.resolve(), writes = Promise.resolve(), ended = false;
+  const fail = (error) => {
+    if (ended) return;
+    ended = true;
+    failed(error);
+    socket.destroy();
+  };
+  socket.on("error", fail);
+  socket.on("data", (chunk) => {
+    buffer += chunk.toString("utf8");
+    if (Buffer.byteLength(buffer) > MAX_FRAME) {
+      fail(new Error("\u5171\u4EAB\u64AD\u653E\u5668\u6D88\u606F\u8FC7\u5927"));
+      return;
+    }
+    let index;
+    while ((index = buffer.indexOf("\n")) >= 0) {
+      const frame = buffer.slice(0, index);
+      buffer = buffer.slice(index + 1);
+      reads = reads.then(async () => {
+        const message = await vault.unseal(Buffer.from(frame, "base64"));
+        void Promise.resolve(receive(message)).catch(fail);
+      }).catch(fail);
+    }
+  });
+  return {
+    send(message) {
+      writes = writes.then(async () => {
+        if (ended || socket.destroyed) return;
+        const bytes = await vault.seal(message);
+        if (bytes.length * 4 / 3 > MAX_FRAME || socket.writableLength > MAX_FRAME * 2) throw new Error("\u5171\u4EAB\u64AD\u653E\u5668\u8FDE\u63A5\u79EF\u538B");
+        socket.write(bytes.toString("base64") + "\n");
+      }).catch(fail);
+      return writes;
+    }
+  };
+}
+
+// src/runtime/media-server.mjs
+import { createServer } from "node:net";
+import { randomUUID as randomUUID3 } from "node:crypto";
+
+// src/music/player.mjs
+import { execFile as execFile3 } from "node:child_process";
+import { promisify as promisify3 } from "node:util";
+import { performance } from "node:perf_hooks";
+var execute3 = promisify3(execFile3);
+async function inspectAudio(path) {
+  const binary = await mediaBinary("ffprobe");
+  const { stdout } = await execute3(binary, ["-v", "error", "-protocol_whitelist", "file,pipe", "-show_entries", "stream=codec_type:format=duration", "-of", "json", await nativeMediaPath(binary, path)], { timeout: 15e3, maxBuffer: 65536, windowsHide: true });
+  const data = JSON.parse(stdout), duration = Number(data.format?.duration);
+  if (!data.streams?.some((stream) => stream.codec_type === "audio") || !Number.isFinite(duration) || duration <= 0) throw new Error("\u5E73\u53F0\u8FD4\u56DE\u7684\u6587\u4EF6\u6CA1\u6709\u53EF\u64AD\u653E\u7684\u97F3\u8F68");
+  return { duration };
+}
+function stopChild(child) {
+  if (!child || child.exitCode !== null || child.signalCode) return Promise.resolve();
+  return new Promise((resolve5) => {
+    child.once("close", resolve5);
+    stopMedia(child);
+  });
+}
+var AudioPlayer = class {
+  constructor({ onState = () => {
+  }, onEnded = () => {
+  }, onError = (_error) => {
+  }, inspect = inspectAudio, binary = mediaBinary, launch = launchMedia } = {}) {
+    Object.assign(this, { onState, onEnded, onError, inspect, binary, launch });
+    this.duration = 0;
+    this.volume = 50;
+    this.playing = false;
+    this.offset = 0;
+    this.generation = 0;
+    this.stopping = Promise.resolve();
+    this.timer = setInterval(() => {
+      if (this.playing) this.onState();
+    }, 500);
+    this.timer.unref?.();
+  }
+  get position() {
+    return Math.min(this.duration, this.offset + (this.playing ? (performance.now() - this.anchor) / 1e3 : 0));
+  }
+  pause() {
+    this.offset = this.position;
+    this.playing = false;
+    ++this.generation;
+    const child = this.child;
+    this.child = void 0;
+    this.stopping = Promise.all([this.stopping, stopChild(child)]).then(() => {
+    });
+    this.onState();
+    return this.stopping;
+  }
+  async open(path) {
+    const stopped = this.pause(), generation = this.generation;
+    await stopped;
+    if (generation !== this.generation) return false;
+    const { duration } = await this.inspect(path);
+    if (generation !== this.generation) return false;
+    this.path = path;
+    this.duration = duration;
+    this.offset = 0;
+    this.onState();
+    return true;
+  }
+  async play() {
+    if (!this.path || this.playing || this.child) return;
+    const generation = ++this.generation;
+    await this.stopping;
+    const binary = await this.binary("ffplay"), path = await nativeMediaPath(binary, this.path);
+    if (generation !== this.generation) return;
+    if (this.offset >= this.duration) this.offset = 0;
+    const child = this.child = this.launch(binary, ["-nodisp", "-autoexit", "-loglevel", "error", "-volume", String(this.volume), "-ss", String(this.offset), "-protocol_whitelist", "file,pipe", "-i", path]);
+    child.stdout?.resume();
+    child.stderr?.resume();
+    const failed = () => {
+      if (generation !== this.generation || child !== this.child) return;
+      this.offset = this.position;
+      this.playing = false;
+      this.child = void 0;
+      this.onState();
+      this.onError(new Error("\u97F3\u9891\u64AD\u653E\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 FFmpeg\u3001\u7CFB\u7EDF\u97F3\u91CF\u548C\u97F3\u9891\u8BBE\u5907"));
+    };
+    child.once("error", failed);
+    child.once("spawn", () => {
+      if (generation !== this.generation) return;
+      this.anchor = performance.now();
+      this.playing = true;
+      this.onState();
+    });
+    child.once("close", (code) => {
+      if (generation !== this.generation || child !== this.child) return;
+      if (code !== 0) {
+        failed();
+        return;
+      }
+      this.offset = this.duration;
+      this.playing = false;
+      this.child = void 0;
+      this.onState();
+      this.onEnded();
+    });
+  }
+  async seek(position) {
+    const playing = this.playing;
+    const stopped = this.pause(), generation = this.generation;
+    await stopped;
+    if (generation !== this.generation) return;
+    this.offset = Math.max(0, Math.min(this.duration, Number(position) || 0));
+    this.onState();
+    if (playing) await this.play();
+  }
+  async setVolume(volume) {
+    const next = Math.max(0, Math.min(100, Math.round(Number(volume) || 0)));
+    if (next === this.volume) return;
+    const playing = this.playing;
+    const stopped = this.pause(), generation = this.generation;
+    await stopped;
+    if (generation !== this.generation) return;
+    this.volume = next;
+    this.onState();
+    if (playing) await this.play();
+  }
+  async dispose() {
+    clearInterval(this.timer);
+    await this.pause();
+    this.path = void 0;
+  }
+};
+var MusicController = class {
+  constructor(service, { onChange = (_state) => {
+  }, player, onError = (_error) => {
+  } } = {}) {
+    this.service = service;
+    this.onChange = onChange;
+    this.onError = onError;
+    this.queue = [];
+    this.currentKey = "";
+    this.repeat = "all";
+    this.busy = false;
+    this.error = "";
+    this.preview = false;
+    this.generation = 0;
+    this.writes = Promise.resolve();
+    this.tasks = /* @__PURE__ */ new Set();
+    this.player = player || new AudioPlayer({ onState: () => this.emit(), onEnded: () => {
+      void this.next(1, true);
+    }, onError: (error) => this.fail(error) });
+  }
+  get current() {
+    return this.radio ? this.radio.history[this.radio.index] : this.queue.find((track) => trackKey(track) === this.currentKey);
+  }
+  get state() {
+    return { queue: this.queue, current: this.current, radio: Boolean(this.radio), playing: this.player.playing, position: this.player.position, duration: this.player.duration, volume: this.player.volume, repeat: this.repeat, busy: this.busy, error: this.error, preview: this.preview };
+  }
+  emit() {
+    if (!this.disposed) this.onChange(this.state);
+  }
+  fail(error) {
+    this.error = error instanceof Error ? error.message : "\u97F3\u4E50\u64CD\u4F5C\u5931\u8D25";
+    this.busy = false;
+    this.emit();
+    if (!this.disposed) this.onError(this.error);
+  }
+  async restore() {
+    const value = await this.service.settings.player();
+    if (this.disposed) return;
+    this.queue = value.queue;
+    this.currentKey = value.currentKey;
+    this.player.volume = value.volume;
+    this.repeat = value.repeat;
+    this.emit();
+  }
+  save() {
+    const value = { queue: this.queue, currentKey: this.currentKey, volume: this.player.volume, repeat: this.repeat };
+    this.writes = this.writes.catch(() => {
+    }).then(() => this.service.settings.savePlayer(value)).catch((error) => this.fail(error));
+    return this.writes;
+  }
+  add(input) {
+    const track = musicTrack(input);
+    this.addMany([track]);
+    return track;
+  }
+  addMany(inputs) {
+    const tracks = inputs.map(musicTrack), known = new Set(this.queue.map(trackKey)), additions = [];
+    for (const track of tracks) if (!known.has(trackKey(track))) {
+      known.add(trackKey(track));
+      additions.push(track);
+    }
+    if (this.queue.length + additions.length > 100) throw new Error(`\u64AD\u653E\u961F\u5217\u6700\u591A 100 \u9996\uFF0C\u8FD8\u5269 ${100 - this.queue.length} \u4E2A\u4F4D\u7F6E\uFF0C\u8BF7\u5148\u6574\u7406\u961F\u5217`);
+    if (additions.length) {
+      this.queue = [...this.queue, ...additions];
+      if (!this.currentKey) this.currentKey = trackKey(this.queue[0]);
+      this.emit();
+      void this.save();
+    }
+    return { added: additions.length, duplicates: tracks.length - additions.length };
+  }
+  play(key) {
+    if (this.disposed) return Promise.resolve();
+    const track = key !== void 0 ? this.queue.find((item) => trackKey(item) === key) : this.current || (!this.radio ? this.queue[0] : void 0);
+    if (!track) return Promise.resolve();
+    if (key !== void 0 && this.radio) {
+      this.radioAbort?.abort();
+      this.radioAbort = void 0;
+      this.radio = void 0;
+      this.error = "";
+      this.emit();
+    }
+    if (trackKey(track) === this.preparedKey && this.prepared && !this.busy) return this.player.play().catch((error) => this.fail(error));
+    return this.task(this.load(track));
+  }
+  task(task) {
+    this.tasks.add(task);
+    void task.finally(() => this.tasks.delete(task)).catch(() => {
+    });
+    return task;
+  }
+  async load(track) {
+    const key = trackKey(track);
+    this.abort?.abort();
+    const abort = this.abort = new AbortController(), generation = ++this.generation;
+    const previous = this.prepared;
+    this.prepared = void 0;
+    this.preparedKey = void 0;
+    if (!this.radio) this.currentKey = key;
+    this.busy = true;
+    this.error = "";
+    this.preview = false;
+    this.emit();
+    void this.save();
+    let prepared;
+    try {
+      await this.player.pause();
+      await previous?.release();
+      abort.signal.throwIfAborted();
+      this.player.path = void 0;
+      this.player.duration = 0;
+      this.player.offset = 0;
+      prepared = await this.service.prepare(track, { signal: abort.signal });
+      if (abort.signal.aborted || generation !== this.generation || this.disposed) return;
+      if (!await this.player.open(prepared.path)) return;
+      if (abort.signal.aborted || generation !== this.generation || this.disposed) return;
+      this.prepared = prepared;
+      this.preparedKey = key;
+      this.preview = prepared.preview || Boolean(track.duration && this.player.duration < track.duration - 3);
+      await this.player.play();
+    } catch (error) {
+      if (!abort.signal.aborted && generation === this.generation && !this.disposed) this.fail(error);
+    } finally {
+      if (prepared && this.prepared !== prepared) await prepared.release().catch(() => {
+      });
+      if (generation === this.generation) {
+        this.busy = false;
+        this.abort = void 0;
+        this.emit();
+      }
+    }
+  }
+  pause() {
+    this.abort?.abort();
+    this.abort = void 0;
+    this.radioAbort?.abort();
+    this.radioAbort = void 0;
+    ++this.generation;
+    this.busy = false;
+    this.emit();
+    return this.player.pause();
+  }
+  toggle() {
+    return this.player.playing || this.busy ? this.pause() : this.radio && !this.current ? this.next() : this.play();
+  }
+  startRadio() {
+    if (this.disposed) return Promise.resolve();
+    this.radio = { history: [], index: -1, seen: [] };
+    return this.next();
+  }
+  async stopRadio() {
+    if (!this.radio) return;
+    const stopped = this.pause(), prepared = this.prepared;
+    this.radio = void 0;
+    this.prepared = void 0;
+    this.preparedKey = void 0;
+    this.player.path = void 0;
+    this.player.duration = 0;
+    this.player.offset = 0;
+    this.error = "";
+    this.preview = false;
+    this.emit();
+    await stopped;
+    await prepared?.release();
+  }
+  async advanceRadio(direction) {
+    const session = this.radio, stopped = this.pause(), abort = this.radioAbort = new AbortController();
+    this.busy = true;
+    this.error = "";
+    this.emit();
+    try {
+      await stopped;
+      abort.signal.throwIfAborted();
+      let index = Math.max(0, session.index + (direction < 0 ? -1 : 1));
+      if (index >= session.history.length) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const result = await this.service.radio({ exclude: session.seen, signal: abort.signal });
+          abort.signal.throwIfAborted();
+          if (this.radio !== session || this.disposed) return;
+          const seen = new Set(session.seen), tracks = result.tracks.map(musicTrack).filter((track) => {
+            if (seen.has(track.id)) return false;
+            seen.add(track.id);
+            return true;
+          });
+          if (!tracks.length) continue;
+          session.history.push(...tracks);
+          session.seen = [...seen].slice(-100);
+          const trim = Math.max(0, session.history.length - 100);
+          if (trim) {
+            session.history.splice(0, trim);
+            session.index -= trim;
+            index -= trim;
+          }
+          break;
+        }
+      }
+      if (index >= session.history.length) throw new Error("QQ\u97F3\u4E50\u6682\u672A\u8FD4\u56DE\u65B0\u7684\u63A8\u8350\uFF0C\u8BF7\u7A0D\u540E\u70B9\u4E0B\u4E00\u9996\u91CD\u8BD5");
+      session.index = index;
+      if (this.preparedKey === trackKey(this.current) && this.prepared) await this.player.seek(0);
+      abort.signal.throwIfAborted();
+      if (this.radio !== session || this.disposed) return;
+      this.radioAbort = void 0;
+      this.busy = false;
+      await this.play();
+    } catch (error) {
+      if (!abort.signal.aborted && this.radio === session && !this.disposed) this.fail(error);
+    } finally {
+      if (this.radioAbort === abort) {
+        this.radioAbort = void 0;
+        this.busy = false;
+        this.emit();
+      }
+    }
+  }
+  async next(direction = 1, natural = false) {
+    if (this.radio && !this.disposed) return this.task(this.advanceRadio(direction));
+    if (!this.queue.length || this.disposed) return;
+    const index = Math.max(0, this.queue.findIndex((track) => trackKey(track) === this.currentKey));
+    const next = natural && this.repeat === "one" ? index : (index + direction + this.queue.length) % this.queue.length;
+    const target = this.queue[next], stopped = this.pause(), generation = this.generation;
+    await stopped;
+    if (generation !== this.generation || this.disposed || !this.queue.some((track) => trackKey(track) === trackKey(target))) return;
+    if (trackKey(target) === this.currentKey && this.prepared) await this.player.seek(0);
+    return this.play(trackKey(target));
+  }
+  async seek(delta) {
+    if (!this.prepared || this.busy) return;
+    try {
+      await this.player.seek(this.player.position + delta);
+    } catch (error) {
+      this.fail(error);
+    }
+  }
+  async volume(value) {
+    try {
+      await this.player.setVolume(value);
+      await this.save();
+    } catch (error) {
+      this.fail(error);
+    }
+  }
+  cycleRepeat() {
+    this.repeat = this.repeat === "all" ? "one" : "all";
+    this.emit();
+    void this.save();
+  }
+  async remove(key = this.currentKey) {
+    let stopped, prepared;
+    if (!this.radio && key === this.currentKey) {
+      stopped = this.pause();
+      prepared = this.prepared;
+      this.prepared = void 0;
+      this.preparedKey = void 0;
+      this.player.path = void 0;
+      this.player.duration = 0;
+      this.player.offset = 0;
+    }
+    this.queue = this.queue.filter((track) => trackKey(track) !== key);
+    if (key === this.currentKey) this.currentKey = this.queue[0] ? trackKey(this.queue[0]) : "";
+    if (!this.radio) {
+      this.error = "";
+      this.preview = false;
+    }
+    this.emit();
+    await this.save();
+    await stopped;
+    await prepared?.release();
+  }
+  async clear() {
+    await this.stopRadio();
+    const removing = this.remove(this.currentKey);
+    this.queue = [];
+    this.currentKey = "";
+    this.emit();
+    await this.save();
+    await removing;
+  }
+  async dispose() {
+    this.disposed = true;
+    await this.pause();
+    await this.player.dispose();
+    await Promise.allSettled([...this.tasks]);
+    await this.prepared?.release();
+    this.prepared = void 0;
+    await this.writes;
+  }
+};
+
+// src/runtime/media-server.mjs
+var methods = /* @__PURE__ */ new Set(["add", "addMany", "play", "toggle", "pause", "next", "seek", "volume", "cycleRepeat", "remove", "clear", "startRadio", "stopRadio"]);
+var startsAudio = /* @__PURE__ */ new Set(["play", "toggle", "next", "startRadio"]);
+var SharedMediaServer = class {
+  constructor(library, { service = new MusicService(library), player } = {}) {
+    this.library = library;
+    this.service = service;
+    this.peers = /* @__PURE__ */ new Set();
+    this.epoch = randomUUID3();
+    this.sequence = 0;
+    this.preferences = {};
+    this.videoOwner = "";
+    this.mediaWrites = Promise.resolve();
+    this.settingsWrites = Promise.resolve();
+    this.controller = new MusicController(service, { player, onChange: () => this.publish() });
+    this.server = createServer((socket) => this.connect(socket));
+  }
+  async listen(path) {
+    try {
+      await new Promise((resolve5, reject) => {
+        this.server.once("error", reject);
+        this.server.listen(path, () => {
+          this.server.off("error", reject);
+          resolve5();
+        });
+      });
+    } catch (error) {
+      await this.controller.dispose();
+      throw error;
+    }
+    this.ready = Promise.all([this.controller.restore(), this.service.settings.read("preferences", {}).then((value) => {
+      this.preferences = value;
+    })]);
+    try {
+      await this.ready;
+    } catch (error) {
+      await this.close();
+      throw error;
+    }
+    return this;
+  }
+  snapshot() {
+    return { ...this.controller.state, currentKey: this.controller.currentKey, preferences: this.preferences, videoOwner: this.videoOwner, epoch: this.epoch, sequence: ++this.sequence };
+  }
+  sendState(peer, state) {
+    const update = { ...state };
+    if (peer.queue === state.queue) delete update.queue;
+    if (peer.preferences === state.preferences) delete update.preferences;
+    peer.queue = state.queue;
+    peer.preferences = state.preferences;
+    return peer.channel.send({ type: "state", state: update });
+  }
+  publish() {
+    if (this.closing) return;
+    const state = this.snapshot();
+    for (const peer of this.peers) if (peer.id) void this.sendState(peer, state);
+  }
+  connect(socket) {
+    const peer = { socket, id: "", requests: /* @__PURE__ */ new Map(), calls: /* @__PURE__ */ new Map(), seen: /* @__PURE__ */ new Set() };
+    this.peers.add(peer);
+    const timer = setTimeout(() => {
+      if (!peer.id) socket.destroy();
+    }, 5e3);
+    timer.unref?.();
+    peer.channel = channel(socket, this.library.vault, (message) => this.receive(peer, message), () => {
+    });
+    socket.once("close", () => {
+      clearTimeout(timer);
+      this.peers.delete(peer);
+      for (const request of peer.requests.values()) request.abort();
+      for (const call of peer.calls.values()) {
+        clearTimeout(call.timer);
+        call.reject(new Error("\u89C6\u9891\u7A97\u53E3\u5DF2\u5173\u95ED"));
+      }
+      if (this.videoOwner === peer.id) {
+        this.videoOwner = "";
+        this.publish();
+      }
+    });
+  }
+  async receive(peer, message) {
+    if (this.closing && message?.type !== "callback") return;
+    if (message?.type === "hello") {
+      if (peer.id || !/^[\w-]{16,80}$/.test(message.clientId)) throw new Error("\u65E0\u6548\u5171\u4EAB\u4F1A\u8BDD");
+      peer.id = message.clientId;
+      await this.ready;
+      await this.sendState(peer, this.snapshot());
+      return;
+    }
+    if (!peer.id || message?.epoch !== this.epoch) throw new Error("\u5171\u4EAB\u4F1A\u8BDD\u5DF2\u66F4\u6362");
+    if (message.type === "callback") {
+      const pending = peer.calls.get(message.id);
+      if (pending) {
+        peer.calls.delete(message.id);
+        clearTimeout(pending.timer);
+        message.error ? pending.reject(new Error(message.error)) : pending.resolve();
+      }
+      return;
+    }
+    if (message.type === "cancel") {
+      peer.requests.get(message.id)?.abort();
+      return;
+    }
+    if (message.type !== "request" || typeof message.id !== "string" || peer.seen.has(message.id)) throw new Error("\u65E0\u6548\u5171\u4EAB\u547D\u4EE4");
+    peer.seen.add(message.id);
+    if (peer.seen.size > 512) peer.seen.delete(peer.seen.values().next().value);
+    const abort = new AbortController();
+    peer.requests.set(message.id, abort);
+    try {
+      const value = await this.execute(peer, message.method, message.args || [], abort.signal);
+      await peer.channel.send({ type: "reply", id: message.id, value });
+    } catch (error) {
+      await peer.channel.send({ type: "reply", id: message.id, error: error instanceof Error ? error.message : "\u5171\u4EAB\u64CD\u4F5C\u5931\u8D25" });
+    } finally {
+      peer.requests.delete(message.id);
+    }
+  }
+  serialize(kind, operation) {
+    const pending = this[kind].catch(() => {
+    }).then(operation);
+    this[kind] = pending.then(() => {
+    }, () => {
+    });
+    return pending;
+  }
+  pauseVideo(peer) {
+    if (!peer) return Promise.resolve();
+    const id = randomUUID3();
+    return new Promise((resolve5, reject) => {
+      const timer = setTimeout(() => {
+        peer.calls.delete(id);
+        reject(new Error("\u53E6\u4E00\u4E2A\u89C6\u9891\u7A97\u53E3\u672A\u54CD\u5E94\uFF0C\u8BF7\u5148\u6682\u505C\u8BE5\u7A97\u53E3"));
+      }, 5e3);
+      peer.calls.set(id, { resolve: resolve5, reject, timer });
+      void peer.channel.send({ type: "pauseVideo", id, epoch: this.epoch });
+    });
+  }
+  async execute(peer, method, args, signal) {
+    if (method === "video.claim") return this.serialize("mediaWrites", async () => {
+      if (!Number.isSafeInteger(args[0]) || args[0] < (peer.videoRevision || 0)) return false;
+      peer.videoRevision = args[0];
+      signal.throwIfAborted();
+      await this.controller.pause();
+      if (this.videoOwner && this.videoOwner !== peer.id) {
+        await this.pauseVideo([...this.peers].find((item) => item.id === this.videoOwner));
+        this.videoOwner = "";
+        this.publish();
+      }
+      signal.throwIfAborted();
+      this.videoOwner = peer.id;
+      this.publish();
+      return true;
+    });
+    if (method === "video.release") return this.serialize("mediaWrites", () => {
+      if (!Number.isSafeInteger(args[0]) || args[0] < (peer.videoRevision || 0)) return;
+      peer.videoRevision = args[0];
+      if (this.videoOwner === peer.id) {
+        this.videoOwner = "";
+        this.publish();
+      }
+    });
+    if (method === "preference.set") return this.serialize("settingsWrites", async () => {
+      const [key, value] = args;
+      if (typeof key !== "string" || !key.startsWith("opencode-moyu:") || key.length > 180 || JSON.stringify(value)?.length > 4096) throw new Error("\u65E0\u6548\u9605\u8BFB\u8BBE\u7F6E");
+      signal.throwIfAborted();
+      const next = { ...this.preferences, [key]: value };
+      await this.service.settings.write("preferences", next);
+      this.preferences = next;
+      this.publish();
+    });
+    if (method === "account.version") return (await this.service.settings.read("accounts", {}))[args[0]] || "0";
+    if (method === "account.save" || method === "account.logout") return this.serialize("settingsWrites", async () => {
+      const [platform, cookie, options = {}] = args;
+      if (!["netease", "qq", "kugou"].includes(platform)) throw new Error("\u65E0\u6548\u97F3\u4E50\u5E73\u53F0");
+      const versions = await this.service.settings.read("accounts", {});
+      if (options.expectedVersion !== void 0 && options.expectedVersion !== (versions[platform] || "0")) throw new Error("\u5176\u4ED6\u7A97\u53E3\u5DF2\u4FEE\u6539\u8BE5\u8D26\u53F7\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+      if (method === "account.save") normalizeMusicCookie(platform, cookie);
+      signal.throwIfAborted();
+      await this.service.settings.write("accounts", { ...versions, [platform]: randomUUID3() });
+      signal.throwIfAborted();
+      return method === "account.save" ? this.service.settings.saveAccount(platform, cookie, options) : this.service.settings.logout(platform);
+    });
+    if (!methods.has(method)) throw new Error("\u672A\u77E5\u5171\u4EAB\u64CD\u4F5C");
+    const begin = () => {
+      if (this.closing) throw new Error("\u5171\u4EAB\u64AD\u653E\u5668\u6B63\u5728\u5207\u6362\u7A97\u53E3\uFF0C\u8BF7\u91CD\u8BD5");
+      signal.throwIfAborted();
+      const pausing = method === "toggle" && (this.controller.state.playing || this.controller.state.busy);
+      if (startsAudio.has(method) && !pausing && this.videoOwner) throw new Error("\u6709\u7A97\u53E3\u6B63\u5728\u770B\u89C6\u9891\uFF0C\u8BF7\u5148\u6682\u505C\u89C6\u9891\u6216\u5207\u56DE\u5C0F\u8BF4 / \u97F3\u4E50");
+      return { pending: this.controller[method](...args) };
+    };
+    const { pending } = startsAudio.has(method) ? await this.serialize("mediaWrites", begin) : begin();
+    try {
+      return await pending;
+    } finally {
+      this.publish();
+    }
+  }
+  async close() {
+    if (this.closing) return this.closed;
+    this.closing = true;
+    this.closed = (async () => {
+      for (const peer of this.peers) for (const request of peer.requests.values()) request.abort();
+      if (this.videoOwner) await this.pauseVideo([...this.peers].find((peer) => peer.id === this.videoOwner));
+      await this.controller.dispose();
+      await Promise.allSettled([this.mediaWrites, this.settingsWrites]);
+      for (const peer of this.peers) {
+        await peer.channel.send({ type: "reconnect" });
+        peer.socket.destroy();
+      }
+      await new Promise((resolve5) => this.server.close(resolve5));
+    })();
+    return this.closed;
+  }
+};
+
+// src/runtime/media-client.mjs
+var SharedMediaClient = class {
+  constructor(library, { onChange = (_state) => {
+  }, onError = (_error) => {
+  }, service, player, reconnectMs = 150 } = {}) {
+    this.library = library;
+    this.onChange = onChange;
+    this.onError = onError;
+    this.serverOptions = { service, player };
+    this.reconnectMs = reconnectMs;
+    this.onPauseVideo = async () => {
+    };
+    this.videoRevision = 0;
+    this.id = randomUUID4();
+    this.pending = /* @__PURE__ */ new Map();
+    this.preferenceWrites = /* @__PURE__ */ new Map();
+    this.preferenceTasks = /* @__PURE__ */ new Set();
+    this.listeners = /* @__PURE__ */ new Set();
+    this.ready = this.ensure();
+  }
+  async ensure() {
+    if (this.disposed) throw new Error("\u5171\u4EAB\u64AD\u653E\u5668\u5DF2\u5173\u95ED");
+    if (this.connecting) return this.connecting;
+    this.connecting = this.connect().finally(() => {
+      this.connecting = void 0;
+    });
+    return this.connecting;
+  }
+  async connect() {
+    const address = this.address ||= await runtimeAddress(this.library);
+    for (let attempt = 0; attempt < 40 && !this.disposed; attempt++) {
+      try {
+        await this.open(address.path);
+        return;
+      } catch (error) {
+        if (!["ENOENT", "ECONNREFUSED", "EPIPE", "ECONNRESET"].includes(error.code)) throw error;
+        try {
+          this.host = await new SharedMediaServer(this.library, this.serverOptions).listen(address.path);
+        } catch (error2) {
+          if (error2.code !== "EADDRINUSE") throw error2;
+        }
+        await new Promise((resolve5) => setTimeout(resolve5, 25));
+      }
+    }
+    throw new Error("\u5171\u4EAB\u64AD\u653E\u5668\u8FDE\u63A5\u5931\u8D25\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u97F3\u4E50\u9762\u677F");
+  }
+  open(path) {
+    return new Promise((resolve5, reject) => {
+      const socket = createConnection(path), timeout = setTimeout(() => {
+        socket.destroy();
+        reject(new Error("\u5171\u4EAB\u64AD\u653E\u5668\u8FDE\u63A5\u8D85\u65F6"));
+      }, 8e3);
+      let accepted = false;
+      socket.once("error", reject);
+      const transport = channel(socket, this.library.vault, async (message) => {
+        if (message.type === "state") {
+          if (this.epoch === message.state.epoch && this.state?.sequence > message.state.sequence) return;
+          this.state = this.epoch === message.state.epoch ? { ...this.state, ...message.state } : message.state;
+          this.epoch = message.state.epoch;
+          this.preferences = { ...this.state.preferences, ...Object.fromEntries([...this.preferenceWrites].map(([key, entry]) => [key, entry.value])) };
+          this.onChange(this.state);
+          for (const listener of this.listeners) listener(this.state);
+          if (!accepted) {
+            accepted = true;
+            clearTimeout(timeout);
+            this.socket = socket;
+            this.transport = transport;
+            resolve5();
+          }
+        } else if (message.type === "reply") {
+          const pending = this.pending.get(message.id);
+          if (pending) {
+            this.pending.delete(message.id);
+            pending.cleanup();
+            message.error ? pending.reject(new Error(message.error)) : pending.resolve(message.value);
+          }
+        } else if (message.type === "pauseVideo") {
+          try {
+            await this.onPauseVideo?.();
+            await transport.send({ type: "callback", id: message.id, epoch: this.epoch });
+          } catch {
+            await transport.send({ type: "callback", id: message.id, epoch: this.epoch, error: "\u89C6\u9891\u6682\u505C\u5931\u8D25\uFF0C\u8BF7\u5148\u5728\u539F\u7A97\u53E3\u6682\u505C" });
+          }
+        } else if (message.type === "reconnect") socket.destroy();
+      }, reject);
+      socket.once("connect", () => {
+        void transport.send({ type: "hello", clientId: this.id });
+      });
+      socket.once("close", () => {
+        clearTimeout(timeout);
+        if (!accepted) reject(Object.assign(new Error("\u5171\u4EAB\u8FDE\u63A5\u5DF2\u5173\u95ED"), { code: "ECONNRESET" }));
+        if (this.socket !== socket) return;
+        this.socket = void 0;
+        const stoppedVideo = Promise.resolve(this.onPauseVideo()).catch(() => {
+        });
+        for (const request of this.pending.values()) {
+          request.cleanup();
+          request.reject(new Error("\u5171\u4EAB\u64AD\u653E\u5668\u6B63\u5728\u5207\u6362\u7A97\u53E3\uFF0C\u8BF7\u91CD\u8BD5"));
+        }
+        this.pending.clear();
+        if (!this.disposed) this.reconnectTimer = setTimeout(() => {
+          void stoppedVideo.then(() => this.ensure()).catch(this.onError);
+        }, this.reconnectMs);
+      });
+    });
+  }
+  async request(method, args = [], { signal, timeoutMs = 9e4 } = {}) {
+    signal?.throwIfAborted();
+    if (!this.socket) await this.ensure();
+    signal?.throwIfAborted();
+    const id = randomUUID4();
+    return new Promise((resolve5, reject) => {
+      const abort = () => {
+        this.pending.delete(id);
+        cleanup();
+        void this.transport.send({ type: "cancel", id, epoch: this.epoch });
+        reject(signal?.reason || new Error("\u5171\u4EAB\u64CD\u4F5C\u8D85\u65F6"));
+      };
+      const timer = setTimeout(abort, timeoutMs), cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
+      };
+      this.pending.set(id, { resolve: resolve5, reject, cleanup });
+      signal?.addEventListener("abort", abort, { once: true });
+      void this.transport.send({ type: "request", id, epoch: this.epoch, method, args });
+    });
+  }
+  get currentKey() {
+    return this.state?.currentKey || "";
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    if (this.state) listener(this.state);
+    return () => this.listeners.delete(listener);
+  }
+  add(track) {
+    return this.request("add", [track]);
+  }
+  addMany(tracks) {
+    return this.request("addMany", [tracks]);
+  }
+  play(key) {
+    return this.request("play", key === void 0 ? [] : [key]);
+  }
+  toggle() {
+    return this.request("toggle");
+  }
+  pause() {
+    return this.request("pause");
+  }
+  next(direction = 1) {
+    return this.request("next", [direction]);
+  }
+  seek(delta) {
+    return this.request("seek", [delta]);
+  }
+  volume(value) {
+    return this.request("volume", [value]);
+  }
+  cycleRepeat() {
+    return this.request("cycleRepeat");
+  }
+  remove() {
+    return this.request("remove");
+  }
+  clear() {
+    return this.request("clear");
+  }
+  startRadio() {
+    return this.request("startRadio");
+  }
+  stopRadio() {
+    return this.request("stopRadio");
+  }
+  claimVideo(options = {}) {
+    return this.request("video.claim", [++this.videoRevision], options);
+  }
+  releaseVideo(stopped = Promise.resolve()) {
+    const revision = ++this.videoRevision;
+    return stopped.then(() => this.request("video.release", [revision]));
+  }
+  accountVersion(platform) {
+    return this.request("account.version", [platform]);
+  }
+  saveAccount(platform, cookie, options = {}) {
+    const { signal, ...settings } = options;
+    return this.request("account.save", [platform, cookie, settings], { signal });
+  }
+  logout(platform) {
+    return this.request("account.logout", [platform]);
+  }
+  setPreference(key, value) {
+    const entry = { value };
+    this.preferenceWrites.set(key, entry);
+    this.preferences = { ...this.preferences, [key]: value };
+    const writing = this.request("preference.set", [key, value], { timeoutMs: 5e3 }).finally(() => {
+      if (this.preferenceWrites.get(key) === entry) this.preferenceWrites.delete(key);
+      this.preferences = { ...this.state?.preferences, ...Object.fromEntries([...this.preferenceWrites].map(([name, pending]) => [name, pending.value])) };
+    });
+    this.preferenceTasks.add(writing);
+    void writing.finally(() => this.preferenceTasks.delete(writing)).catch(() => {
+    });
+    return writing;
+  }
+  async dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    clearTimeout(this.reconnectTimer);
+    await this.onPauseVideo?.();
+    await Promise.allSettled([...this.preferenceTasks]);
+    this.socket?.destroy();
+    if (this.host) await this.host.close();
+    for (const request of this.pending.values()) {
+      request.cleanup();
+      request.reject(new Error("\u5171\u4EAB\u64AD\u653E\u5668\u5DF2\u5173\u95ED"));
+    }
+    this.pending.clear();
+  }
+};
+
 // src/ui/index.tsx
 var prefix2 = "opencode-moyu:";
-var pluginRoot = resolve3(dirname4(fileURLToPath(import.meta.url)), "..");
-var tui = async (api, options) => {
+var pluginRoot = resolve4(dirname5(fileURLToPath(import.meta.url)), "..");
+var tui = async (host, options) => {
   const configuredRows = Number(options?.rows);
   const fixedRows = Number.isInteger(configuredRows) && configuredRows >= 4 ? Math.min(configuredRows, 40) : void 0;
-  const booksDir = expandPath(typeof options?.booksDir === "string" ? options.booksDir : resolve3(pluginRoot, "books"));
+  const booksDir = expandPath(typeof options?.booksDir === "string" ? options.booksDir : resolve4(pluginRoot, "books"));
   const keyFile = typeof options?.keyFile === "string" ? expandPath(options.keyFile) : void 0;
   const library = new LibraryStore(booksDir, {
     keyFile
   });
   await library.ready();
-  const collect = api.moyu?.collect;
-  const [visible, setVisible] = createSignal2(true);
-  const [mode, setMode] = createSignal2("novel");
-  const [book, setBook] = createSignal2();
-  const [offset, setOffset] = createSignal2(0);
-  const [height, setHeight] = createSignal2(api.renderer.height);
-  const [width, setWidth] = createSignal2(api.renderer.width);
-  const [bodyWidth, setBodyWidth] = createSignal2(36);
-  const [busy, setBusy] = createSignal2(false);
-  const [heightPercent, setHeightPercent] = createSignal2();
-  const [widthPercent, setWidthPercent] = createSignal2();
-  const [viewportHeight, setViewportHeight] = createSignal2();
-  const [hostRows, setHostRows] = createSignal2(0);
+  const playback = new SharedMediaClient(library, {
+    onError: (error) => {
+      if (!host.lifecycle.signal.aborted) host.ui.toast({
+        title: "\u5168\u5C40\u64AD\u653E\u5668",
+        message: String(error),
+        variant: "error"
+      });
+    }
+  });
+  try {
+    await playback.ready;
+  } catch (error) {
+    await playback.dispose();
+    throw error;
+  }
+  const api = {
+    ...host,
+    kv: {
+      ready: true,
+      get(key, fallback) {
+        return Object.hasOwn(playback.preferences || {}, key) ? playback.preferences[key] : host.kv.get(key, fallback);
+      },
+      set(key, value) {
+        void playback.setPreference(key, value).catch((error) => {
+          if (!host.lifecycle.signal.aborted) host.ui.toast({
+            message: String(error),
+            variant: "error"
+          });
+        });
+      }
+    }
+  };
+  const moyu = api.moyu;
+  const collect = moyu?.collect;
+  const [visible, setVisible] = createSignal3(true);
+  const [mode, setMode] = createSignal3("novel");
+  const [book, setBook] = createSignal3();
+  const [offset, setOffset] = createSignal3(0);
+  const [height, setHeight] = createSignal3(api.renderer.height);
+  const [width, setWidth] = createSignal3(api.renderer.width);
+  const [bodyWidth, setBodyWidth] = createSignal3(36);
+  const [busy, setBusy] = createSignal3(false);
+  const [novelHeightPercent, setNovelHeightPercent] = createSignal3();
+  const [novelWidthPercent, setNovelWidthPercent] = createSignal3();
+  const [videoHeightPercent, setVideoHeightPercent] = createSignal3(100);
+  const [videoWidthPercent, setVideoWidthPercent] = createSignal3(60);
+  const [videoExpanded, setVideoExpanded] = createSignal3(false);
+  const [videoScalePercent, setVideoScalePercent] = createSignal3(100);
+  const [expandedScalePercent, setExpandedScalePercent] = createSignal3(100);
+  const [viewportHeight, setViewportHeight] = createSignal3();
+  const [hostRows, setHostRows] = createSignal3(0);
   const onboarding = createMemo(() => options?.hostMajor === 2 || !api.kv.get("dismissed_getting_started", false) && !api.state.provider.some((provider) => provider.id !== "opencode" || Object.values(provider.models).some((model) => model.cost?.input !== 0)));
-  const chromeRows = () => height() < 40 ? 9 : 12;
+  const chromeRows = () => mode() === "music" ? 2 : (height() < 40 ? 9 : 12) + (mode() === "video" && options?.hostMajor === 2 ? 1 : 0);
   const minimumRows = () => options?.hostMajor !== 2 && height() < 40 ? 2 : 4;
   const availableRows = createMemo(() => Math.max(minimumRows(), viewportHeight() === void 0 ? height() - (onboarding() ? 31 : 20) : viewportHeight() - chromeRows() - hostRows()));
+  const normalVideoSize = createMemo(() => scaledVideoSize(videoWidthPercent() ?? Math.max(20, Math.min(75, (bodyWidth() + 4) / Math.max(1, width()) * 100)), videoHeightPercent() ?? Math.min(fixedRows ?? 24, availableRows()) / availableRows() * 100, videoScalePercent()));
+  const videoSize = createMemo(() => videoExpanded() ? scaledVideoSize(75, 100, expandedScalePercent()) : normalVideoSize());
+  const heightPercent = createMemo(() => mode() === "music" ? 100 : mode() === "video" ? !videoExpanded() && videoHeightPercent() === void 0 && videoScalePercent() === 100 ? void 0 : videoSize().height : novelHeightPercent());
+  const widthPercent = createMemo(() => mode() === "music" ? 33 : mode() === "video" ? !videoExpanded() && videoWidthPercent() === void 0 && videoScalePercent() === 100 ? void 0 : videoSize().width : novelWidthPercent());
   const rows = createMemo(() => heightPercent() === void 0 ? Math.min(fixedRows ?? 24, availableRows()) : Math.max(minimumRows(), Math.floor(availableRows() * heightPercent() / 100)));
   const paginate = createPaginator();
   const pages = createMemo((previous) => mode() !== "novel" || !visible() ? previous ?? [{
@@ -3530,7 +8147,7 @@ var tui = async (api, options) => {
   let request = 0;
   let ownsDialog = false;
   let started = false;
-  const progressKey = (path) => prefix2 + "position:" + createHash3("sha256").update(path).digest("hex");
+  const progressKey = (path) => prefix2 + "position:" + createHash6("sha256").update(path).digest("hex");
   function save() {
     const current = book();
     if (current) api.kv.set(progressKey(current.path), offset());
@@ -3559,7 +8176,28 @@ var tui = async (api, options) => {
     active: () => mode() === "video" && visible() && api.route.current.name === "session",
     activate: () => selectMode("video"),
     dialog,
+    close: closeDialog,
+    collect: collect ? promptVideoCollection : void 0,
+    beforePlay: (signal) => playback.claimVideo({
+      signal
+    }),
+    releasePlayback: (stopped) => playback.releaseVideo(stopped)
+  });
+  playback.onPauseVideo = () => video.pauseAndWait();
+  const music = createMusicReader(api, library, playback, {
+    rows,
+    active: () => mode() === "music" && visible() && api.route.current.name === "session",
+    canDialog: () => !ownsDialog,
+    dialog,
     close: closeDialog
+  });
+  await music.ready;
+  moyu?.registerMusicLogin?.((platform) => {
+    if (api.lifecycle.signal.aborted) return;
+    selectMode("music");
+    setVisible(true);
+    api.kv.set(prefix2 + "visible", true);
+    music.login(platform);
   });
   function selectMode(next) {
     save();
@@ -3597,6 +8235,10 @@ var tui = async (api, options) => {
       video.seek(direction * 10);
       return;
     }
+    if (mode() === "music") {
+      void music.seek(direction * 10);
+      return;
+    }
     if (!book() || busy()) return;
     const next = Math.max(0, Math.min(pages().length - 1, page() + direction));
     setOffset(pages()[next].start);
@@ -3610,7 +8252,7 @@ var tui = async (api, options) => {
     if (next && api.route.current.name !== "session") toast("\u9605\u8BFB\u9762\u677F\u4F4D\u4E8E\u4F1A\u8BDD\u53F3\u4FA7\u680F\uFF1B\u8FDB\u5165\u4F1A\u8BDD\u540E\u663E\u793A");
   }
   function promptFile() {
-    dialog(() => _$createComponent2(api.ui.DialogPrompt, {
+    dialog(() => _$createComponent3(api.ui.DialogPrompt, {
       title: "\u6253\u5F00\u5C0F\u8BF4 \xB7 \u672C\u5730 TXT / Markdown",
       placeholder: "/mnt/d/books/\u5C0F\u8BF4.txt \u6216 ~/books/\u5C0F\u8BF4.txt",
       onCancel: closeDialog,
@@ -3621,7 +8263,7 @@ var tui = async (api, options) => {
     }));
   }
   function promptCollection() {
-    dialog(() => _$createComponent2(api.ui.DialogPrompt, {
+    dialog(() => _$createComponent3(api.ui.DialogPrompt, {
       title: "\u8BA9\u5F53\u524D\u6A21\u578B\u91C7\u96C6\u5C0F\u8BF4",
       placeholder: "\u4F8B\u5982\uFF1A\u5FD8\u8BED\u7684\u51E1\u4EBA\u4FEE\u4ED9\u4F20\uFF0C\u5148\u91C7\u96C620\u7AE0\uFF1B\u4E5F\u53EF\u8F93\u5165\u76EE\u5F55\u94FE\u63A5",
       onCancel: closeDialog,
@@ -3631,13 +8273,24 @@ var tui = async (api, options) => {
       }
     }));
   }
+  function promptVideoCollection() {
+    dialog(() => _$createComponent3(api.ui.DialogPrompt, {
+      title: "\u8BA9\u5F53\u524D\u6A21\u578B\u641C\u7D22 / \u91C7\u96C6\u89C6\u9891",
+      placeholder: "\u4F8B\u5982\uFF1A\u70ED\u95E8\uFF1B\u641C\u7D22 \u732B\u54AA\uFF1B\u4E0B\u8F7D\u8FD9\u4E2A B \u7AD9\u94FE\u63A5\uFF0C1080p",
+      onCancel: closeDialog,
+      onConfirm: (query) => {
+        closeDialog();
+        void collect?.(`\u89C6\u9891 ${query}`);
+      }
+    }));
+  }
   async function shelf() {
     try {
       const items = await listBooks(booksDir, {
         keyFile
       });
       if (api.lifecycle.signal.aborted) return;
-      dialog(() => _$createComponent2(api.ui.DialogSelect, {
+      dialog(() => _$createComponent3(api.ui.DialogSelect, {
         title: "\u4E66\u67B6 \xB7 \u6478\u9C7C\u9605\u8BFB",
         placeholder: "\u641C\u7D22\u4E66\u540D\uFF0C\u6216\u9009\u62E9\u91C7\u96C6 / \u6253\u5F00\u672C\u5730\u6587\u4EF6",
         get options() {
@@ -3645,6 +8298,10 @@ var tui = async (api, options) => {
             title: "\uFF0B \u8BA9\u5F53\u524D\u6A21\u578B\u91C7\u96C6\u5C0F\u8BF4\u2026",
             value: "moyu:collect",
             description: "\u8F93\u5165\u4E66\u540D\u3001\u4F5C\u8005\u6216\u76EE\u5F55\u94FE\u63A5"
+          }] : [], ...collect ? [{
+            title: "\uFF0B \u89C6\u9891\u641C\u7D22 / \u70ED\u95E8\u91C7\u96C6\u2026",
+            value: "moyu:video",
+            description: "\u7528\u5F53\u524D\u6A21\u578B\u6D4F\u89C8 B \u7AD9\u70ED\u95E8\u3001\u641C\u7D22\u6216\u4E0B\u8F7D\u89C6\u9891"
           }] : [], {
             title: "\uFF0B \u6253\u5F00\u672C\u5730\u6587\u4EF6\u2026",
             value: "",
@@ -3658,6 +8315,7 @@ var tui = async (api, options) => {
         onSelect: (item) => {
           closeDialog();
           if (item.value === "moyu:collect") promptCollection();
+          else if (item.value === "moyu:video") promptVideoCollection();
           else if (item.value) void open3(String(item.value));
           else promptFile();
         }
@@ -3669,7 +8327,7 @@ var tui = async (api, options) => {
   function openMoyu() {
     setVisible(true);
     api.kv.set(prefix2 + "visible", true);
-    return mode() === "video" ? video.shelf() : shelf();
+    return mode() === "music" ? music.queue() : mode() === "video" ? video.shelf() : shelf();
   }
   function chapters() {
     if (mode() !== "novel") selectMode("novel");
@@ -3677,7 +8335,7 @@ var tui = async (api, options) => {
     if (!current) return promptFile();
     const items = current.chapters.length ? current.chapters : chaptersOf(current.text);
     if (!items.length) return toast("\u6CA1\u6709\u8BC6\u522B\u5230\u7AE0\u8282\u6807\u9898\uFF0C\u53EF\u7528\u300C\u8DF3\u8F6C\u8FDB\u5EA6\u300D\u5B9A\u4F4D");
-    dialog(() => _$createComponent2(api.ui.DialogSelect, {
+    dialog(() => _$createComponent3(api.ui.DialogSelect, {
       get title() {
         return `${current.title} \xB7 \u76EE\u5F55`;
       },
@@ -3699,9 +8357,10 @@ var tui = async (api, options) => {
     }));
   }
   function jump() {
+    if (mode() === "music") return music.jump();
     if (mode() === "video") return video.jump();
     if (!book()) return promptFile();
-    dialog(() => _$createComponent2(api.ui.DialogPrompt, {
+    dialog(() => _$createComponent3(api.ui.DialogPrompt, {
       title: "\u8DF3\u8F6C\u9605\u8BFB\u8FDB\u5EA6 \xB7 \u8F93\u5165 0\u2013100",
       placeholder: "\u4F8B\u5982 35 \u6216 35%",
       onCancel: closeDialog,
@@ -3715,13 +8374,126 @@ var tui = async (api, options) => {
     }));
   }
   function setSize(percent) {
-    setHeightPercent(percent);
-    api.kv.set(prefix2 + "heightPercent", percent ?? null);
+    if (mode() === "video") {
+      commitVideoScale();
+      setVideoHeightPercent(percent);
+      api.kv.set(prefix2 + "video:heightPercent", percent ?? "auto");
+      resetVideoExpanded();
+    } else {
+      setNovelHeightPercent(percent);
+      api.kv.set(prefix2 + "heightPercent", percent ?? null);
+    }
     save();
   }
+  function resetVideoExpanded() {
+    setVideoExpanded(false);
+    api.kv.set(prefix2 + "video:expanded", false);
+  }
+  function toggleVideoSize() {
+    if (!videoExpanded()) {
+      setExpandedScalePercent(100);
+      api.kv.set(prefix2 + "video:expandedScalePercent", 100);
+    }
+    setVideoExpanded((previous) => !previous);
+    api.kv.set(prefix2 + "video:expanded", videoExpanded());
+  }
+  function setViewerWidth(percent) {
+    if (mode() === "video") {
+      commitVideoScale();
+      setVideoWidthPercent(percent);
+      api.kv.set(prefix2 + "video:widthPercent", percent ?? "auto");
+      resetVideoExpanded();
+    } else {
+      setNovelWidthPercent(percent);
+      api.kv.set(prefix2 + "widthPercent", percent ?? null);
+    }
+    save();
+  }
+  function commitVideoScale() {
+    if (videoScalePercent() === 100) return;
+    const current = normalVideoSize();
+    setVideoWidthPercent(current.width);
+    setVideoHeightPercent(current.height);
+    setVideoScalePercent(100);
+    api.kv.set(prefix2 + "video:widthPercent", current.width);
+    api.kv.set(prefix2 + "video:heightPercent", current.height);
+    api.kv.set(prefix2 + "video:scalePercent", 100);
+  }
+  function scaleVideo(percent) {
+    if (videoExpanded()) {
+      const next = scaledVideoSize(75, 100, percent);
+      setExpandedScalePercent(next.percent);
+      api.kv.set(prefix2 + "video:expandedScalePercent", next.percent);
+    } else {
+      if (videoWidthPercent() === void 0) {
+        const baseline = Math.max(20, Math.min(75, (bodyWidth() + 4) / width() * 100));
+        setVideoWidthPercent(baseline);
+        api.kv.set(prefix2 + "video:widthPercent", baseline);
+      }
+      if (videoHeightPercent() === void 0) {
+        const baseline = Math.min(100, Math.min(fixedRows ?? 24, availableRows()) / availableRows() * 100);
+        setVideoHeightPercent(baseline);
+        api.kv.set(prefix2 + "video:heightPercent", baseline);
+      }
+      const next = scaledVideoSize(videoWidthPercent(), videoHeightPercent(), percent);
+      setVideoScalePercent(next.percent);
+      api.kv.set(prefix2 + "video:scalePercent", next.percent);
+    }
+  }
+  function stepVideoScale(direction) {
+    const current = videoSize();
+    const next = Math.max(25, Math.min(current.maximum, current.percent + direction * 10));
+    if (next === current.percent) return toast(direction > 0 ? videoExpanded() ? "\u5DF2\u8FBE\u5230\u5F53\u524D\u7EC8\u7AEF\u53EF\u7528\u7A7A\u95F4\u4E0A\u9650" : "\u5DF2\u8FBE\u5230\u5F53\u524D\u64AD\u653E\u533A\u4E0A\u9650\uFF0C\u53EF\u4F7F\u7528\u300C\u5927\u753B\u9762\u300D\u589E\u52A0\u7A7A\u95F4" : "\u5DF2\u8FBE\u5230\u6700\u5C0F\u7F29\u653E\u6BD4\u4F8B");
+    scaleVideo(next);
+  }
+  function customVideoScale() {
+    const maximum = videoSize().maximum;
+    dialog(() => _$createComponent3(api.ui.DialogPrompt, {
+      title: `\u89C6\u9891\u7F29\u653E \xB7 \u8F93\u5165 25\u2013${maximum}%`,
+      get placeholder() {
+        return `\u5F53\u524D ${videoSize().percent}%\uFF0C\u5BBD\u9AD8\u4E00\u8D77\u8C03\u6574`;
+      },
+      onCancel: closeDialog,
+      onConfirm: (input) => {
+        const value = Number(input.trim().replace(/%$/, ""));
+        if (!input.trim() || !Number.isFinite(value) || value < 25 || value > maximum) return toast(`\u8BF7\u8F93\u5165 25\u2013${maximum} \u4E4B\u95F4\u7684\u767E\u5206\u6BD4`, "error");
+        closeDialog();
+        scaleVideo(value);
+      }
+    }));
+  }
+  function videoScaleMenu() {
+    const current = videoSize();
+    const presets = [.../* @__PURE__ */ new Set([...VIDEO_SCALE_PRESETS.filter((value) => value <= current.maximum), current.percent])].sort((a, b) => a - b);
+    dialog(() => _$createComponent3(api.ui.DialogSelect, {
+      title: "\u89C6\u9891\u7B49\u6BD4\u4F8B\u7F29\u653E",
+      placeholder: "100% \u4E3A\u57FA\u51C6\u5C3A\u5BF8\uFF1B\u5BBD\u9AD8\u4E00\u8D77\u8C03\u6574\uFF0C\u753B\u9762\u4FDD\u6301\u539F\u6BD4\u4F8B",
+      get current() {
+        return String(current.percent);
+      },
+      get options() {
+        return [...presets.map((value) => ({
+          title: `\u7F29\u653E ${value}%${value === 100 ? "\uFF08\u57FA\u51C6\uFF09" : ""}`,
+          value: String(value),
+          description: "\u53D7\u7EC8\u7AEF\u53EF\u7528\u7A7A\u95F4\u548C\u6700\u5C0F\u5C3A\u5BF8\u9650\u5236"
+        })), {
+          title: "\u81EA\u5B9A\u4E49\u6BD4\u4F8B\u2026",
+          value: "custom",
+          description: `\u8F93\u5165 25\u2013${current.maximum}%`
+        }];
+      },
+      onSelect: (item) => {
+        closeDialog();
+        if (item.value === "custom") customVideoScale();
+        else scaleVideo(Number(item.value));
+      }
+    }));
+  }
   function customSize() {
-    dialog(() => _$createComponent2(api.ui.DialogPrompt, {
-      title: "\u9605\u8BFB\u533A\u9AD8\u5EA6 \xB7 \u8F93\u5165 10\u2013100%",
+    dialog(() => _$createComponent3(api.ui.DialogPrompt, {
+      get title() {
+        return `${mode() === "video" ? "\u89C6\u9891\u64AD\u653E\u533A" : "\u9605\u8BFB\u533A"}\u9AD8\u5EA6 \xB7 \u8F93\u5165 10\u2013100%`;
+      },
       placeholder: "\u4F8B\u5982 75\uFF0C\u6309\u53EF\u7528\u6B63\u6587\u9AD8\u5EA6\u8BA1\u7B97",
       onCancel: closeDialog,
       onConfirm: (input) => {
@@ -3734,9 +8506,13 @@ var tui = async (api, options) => {
   }
   function heightSize() {
     const selected = heightPercent() === void 0 ? "auto" : String(heightPercent());
-    dialog(() => _$createComponent2(api.ui.DialogSelect, {
-      title: "\u9605\u8BFB\u533A\u9AD8\u5EA6",
-      placeholder: "\u70B9\u51FB\u9009\u62E9\u9AD8\u5EA6\uFF0C\u8BBE\u7F6E\u81EA\u52A8\u4FDD\u5B58",
+    dialog(() => _$createComponent3(api.ui.DialogSelect, {
+      get title() {
+        return `${mode() === "video" ? "\u89C6\u9891\u64AD\u653E\u533A" : "\u9605\u8BFB\u533A"}\u9AD8\u5EA6`;
+      },
+      get placeholder() {
+        return mode() === "video" ? "\u5355\u72EC\u4FDD\u5B58\u89C6\u9891\u9AD8\u5EA6\uFF0C\u4E0D\u5F71\u54CD\u5C0F\u8BF4\u9605\u8BFB" : "\u70B9\u51FB\u9009\u62E9\u9AD8\u5EA6\uFF0C\u8BBE\u7F6E\u81EA\u52A8\u4FDD\u5B58";
+      },
       get options() {
         return [{
           title: "\u81EA\u52A8\u9AD8\u5EA6",
@@ -3762,15 +8538,19 @@ var tui = async (api, options) => {
   }
   function widthSize() {
     const selected = widthPercent() === void 0 ? "auto" : String(widthPercent());
-    dialog(() => _$createComponent2(api.ui.DialogSelect, {
-      title: "\u9605\u8BFB\u533A\u5BBD\u5EA6",
-      placeholder: "\u70B9\u51FB\u9009\u62E9\u4FA7\u680F\u5BBD\u5EA6\uFF0C\u6309\u4F1A\u8BDD\u53EF\u7528\u5BBD\u5EA6\u8BA1\u7B97",
+    dialog(() => _$createComponent3(api.ui.DialogSelect, {
+      get title() {
+        return `${mode() === "video" ? "\u89C6\u9891\u64AD\u653E\u533A" : "\u9605\u8BFB\u533A"}\u5BBD\u5EA6`;
+      },
+      get placeholder() {
+        return mode() === "video" ? "\u5355\u72EC\u4FDD\u5B58\u89C6\u9891\u5BBD\u5EA6\uFF0C\u4E3B\u4F1A\u8BDD\u81F3\u5C11\u4FDD\u7559 44 \u5217" : "\u70B9\u51FB\u9009\u62E9\u4FA7\u680F\u5BBD\u5EA6\uFF0C\u6309\u4F1A\u8BDD\u53EF\u7528\u5BBD\u5EA6\u8BA1\u7B97";
+      },
       get options() {
         return [{
           title: "\u9ED8\u8BA4\u5BBD\u5EA6",
           value: "auto",
           description: "\u6062\u590D OpenCode \u539F\u6709\u4FA7\u680F\u5BBD\u5EA6"
-        }, ...[25, 33, 40, 50, 60].map((value) => ({
+        }, ...(mode() === "video" ? [33, 40, 50, 60, 75] : [25, 33, 40, 50, 60]).map((value) => ({
           title: `\u5BBD\u5EA6 ${value}%`,
           value: String(value),
           description: "\u540C\u65F6\u4FDD\u7559\u4E3B\u4F1A\u8BDD\u7684\u8F93\u5165\u7A7A\u95F4"
@@ -3780,18 +8560,26 @@ var tui = async (api, options) => {
       onSelect: (item) => {
         closeDialog();
         const percent = item.value === "auto" ? void 0 : Number(item.value);
-        setWidthPercent(percent);
-        api.kv.set(prefix2 + "widthPercent", percent ?? null);
-        save();
+        setViewerWidth(percent);
       }
     }));
   }
   function size() {
-    dialog(() => _$createComponent2(api.ui.DialogSelect, {
-      title: "\u9605\u8BFB\u533A\u57DF\u5927\u5C0F",
+    dialog(() => _$createComponent3(api.ui.DialogSelect, {
+      get title() {
+        return mode() === "video" ? "\u89C6\u9891\u64AD\u653E\u533A\u57DF\u5927\u5C0F" : "\u9605\u8BFB\u533A\u57DF\u5927\u5C0F";
+      },
       placeholder: "\u70B9\u51FB\u9009\u62E9\u8981\u8C03\u6574\u7684\u5C3A\u5BF8",
       get options() {
-        return [...options?.hostMajor === 2 ? [{
+        return [...mode() === "video" && options?.hostMajor === 2 ? [{
+          title: videoExpanded() ? "\u8FD8\u539F\u89C6\u9891\u7A97\u53E3" : "\u653E\u5927\u89C6\u9891\u7A97\u53E3",
+          value: "expand",
+          description: "\u653E\u5927\u65F6\u6536\u8D77\u4FA7\u680F\u539F\u751F\u4FE1\u606F\uFF0C\u70B9\u8FD8\u539F\u6062\u590D"
+        }] : [], ...mode() === "video" && options?.hostMajor === 2 ? [{
+          title: "\u7B49\u6BD4\u4F8B\u7F29\u653E\u2026",
+          value: "scale",
+          description: "\u5BBD\u9AD8\u4E00\u8D77\u7F29\u5C0F\u6216\u653E\u5927\uFF0C\u4E5F\u53EF\u8F93\u5165\u767E\u5206\u6BD4"
+        }] : [], ...options?.hostMajor === 2 ? [{
           title: "\u8C03\u6574\u5BBD\u5EA6",
           value: "width",
           description: "\u6539\u53D8\u4FA7\u680F\u5BBD\u5EA6\u5E76\u91CD\u65B0\u5206\u9875"
@@ -3803,7 +8591,9 @@ var tui = async (api, options) => {
       },
       onSelect: (item) => {
         closeDialog();
-        item.value === "width" ? widthSize() : heightSize();
+        if (item.value === "expand") toggleVideoSize();
+        else if (item.value === "scale") videoScaleMenu();
+        else item.value === "width" ? widthSize() : heightSize();
       }
     }));
   }
@@ -3814,7 +8604,7 @@ var tui = async (api, options) => {
   let refresh;
   const watcher = watch2(booksDir, (_event, filename) => {
     const current = book();
-    if (!current || filename?.toString() !== basename3(current.path)) return;
+    if (!current || filename?.toString() !== basename4(current.path)) return;
     clearTimeout(refresh);
     refresh = setTimeout(() => {
       if (api.lifecycle.signal.aborted || book()?.path !== current.path) return;
@@ -3828,10 +8618,11 @@ var tui = async (api, options) => {
     }, 100);
   });
   function removeBook() {
+    if (mode() === "music") return music.remove();
     if (mode() === "video") return video.remove();
     const current = book();
     if (!current?.resourceId) return toast("\u8BF7\u5148\u5728\u4E66\u67B6\u6253\u5F00\u8981\u5220\u9664\u7684\u5C0F\u8BF4");
-    dialog(() => _$createComponent2(api.ui.DialogConfirm, {
+    dialog(() => _$createComponent3(api.ui.DialogConfirm, {
       title: "\u4ECE\u8D44\u6599\u5E93\u5220\u9664",
       get message() {
         return `\u5220\u9664\u300A${current.title}\u300B\u7684\u52A0\u5BC6\u526F\u672C\u548C\u91C7\u96C6\u7F13\u5B58\uFF1F\u5916\u90E8\u539F\u6587\u4EF6\u4FDD\u7559\u3002`;
@@ -3858,7 +8649,7 @@ var tui = async (api, options) => {
     watcher.close();
     clearTimeout(refresh);
     save();
-    const disposing = video.dispose();
+    const disposing = Promise.all([video.dispose(), music.dispose()]).then(() => playback.dispose());
     api.renderer.off("resize", resize);
     if (ownsDialog) closeDialog();
     return disposing;
@@ -3867,13 +8658,32 @@ var tui = async (api, options) => {
     if (!api.kv.ready || started) return;
     started = true;
     const savedSize = Number(api.kv.get(prefix2 + "heightPercent", null));
-    if (Number.isFinite(savedSize) && savedSize >= 10 && savedSize <= 100) setHeightPercent(savedSize);
+    if (Number.isFinite(savedSize) && savedSize >= 10 && savedSize <= 100) setNovelHeightPercent(savedSize);
     const savedWidth = Number(api.kv.get(prefix2 + "widthPercent", null));
-    if (Number.isFinite(savedWidth) && savedWidth >= 20 && savedWidth <= 60) setWidthPercent(savedWidth);
+    if (Number.isFinite(savedWidth) && savedWidth >= 20 && savedWidth <= 60) setNovelWidthPercent(savedWidth);
+    const videoHeight = api.kv.get(prefix2 + "video:heightPercent", 100);
+    if (videoHeight === "auto") setVideoHeightPercent(void 0);
+    else if (Number.isFinite(Number(videoHeight)) && Number(videoHeight) > 0 && Number(videoHeight) <= 100) setVideoHeightPercent(Number(videoHeight));
+    const videoWidth = api.kv.get(prefix2 + "video:widthPercent", 60);
+    if (videoWidth === "auto") setVideoWidthPercent(void 0);
+    else if (Number.isFinite(Number(videoWidth)) && Number(videoWidth) > 0 && Number(videoWidth) <= 75) setVideoWidthPercent(Number(videoWidth));
+    const scale = Number(api.kv.get(prefix2 + "video:scalePercent", 100));
+    if (Number.isFinite(scale) && scale >= 25 && scale <= 200) setVideoScalePercent(scale);
+    const expandedScale = Number(api.kv.get(prefix2 + "video:expandedScalePercent", 100));
+    if (Number.isFinite(expandedScale) && expandedScale >= 25 && expandedScale <= 100) setExpandedScalePercent(expandedScale);
+    setVideoExpanded(api.kv.get(prefix2 + "video:expanded", false));
     setVisible(api.kv.get(prefix2 + "visible", true));
-    if (api.kv.get(prefix2 + "mode", "novel") === "video") selectMode("video");
+    if (api.kv.get(prefix2 + "mode", "novel") === "video" && !playback.state?.playing && !playback.state?.videoOwner) setMode("video");
+    else if (api.kv.get(prefix2 + "mode", "novel") === "music") selectMode("music");
     const initial = typeof options?.file === "string" ? options.file : api.kv.get(prefix2 + "last", "");
-    void open3(initial || resolve3(pluginRoot, "books/\u591C\u73ED\u4FBF\u5229\u5E97.txt"), true);
+    void open3(initial || resolve4(pluginRoot, "books/\u591C\u73ED\u4FBF\u5229\u5E97.txt"), true);
+  });
+  let hadVideo = false;
+  createEffect2(() => {
+    const showingVideo = mode() === "video" && visible() && api.route.current.name === "session";
+    if (hadVideo === showingVideo) return;
+    hadVideo = showingVideo;
+    void (showingVideo ? playback.claimVideo() : playback.releaseVideo(video.pauseAndWait())).catch((error) => toast(String(error), "error"));
   });
   api.keymap.registerLayer({
     commands: [{
@@ -3904,6 +8714,15 @@ var tui = async (api, options) => {
         selectMode("video");
         setVisible(true);
         return video.shelf();
+      }
+    }, {
+      name: "moyu.music",
+      title: "\u6478\u9C7C\u97F3\u4E50\uFF1A\u6253\u5F00\u805A\u5408\u64AD\u653E\u5668",
+      slashName: "music",
+      run: () => {
+        selectMode("music");
+        setVisible(true);
+        api.kv.set(prefix2 + "visible", true);
       }
     }, {
       name: "moyu.shelf",
@@ -3975,10 +8794,11 @@ var tui = async (api, options) => {
   });
   function Reader() {
     let viewport;
+    let scrollbox;
     let readerNode;
     let docking;
     let mountTimer;
-    const [layout, setLayout] = createSignal2();
+    const [layout, setLayout] = createSignal3();
     const measure = () => {
       if (viewport && !viewport.isDestroyed && Number.isFinite(viewport.height) && viewport.height > 0) setViewportHeight(viewport.height);
     };
@@ -3990,8 +8810,8 @@ var tui = async (api, options) => {
     const dock = () => {
       if (options?.hostMajor !== 2 || api.lifecycle.signal.aborted) return;
       measure();
-      if (visible() && readerNode && !readerNode.isDestroyed && viewport && !docking) docking = sidebarDock(readerNode, viewport, dock);
-      setHostRows(docking?.measure(visible()) ?? 0);
+      if (visible() && readerNode && !readerNode.isDestroyed && viewport && !docking) docking = sidebarDock(readerNode, viewport, dock, scrollbox);
+      setHostRows(docking?.measure(visible(), mode() === "video" && videoExpanded()) ?? 0);
       if (!visible()) docking = void 0;
     };
     createEffect2(dock);
@@ -4009,6 +8829,7 @@ var tui = async (api, options) => {
       if (viewport) return;
       for (let parent = node.parent; parent; parent = parent.parent) {
         if (!(parent instanceof ScrollBoxRenderable)) continue;
+        scrollbox = parent;
         viewport = parent.viewport;
         const sizing = sidebarLayout(parent);
         setLayout(sizing);
@@ -4021,6 +8842,8 @@ var tui = async (api, options) => {
     }
     onCleanup2(() => {
       video.pause();
+      void playback.releaseVideo(video.pauseAndWait()).catch(() => {
+      });
       clearTimeout(mountTimer);
       viewport?.off("resized", measure);
       layout()?.frame?.off("resized", frameResized);
@@ -4040,164 +8863,304 @@ var tui = async (api, options) => {
         event.preventDefault();
         event.stopPropagation();
         queueMicrotask(() => {
-          if (!api.lifecycle.signal.aborted) props.action();
+          if (api.lifecycle.signal.aborted) return;
+          try {
+            void Promise.resolve(props.action()).catch((error) => toast(error instanceof Error ? error.message : String(error), "error"));
+          } catch (error) {
+            toast(error instanceof Error ? error.message : String(error), "error");
+          }
         });
       };
       return (() => {
-        var _el$ = _$createElement2("text");
-        _$setProp2(_el$, "selectable", false);
-        _$setProp2(_el$, "wrapMode", "none");
-        _$setProp2(_el$, "onMouseDown", (event) => {
+        var _el$ = _$createElement3("text");
+        _$setProp3(_el$, "selectable", false);
+        _$setProp3(_el$, "wrapMode", "none");
+        _$setProp3(_el$, "onMouseDown", (event) => {
           if (event.button === 0) {
             pressed = true;
             event.preventDefault();
             event.stopPropagation();
           }
         });
-        _$setProp2(_el$, "onMouseOut", () => {
+        _$setProp3(_el$, "onMouseOut", () => {
           pressed = false;
         });
-        _$setProp2(_el$, "onMouseDrag", () => {
+        _$setProp3(_el$, "onMouseDrag", () => {
           pressed = false;
         });
-        _$setProp2(_el$, "onMouseUp", click);
-        _$insert2(_el$, () => props.label);
-        _$effect2((_$p) => _$setProp2(_el$, "fg", props.muted ? theme().textMuted : theme().primary, _$p));
+        _$setProp3(_el$, "onMouseUp", click);
+        _$insert3(_el$, () => props.label);
+        _$effect3((_$p) => _$setProp3(_el$, "fg", props.muted ? theme().textMuted : theme().primary, _$p));
         return _el$;
       })();
     }
-    return _$createComponent2(Show2, {
+    return _$createComponent3(Show3, {
       get when() {
         return visible();
       },
       get fallback() {
         return (() => {
-          var _el$16 = _$createElement2("box");
-          _$setProp2(_el$16, "height", 1);
-          _$insert2(_el$16, _$createComponent2(Button, {
+          var _el$17 = _$createElement3("box");
+          _$setProp3(_el$17, "height", 1);
+          _$insert3(_el$17, _$createComponent3(Button, {
             label: "[\u663E\u793A\u9605\u8BFB]",
             action: toggle
           }));
-          return _el$16;
+          return _el$17;
         })();
       },
       get children() {
-        var _el$2 = _$createElement2("box"), _el$3 = _$createElement2("box"), _el$4 = _$createElement2("text"), _el$5 = _$createElement2("b"), _el$7 = _$createElement2("box"), _el$8 = _$createElement2("box"), _el$9 = _$createElement2("box");
-        _$insertNode2(_el$2, _el$3);
-        _$insertNode2(_el$2, _el$8);
-        _$insertNode2(_el$2, _el$9);
+        var _el$2 = _$createElement3("box"), _el$3 = _$createElement3("box"), _el$4 = _$createElement3("text"), _el$5 = _$createElement3("b"), _el$7 = _$createElement3("box");
+        _$insertNode3(_el$2, _el$3);
         _$use2((node) => {
           readerNode = node;
         }, _el$2);
-        _$setProp2(_el$2, "flexShrink", 0);
-        _$setProp2(_el$2, "width", "100%");
-        _$setProp2(_el$2, "onSizeChange", function() {
+        _$setProp3(_el$2, "flexShrink", 0);
+        _$setProp3(_el$2, "width", "100%");
+        _$setProp3(_el$2, "onSizeChange", function() {
           readerNode = this;
           setBodyWidth(Math.max(2, Math.floor(this.width)));
           observe(this);
           dock();
         });
-        _$insertNode2(_el$3, _el$4);
-        _$insertNode2(_el$3, _el$7);
-        _$setProp2(_el$3, "flexShrink", 0);
-        _$setProp2(_el$3, "height", 1);
-        _$setProp2(_el$3, "flexDirection", "row");
-        _$setProp2(_el$3, "justifyContent", "space-between");
-        _$insertNode2(_el$4, _el$5);
-        _$insertNode2(_el$5, _$createTextNode2(`\u968F\u624B\u8BFB`));
-        _$setProp2(_el$7, "flexDirection", "row");
-        _$setProp2(_el$7, "gap", 1);
-        _$insert2(_el$7, _$createComponent2(Button, {
+        _$insertNode3(_el$3, _el$4);
+        _$insertNode3(_el$3, _el$7);
+        _$setProp3(_el$3, "flexShrink", 0);
+        _$setProp3(_el$3, "height", 1);
+        _$setProp3(_el$3, "flexDirection", "row");
+        _$setProp3(_el$3, "justifyContent", "space-between");
+        _$insertNode3(_el$4, _el$5);
+        _$insertNode3(_el$5, _$createTextNode2(`\u968F\u624B\u8BFB`));
+        _$setProp3(_el$7, "flexDirection", "row");
+        _$setProp3(_el$7, "gap", 1);
+        _$insert3(_el$7, _$createComponent3(Button, {
           label: "[\u5C0F\u8BF4]",
           action: () => selectMode("novel"),
           get muted() {
             return mode() !== "novel";
           }
         }), null);
-        _$insert2(_el$7, _$createComponent2(Button, {
+        _$insert3(_el$7, _$createComponent3(Button, {
           label: "[\u89C6\u9891]",
           action: () => selectMode("video"),
           get muted() {
             return mode() !== "video";
           }
         }), null);
-        _$insert2(_el$7, _$createComponent2(Button, {
+        _$insert3(_el$7, _$createComponent3(Button, {
+          label: "[\u97F3\u4E50]",
+          action: () => selectMode("music"),
+          get muted() {
+            return mode() !== "music";
+          }
+        }), null);
+        _$insert3(_el$7, _$createComponent3(Button, {
           label: "[\u9690\u85CF]",
           action: toggle,
           muted: true
         }), null);
-        _$setProp2(_el$8, "flexShrink", 0);
-        _$setProp2(_el$8, "height", 1);
-        _$setProp2(_el$8, "flexDirection", "row");
-        _$setProp2(_el$8, "gap", 2);
-        _$insert2(_el$8, _$createComponent2(Button, {
-          get label() {
-            return mode() === "video" ? "[\u89C6\u9891\u5E93]" : "[\u4E66\u67B6]";
-          },
-          action: () => mode() === "video" ? video.shelf() : shelf()
-        }), null);
-        _$insert2(_el$8, _$createComponent2(Button, {
-          get label() {
-            return mode() === "video" ? "[\u641C\u7D22]" : "[\u76EE\u5F55]";
-          },
-          action: () => mode() === "video" ? video.search() : chapters()
-        }), null);
-        _$insert2(_el$8, _$createComponent2(Show2, {
+        _$insert3(_el$2, _$createComponent3(Show3, {
           get when() {
-            return mode() === "video";
-          },
-          get children() {
-            return _$createComponent2(Button, {
-              label: "[\u70ED\u95E8]",
-              action: () => video.popular()
-            });
-          }
-        }), null);
-        _$insert2(_el$8, _$createComponent2(Button, {
-          label: "[\u5220\u9664]",
-          action: removeBook
-        }), null);
-        _$setProp2(_el$9, "flexShrink", 0);
-        _$setProp2(_el$9, "flexDirection", "row");
-        _$setProp2(_el$9, "gap", 2);
-        _$insert2(_el$9, _$createComponent2(Show2, {
-          get when() {
-            return options?.hostMajor === 2;
-          },
-          get children() {
-            return _$createComponent2(Button, {
-              get label() {
-                return `[\u5BBD\u5EA6 ${widthPercent() ?? "\u81EA\u52A8"}${widthPercent() === void 0 ? "" : "%"}]`;
-              },
-              action: widthSize
-            });
-          }
-        }), null);
-        _$insert2(_el$9, _$createComponent2(Button, {
-          get label() {
-            return `[\u9AD8\u5EA6 ${heightPercent() ?? "\u81EA\u52A8"}${heightPercent() === void 0 ? "" : "%"}]`;
-          },
-          action: heightSize
-        }), null);
-        _$insert2(_el$2, _$createComponent2(Show2, {
-          get when() {
-            return mode() === "novel";
+            return mode() === "music";
           },
           get fallback() {
-            return _$createComponent2(video.View, {
-              Button,
-              get gap() {
-                return gap();
+            return (() => {
+              var _el$18 = _$createElement3("box");
+              _$setProp3(_el$18, "flexShrink", 0);
+              _$setProp3(_el$18, "height", 1);
+              _$setProp3(_el$18, "flexDirection", "row");
+              _$setProp3(_el$18, "gap", 2);
+              _$insert3(_el$18, _$createComponent3(Button, {
+                get label() {
+                  return mode() === "video" ? "[\u89C6\u9891\u5E93]" : "[\u4E66\u67B6]";
+                },
+                action: () => mode() === "video" ? video.shelf() : shelf()
+              }), null);
+              _$insert3(_el$18, _$createComponent3(Button, {
+                get label() {
+                  return mode() === "video" ? "[\u641C\u7D22]" : "[\u76EE\u5F55]";
+                },
+                action: () => mode() === "video" ? video.search() : chapters()
+              }), null);
+              _$insert3(_el$18, _$createComponent3(Show3, {
+                get when() {
+                  return mode() === "video";
+                },
+                get children() {
+                  return _$createComponent3(Button, {
+                    label: "[\u70ED\u95E8]",
+                    action: () => video.popular()
+                  });
+                }
+              }), null);
+              _$insert3(_el$18, _$createComponent3(Button, {
+                label: "[\u5220\u9664]",
+                action: removeBook
+              }), null);
+              return _el$18;
+            })();
+          },
+          get children() {
+            var _el$8 = _$createElement3("box");
+            _$setProp3(_el$8, "flexShrink", 0);
+            _$setProp3(_el$8, "height", 1);
+            _$setProp3(_el$8, "flexDirection", "row");
+            _$setProp3(_el$8, "gap", 1);
+            _$insert3(_el$8, _$createComponent3(Button, {
+              label: "[\u641C\u7D22]",
+              get action() {
+                return music.search;
+              }
+            }), null);
+            _$insert3(_el$8, _$createComponent3(Button, {
+              label: "[\u7ED3\u679C]",
+              get action() {
+                return music.results;
+              }
+            }), null);
+            _$insert3(_el$8, _$createComponent3(Button, {
+              get label() {
+                return `[\u961F\u5217${music.state().queue.length}]`;
+              },
+              get action() {
+                return music.queue;
+              }
+            }), null);
+            _$insert3(_el$8, _$createComponent3(Button, {
+              label: "[\u8D26\u53F7]",
+              get action() {
+                return music.accounts;
+              }
+            }), null);
+            return _el$8;
+          }
+        }), null);
+        _$insert3(_el$2, _$createComponent3(Show3, {
+          get when() {
+            return mode() !== "music";
+          },
+          get children() {
+            return [(() => {
+              var _el$9 = _$createElement3("box");
+              _$setProp3(_el$9, "flexShrink", 0);
+              _$setProp3(_el$9, "flexDirection", "row");
+              _$insert3(_el$9, _$createComponent3(Show3, {
+                get when() {
+                  return options?.hostMajor === 2;
+                },
+                get children() {
+                  return _$createComponent3(Button, {
+                    get label() {
+                      return `[\u5BBD\u5EA6 ${widthPercent() === void 0 ? "\u81EA\u52A8" : Math.round(widthPercent() * 10) / 10 + "%"}]`;
+                    },
+                    action: widthSize
+                  });
+                }
+              }), null);
+              _$insert3(_el$9, _$createComponent3(Button, {
+                get label() {
+                  return `[\u9AD8\u5EA6 ${heightPercent() === void 0 ? "\u81EA\u52A8" : Math.round(heightPercent() * 10) / 10 + "%"}]`;
+                },
+                action: heightSize
+              }), null);
+              _$insert3(_el$9, _$createComponent3(Show3, {
+                get when() {
+                  return _$memo3(() => mode() === "video")() && options?.hostMajor === 2;
+                },
+                get children() {
+                  return _$createComponent3(Button, {
+                    get label() {
+                      return videoExpanded() ? "[\u8FD8\u539F]" : "[\u5927\u753B\u9762]";
+                    },
+                    action: toggleVideoSize
+                  });
+                }
+              }), null);
+              _$effect3((_p$) => {
+                var _v$ = 1 + gap(), _v$2 = mode() === "video" ? 1 : 2;
+                _v$ !== _p$.e && (_p$.e = _$setProp3(_el$9, "height", _v$, _p$.e));
+                _v$2 !== _p$.t && (_p$.t = _$setProp3(_el$9, "gap", _v$2, _p$.t));
+                return _p$;
+              }, {
+                e: void 0,
+                t: void 0
+              });
+              return _el$9;
+            })(), _$createComponent3(Show3, {
+              get when() {
+                return _$memo3(() => mode() === "video")() && options?.hostMajor === 2;
+              },
+              get children() {
+                var _el$0 = _$createElement3("box");
+                _$setProp3(_el$0, "height", 1);
+                _$setProp3(_el$0, "flexShrink", 0);
+                _$setProp3(_el$0, "flexDirection", "row");
+                _$setProp3(_el$0, "gap", 1);
+                _$insert3(_el$0, _$createComponent3(Button, {
+                  label: "[\u2212]",
+                  action: () => stepVideoScale(-1),
+                  get muted() {
+                    return videoSize().percent <= 25;
+                  }
+                }), null);
+                _$insert3(_el$0, _$createComponent3(Button, {
+                  get label() {
+                    return `[\u7F29\u653E${videoSize().percent}%]`;
+                  },
+                  action: videoScaleMenu
+                }), null);
+                _$insert3(_el$0, _$createComponent3(Button, {
+                  label: "[+]",
+                  action: () => stepVideoScale(1),
+                  get muted() {
+                    return videoSize().percent >= videoSize().maximum;
+                  }
+                }), null);
+                _$insert3(_el$0, _$createComponent3(Button, {
+                  label: "[\u91CD\u7F6E]",
+                  action: () => scaleVideo(100)
+                }), null);
+                return _el$0;
+              }
+            })];
+          }
+        }), null);
+        _$insert3(_el$2, _$createComponent3(Show3, {
+          get when() {
+            return mode() === "music";
+          },
+          get fallback() {
+            return _$createComponent3(Show3, {
+              get when() {
+                return mode() === "video";
+              },
+              get children() {
+                return _$createComponent3(video.View, {
+                  Button,
+                  get gap() {
+                    return gap();
+                  }
+                });
               }
             });
           },
           get children() {
-            return _$createComponent2(Show2, {
+            return _$createComponent3(music.View, {
+              Button
+            });
+          }
+        }), null);
+        _$insert3(_el$2, _$createComponent3(Show3, {
+          get when() {
+            return mode() === "novel";
+          },
+          get children() {
+            return _$createComponent3(Show3, {
               get when() {
                 return book();
               },
               get fallback() {
-                return _$createComponent2(Button, {
+                return _$createComponent3(Button, {
                   get label() {
                     return busy() ? "\u6B63\u5728\u6253\u5F00\u2026" : "[\u70B9\u51FB\u6253\u5F00\u672C\u5730\u5C0F\u8BF4]";
                   },
@@ -4206,104 +9169,102 @@ var tui = async (api, options) => {
               },
               get children() {
                 return [(() => {
-                  var _el$0 = _$createElement2("box");
-                  _$setProp2(_el$0, "flexShrink", 0);
-                  _$insert2(_el$0, _$createComponent2(Button, {
+                  var _el$1 = _$createElement3("box");
+                  _$setProp3(_el$1, "flexShrink", 0);
+                  _$insert3(_el$1, _$createComponent3(Button, {
                     get label() {
                       return book()?.title ?? "";
                     },
                     action: shelf,
                     muted: true
                   }), null);
-                  _$insert2(_el$0, _$createComponent2(Button, {
+                  _$insert3(_el$1, _$createComponent3(Button, {
                     get label() {
                       return currentChapter();
                     },
                     action: chapters
                   }), null);
-                  _$effect2((_$p) => _$setProp2(_el$0, "height", 2 + gap(), _$p));
-                  return _el$0;
+                  _$effect3((_$p) => _$setProp3(_el$1, "height", 2 + gap(), _$p));
+                  return _el$1;
                 })(), (() => {
-                  var _el$1 = _$createElement2("box"), _el$10 = _$createElement2("text");
-                  _$insertNode2(_el$1, _el$10);
-                  _$setProp2(_el$1, "flexShrink", 0);
-                  _$setProp2(_el$10, "width", "100%");
-                  _$setProp2(_el$10, "height", "100%");
-                  _$setProp2(_el$10, "wrapMode", "none");
-                  _$insert2(_el$10, () => pages()[page()].text);
-                  _$effect2((_p$) => {
-                    var _v$ = rows(), _v$2 = rows(), _v$3 = theme().text;
-                    _v$ !== _p$.e && (_p$.e = _$setProp2(_el$1, "height", _v$, _p$.e));
-                    _v$2 !== _p$.t && (_p$.t = _$setProp2(_el$1, "minHeight", _v$2, _p$.t));
-                    _v$3 !== _p$.a && (_p$.a = _$setProp2(_el$10, "fg", _v$3, _p$.a));
+                  var _el$10 = _$createElement3("box"), _el$11 = _$createElement3("text");
+                  _$insertNode3(_el$10, _el$11);
+                  _$setProp3(_el$10, "flexShrink", 0);
+                  _$setProp3(_el$11, "width", "100%");
+                  _$setProp3(_el$11, "height", "100%");
+                  _$setProp3(_el$11, "wrapMode", "none");
+                  _$insert3(_el$11, () => pages()[page()].text);
+                  _$effect3((_p$) => {
+                    var _v$3 = rows(), _v$4 = rows(), _v$5 = theme().text;
+                    _v$3 !== _p$.e && (_p$.e = _$setProp3(_el$10, "height", _v$3, _p$.e));
+                    _v$4 !== _p$.t && (_p$.t = _$setProp3(_el$10, "minHeight", _v$4, _p$.t));
+                    _v$5 !== _p$.a && (_p$.a = _$setProp3(_el$11, "fg", _v$5, _p$.a));
                     return _p$;
                   }, {
                     e: void 0,
                     t: void 0,
                     a: void 0
                   });
-                  return _el$1;
+                  return _el$10;
                 })(), (() => {
-                  var _el$11 = _$createElement2("box"), _el$12 = _$createElement2("box"), _el$13 = _$createElement2("box"), _el$14 = _$createElement2("text");
-                  _$insertNode2(_el$11, _el$12);
-                  _$insertNode2(_el$11, _el$13);
-                  _$insertNode2(_el$11, _el$14);
-                  _$setProp2(_el$11, "flexShrink", 0);
-                  _$setProp2(_el$12, "flexShrink", 0);
-                  _$setProp2(_el$12, "height", 1);
-                  _$setProp2(_el$12, "flexDirection", "row");
-                  _$setProp2(_el$12, "justifyContent", "space-between");
-                  _$insert2(_el$12, _$createComponent2(Button, {
+                  var _el$12 = _$createElement3("box"), _el$13 = _$createElement3("box"), _el$14 = _$createElement3("box"), _el$15 = _$createElement3("text");
+                  _$insertNode3(_el$12, _el$13);
+                  _$insertNode3(_el$12, _el$14);
+                  _$insertNode3(_el$12, _el$15);
+                  _$setProp3(_el$12, "flexShrink", 0);
+                  _$setProp3(_el$13, "flexShrink", 0);
+                  _$setProp3(_el$13, "height", 1);
+                  _$setProp3(_el$13, "flexDirection", "row");
+                  _$setProp3(_el$13, "justifyContent", "space-between");
+                  _$insert3(_el$13, _$createComponent3(Button, {
                     get label() {
                       return `${page() + 1} / ${pages().length} \u9875 \xB7 ${percentage()}%`;
                     },
                     action: jump,
                     muted: true
                   }));
-                  _$setProp2(_el$13, "flexShrink", 0);
-                  _$setProp2(_el$13, "height", 1);
-                  _$setProp2(_el$13, "flexDirection", "row");
-                  _$setProp2(_el$13, "justifyContent", "space-between");
-                  _$insert2(_el$13, _$createComponent2(Button, {
+                  _$setProp3(_el$14, "flexShrink", 0);
+                  _$setProp3(_el$14, "height", 1);
+                  _$setProp3(_el$14, "flexDirection", "row");
+                  _$setProp3(_el$14, "justifyContent", "space-between");
+                  _$insert3(_el$14, _$createComponent3(Button, {
                     label: "[\u2039 \u4E0A\u4E00\u9875]",
                     action: () => turn(-1)
                   }), null);
-                  _$insert2(_el$13, _$createComponent2(Button, {
+                  _$insert3(_el$14, _$createComponent3(Button, {
                     label: "[\u4E0B\u4E00\u9875 \u203A]",
                     action: () => turn(1)
                   }), null);
-                  _$insertNode2(_el$14, _$createTextNode2(`\u70B9\u51FB\u4E0A\u65B9\u6309\u94AE\u8C03\u6574\u5BBD\u9AD8`));
-                  _$setProp2(_el$14, "height", 1);
-                  _$setProp2(_el$14, "wrapMode", "none");
-                  _$effect2((_p$) => {
-                    var _v$4 = 4 + gap(), _v$5 = gap(), _v$6 = theme().textMuted;
-                    _v$4 !== _p$.e && (_p$.e = _$setProp2(_el$11, "height", _v$4, _p$.e));
-                    _v$5 !== _p$.t && (_p$.t = _$setProp2(_el$11, "paddingTop", _v$5, _p$.t));
-                    _v$6 !== _p$.a && (_p$.a = _$setProp2(_el$14, "fg", _v$6, _p$.a));
+                  _$insertNode3(_el$15, _$createTextNode2(`\u70B9\u51FB\u4E0A\u65B9\u6309\u94AE\u8C03\u6574\u5BBD\u9AD8`));
+                  _$setProp3(_el$15, "height", 1);
+                  _$setProp3(_el$15, "wrapMode", "none");
+                  _$effect3((_p$) => {
+                    var _v$6 = 4 + gap(), _v$7 = gap(), _v$8 = theme().textMuted;
+                    _v$6 !== _p$.e && (_p$.e = _$setProp3(_el$12, "height", _v$6, _p$.e));
+                    _v$7 !== _p$.t && (_p$.t = _$setProp3(_el$12, "paddingTop", _v$7, _p$.t));
+                    _v$8 !== _p$.a && (_p$.a = _$setProp3(_el$15, "fg", _v$8, _p$.a));
                     return _p$;
                   }, {
                     e: void 0,
                     t: void 0,
                     a: void 0
                   });
-                  return _el$11;
+                  return _el$12;
                 })()];
               }
             });
           }
         }), null);
-        _$effect2((_p$) => {
-          var _v$7 = options?.hostMajor === 2 ? "auto" : 0, _v$8 = book() || mode() === "video" ? rows() + chromeRows() : void 0, _v$9 = theme().text, _v$0 = 1 + gap();
-          _v$7 !== _p$.e && (_p$.e = _$setProp2(_el$2, "marginBottom", _v$7, _p$.e));
-          _v$8 !== _p$.t && (_p$.t = _$setProp2(_el$2, "height", _v$8, _p$.t));
-          _v$9 !== _p$.a && (_p$.a = _$setProp2(_el$4, "fg", _v$9, _p$.a));
-          _v$0 !== _p$.o && (_p$.o = _$setProp2(_el$9, "height", _v$0, _p$.o));
+        _$effect3((_p$) => {
+          var _v$9 = options?.hostMajor === 2 ? "auto" : 0, _v$0 = book() || mode() !== "novel" ? rows() + chromeRows() : void 0, _v$1 = theme().text;
+          _v$9 !== _p$.e && (_p$.e = _$setProp3(_el$2, "marginBottom", _v$9, _p$.e));
+          _v$0 !== _p$.t && (_p$.t = _$setProp3(_el$2, "height", _v$0, _p$.t));
+          _v$1 !== _p$.a && (_p$.a = _$setProp3(_el$4, "fg", _v$1, _p$.a));
           return _p$;
         }, {
           e: void 0,
           t: void 0,
-          a: void 0,
-          o: void 0
+          a: void 0
         });
         return _el$2;
       }
@@ -4312,7 +9273,7 @@ var tui = async (api, options) => {
   api.slots.register({
     order: 50,
     slots: {
-      sidebar_content: () => _$createComponent2(Reader, {})
+      sidebar_content: () => _$createComponent3(Reader, {})
     }
   });
 };
@@ -4321,16 +9282,41 @@ var index_default = {
   tui
 };
 
+// src/domain/collection-task.mjs
+function collectionKind(query) {
+  const text2 = String(query || "").trim();
+  if (/^(?:音乐|music)(?:\s|[:：/]|$)/iu.test(text2)) return "music";
+  if (!/^(?:视频|video)(?:\s|[:：/]|$)/iu.test(text2) && /小说|章节|书名|目录链接/u.test(text2)) return "novel";
+  if (!/^(?:视频|video)(?:\s|[:：/]|$)/iu.test(text2) && /音乐|歌曲|歌手|歌单|听歌|私人(?:电台|FM)|猜你喜欢|个性推荐|随机刷歌|^(?:我喜欢|喜欢)$|网易云|QQ\s*音乐|酷狗|(?:^|\s)music(?:\s|[:：/]|$)/iu.test(text2)) return "music";
+  return /视频|(?:^|\s)video(?:\s|[:：/]|$)|bilibili|哔哩哔哩|B\s*站|youtube|youtu\.be|油管|(?:^|\s)热门(?:\s|$)|搜索热门|BV[\da-zA-Z]{10}/iu.test(text2) ? "video" : "novel";
+}
+
 // src/ui/collect.mjs
 function collectionQuery(input) {
   return typeof input === "string" ? input.trim().replace(/^\/?moyu(?:\s+|$)/iu, "").trim() : "";
 }
+function musicLoginRequest(input) {
+  const query = collectionQuery(input).replace(/\s+/gu, "").replace(/[。！!]+$/u, "");
+  const platform = "(qq(?:\u97F3\u4E50|music)?|\u7F51\u6613\u4E91(?:\u97F3\u4E50)?|\u9177\u72D7(?:\u97F3\u4E50)?|netease|kugou)";
+  const match = new RegExp(`^(?:\u8BF7)?(?:\u5E2E\u6211)?(?:\u626B\u7801)?\u767B\u5F55${platform}(?:\u8D26\u53F7)?$`, "iu").exec(query) || new RegExp(`^${platform}(?:\u626B\u7801)?\u767B\u5F55$`, "iu").exec(query) || new RegExp(`^(?:login|signin)${platform}$`, "iu").exec(query);
+  if (!match) return;
+  return /^(?:qq)/i.test(match[1]) ? "qq" : /网易|netease/i.test(match[1]) ? "netease" : "kugou";
+}
+async function dispatchMoyu(host, input, { login } = {}) {
+  const platform = musicLoginRequest(input);
+  if (platform) {
+    if (!login) throw new Error("\u97F3\u4E50\u767B\u5F55\u5165\u53E3\u5C1A\u672A\u51C6\u5907\u597D\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u6216\u6253\u5F00 /music \u7684\u8D26\u53F7\u83DC\u5355");
+    await login(platform);
+    return { kind: "music-login", platform };
+  }
+  return { kind: "collection", sessionID: await requestCollection(host, input) };
+}
 function collectionPrompt(query) {
-  return `\u91C7\u96C6\u5C0F\u8BF4\uFF1A${query.replace(/\s+/gu, " ")}`;
+  return `${collectionKind(query) === "music" ? "\u97F3\u4E50\u4EFB\u52A1" : collectionKind(query) === "video" ? "\u89C6\u9891\u4EFB\u52A1" : "\u91C7\u96C6\u5C0F\u8BF4"}\uFF1A${query.replace(/\s+/gu, " ")}`;
 }
 async function requestCollection(host, input) {
   const query = collectionQuery(input);
-  if (!query || query.length > 2e3) throw new Error("\u8BF7\u8F93\u5165 1\u20132000 \u5B57\u7684\u4E66\u540D\u3001\u4F5C\u8005\u6216\u5C0F\u8BF4\u76EE\u5F55\u94FE\u63A5");
+  if (!query || query.length > 2e3) throw new Error("\u8BF7\u8F93\u5165 1\u20132000 \u5B57\u7684\u5C0F\u8BF4\u91C7\u96C6\u3001\u89C6\u9891\u70ED\u95E8\u6216\u97F3\u4E50\u641C\u7D22\u8981\u6C42");
   const selected = host.ui.model.current();
   if (!selected) throw new Error("\u8BF7\u5148\u5728 OpenCode \u4E2D\u9009\u62E9\u53EF\u7528\u6A21\u578B");
   const model = { providerID: selected.providerID, id: selected.modelID, ...selected.variant ? { variant: selected.variant } : {} };
@@ -4338,7 +9324,7 @@ async function requestCollection(host, input) {
   const session = await host.client.session.create({ title: `Moyu \xB7 ${query.slice(0, 50)}`, location: host.location ?? host.data.location.default(), model, metadata: { origin: "moyu", ...route.type === "session" ? { sourceSessionID: route.sessionID } : {} } });
   const sessionID = session.id;
   host.ui.router.navigate({ type: "session", sessionID });
-  await host.client.session.prompt({ sessionID, text: collectionPrompt(query), delivery: "queue", metadata: { origin: "moyu", query } });
+  await host.client.session.prompt({ sessionID, text: collectionPrompt(query), delivery: "queue", metadata: { origin: "moyu", query, kind: collectionKind(query) } });
   return sessionID;
 }
 
@@ -4352,6 +9338,7 @@ var v2_default = Plugin.define({
     const writes = /* @__PURE__ */ new Set();
     let dialogGeneration = 0;
     let onClose;
+    let musicLogin;
     const finish = () => {
       const callback = onClose;
       onClose = void 0;
@@ -4395,15 +9382,23 @@ var v2_default = Plugin.define({
     }
     async function collect(query) {
       try {
-        const sessionID = await requestCollection(context, query);
-        context.ui.toast.show({ title: "\u6478\u9C7C\u91C7\u96C6", message: "\u5DF2\u4EA4\u7ED9\u5F53\u524D\u6A21\u578B\uFF0C\u91C7\u96C6\u7ED3\u679C\u5C06\u5728\u4F1A\u8BDD\u4E2D\u663E\u793A", variant: "info" });
-        return sessionID;
+        const result = await dispatchMoyu(context, query, { login(platform) {
+          if (!musicLogin) throw new Error("\u97F3\u4E50\u767B\u5F55\u5165\u53E3\u5C1A\u672A\u51C6\u5907\u597D\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+          musicLogin(platform);
+        } });
+        if (result.kind === "collection") context.ui.toast.show({ title: "\u6478\u9C7C\u91C7\u96C6", message: "\u5DF2\u4EA4\u7ED9\u5F53\u524D\u6A21\u578B\uFF0C\u91C7\u96C6\u7ED3\u679C\u5C06\u5728\u4F1A\u8BDD\u4E2D\u663E\u793A", variant: "info" });
+        return result.sessionID;
       } catch (error) {
-        context.ui.toast.show({ title: "\u91C7\u96C6\u8BF7\u6C42\u5931\u8D25", message: error instanceof Error ? error.message : String(error), variant: "error" });
+        context.ui.toast.show({ title: "\u6478\u9C7C\u8BF7\u6C42\u5931\u8D25", message: error instanceof Error ? error.message : String(error), variant: "error" });
       }
     }
     const bridge = {
-      moyu: { collect },
+      moyu: { collect, registerMusicLogin(handler) {
+        musicLogin = handler;
+        cleanup.push(() => {
+          musicLogin = void 0;
+        });
+      } },
       renderer: context.renderer,
       theme: { get current() {
         return { text: context.theme.text.base, textMuted: context.theme.text.muted, primary: context.theme.text.action.primary.base };

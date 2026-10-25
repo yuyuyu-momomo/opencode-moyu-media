@@ -14,8 +14,12 @@ test("侧栏原画按宿主及终端能力选择，不把字符回退称为高�
   const portrait = imageFrameSize(480,852,36,20,renderer,'sixel')
   assert.ok(portrait.height === 400 && portrait.width > 200)
   const bounded = imageFrameSize(8000,8000,10000,10000,renderer,'kitty')
-  assert.ok(bounded.width * bounded.height <= 921600)
-  assert.ok(bounded.width <= 1280 && bounded.height <= 1280)
+  assert.ok(bounded.width * bounded.height <= 2073600)
+  assert.ok(bounded.width <= 1920 && bounded.height <= 1920)
+  const fullHD = { width: 240, height: 80, resolution: { width: 2400, height: 1600 } }
+  assert.deepEqual(imageFrameSize(1920,1080,200,70,fullHD,'kitty'), {width:1920,height:1080})
+  const characters = imageFrameSize(1920,1080,80,20,fullHD,'blocks')
+  assert.ok(characters.width <= 320 && characters.height <= 160)
 })
 
 test("逐帧原画及时释放引用，替换、隐藏、删除均清理图片且不写终端", () => {

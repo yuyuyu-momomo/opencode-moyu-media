@@ -10,41 +10,65 @@ import { createHash } from "node:crypto"
 import { chaptersOf, expandPath, listBooks, loadBook, pageAt, createPaginator } from "../library/text-reader.mjs"
 import { LibraryStore } from "../library/store.mjs"
 import { sidebarDock, sidebarLayout } from "./sidebar-layout.mjs"
+import { scaledVideoSize, VIDEO_SCALE_PRESETS } from "./video-size.mjs"
 import { createVideoReader } from "./video"
+import { createMusicReader } from "./music"
+import { SharedMediaClient } from "../runtime/media-client.mjs"
 
 type Book = Awaited<ReturnType<typeof loadBook>>
 const prefix = "opencode-moyu:"
 const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
-const tui: TuiPlugin = async (api, options) => {
+const tui: TuiPlugin = async (host, options) => {
   const configuredRows = Number(options?.rows)
   const fixedRows = Number.isInteger(configuredRows) && configuredRows >= 4 ? Math.min(configuredRows, 40) : undefined
   const booksDir = expandPath(typeof options?.booksDir === "string" ? options.booksDir : resolve(pluginRoot, "books"))
   const keyFile = typeof options?.keyFile === "string" ? expandPath(options.keyFile) : undefined
   const library = new LibraryStore(booksDir, { keyFile })
   await library.ready()
-  const collect = (api as typeof api & { moyu?: { collect: (query: string) => Promise<unknown> } }).moyu?.collect
+  const playback = new SharedMediaClient(library, { onError: (error: unknown) => { if (!host.lifecycle.signal.aborted) host.ui.toast({ title: "全局播放器", message: String(error), variant: "error" }) } })
+  try { await playback.ready } catch (error) { await playback.dispose(); throw error }
+  const api: typeof host = { ...host, kv: {
+    ready: true,
+    get<T = unknown>(key: string, fallback?: T): T { return Object.hasOwn(playback.preferences || {}, key) ? playback.preferences[key] : host.kv.get<T>(key, fallback) },
+    set(key: string, value: unknown) { void playback.setPreference(key, value).catch((error: unknown) => { if (!host.lifecycle.signal.aborted) host.ui.toast({ message: String(error), variant: "error" }) }) },
+  } }
+  const moyu = (api as typeof api & { moyu?: { collect: (query: string) => Promise<unknown>; registerMusicLogin?: (handler: (platform: string) => void) => void } }).moyu
+  const collect = moyu?.collect
   const [visible, setVisible] = createSignal(true)
-  const [mode, setMode] = createSignal<"novel" | "video">("novel")
+  const [mode, setMode] = createSignal<"novel" | "video" | "music">("novel")
   const [book, setBook] = createSignal<Book>()
   const [offset, setOffset] = createSignal(0)
   const [height, setHeight] = createSignal(api.renderer.height)
   const [width, setWidth] = createSignal(api.renderer.width)
   const [bodyWidth, setBodyWidth] = createSignal(36)
   const [busy, setBusy] = createSignal(false)
-  const [heightPercent, setHeightPercent] = createSignal<number>()
-  const [widthPercent, setWidthPercent] = createSignal<number>()
+  const [novelHeightPercent, setNovelHeightPercent] = createSignal<number>()
+  const [novelWidthPercent, setNovelWidthPercent] = createSignal<number>()
+  const [videoHeightPercent, setVideoHeightPercent] = createSignal<number | undefined>(100)
+  const [videoWidthPercent, setVideoWidthPercent] = createSignal<number | undefined>(60)
+  const [videoExpanded, setVideoExpanded] = createSignal(false)
+  const [videoScalePercent, setVideoScalePercent] = createSignal(100)
+  const [expandedScalePercent, setExpandedScalePercent] = createSignal(100)
   const [viewportHeight, setViewportHeight] = createSignal<number>()
   const [hostRows, setHostRows] = createSignal(0)
   // V2 does not expose the host's onboarding dismissal state; reserve its space.
   const onboarding = createMemo(() => options?.hostMajor === 2 || (!api.kv.get("dismissed_getting_started", false) && !api.state.provider.some(
     (provider) => provider.id !== "opencode" || Object.values(provider.models).some((model) => model.cost?.input !== 0),
   )))
-  const chromeRows = () => height() < 40 ? 9 : 12
+  const chromeRows = () => mode() === "music" ? 2 : (height() < 40 ? 9 : 12) + (mode() === "video" && options?.hostMajor === 2 ? 1 : 0)
   const minimumRows = () => options?.hostMajor !== 2 && height() < 40 ? 2 : 4
   const availableRows = createMemo(() => Math.max(minimumRows(), viewportHeight() === undefined
     ? height() - (onboarding() ? 31 : 20)
     : viewportHeight()! - chromeRows() - hostRows()))
+  const normalVideoSize = createMemo(() => scaledVideoSize(
+    videoWidthPercent() ?? Math.max(20, Math.min(75, (bodyWidth() + 4) / Math.max(1, width()) * 100)),
+    videoHeightPercent() ?? Math.min(fixedRows ?? 24, availableRows()) / availableRows() * 100,
+    videoScalePercent(),
+  ))
+  const videoSize = createMemo(() => videoExpanded() ? scaledVideoSize(75, 100, expandedScalePercent()) : normalVideoSize())
+  const heightPercent = createMemo(() => mode() === "music" ? 100 : mode() === "video" ? !videoExpanded() && videoHeightPercent() === undefined && videoScalePercent() === 100 ? undefined : videoSize().height : novelHeightPercent())
+  const widthPercent = createMemo(() => mode() === "music" ? 33 : mode() === "video" ? !videoExpanded() && videoWidthPercent() === undefined && videoScalePercent() === 100 ? undefined : videoSize().width : novelWidthPercent())
   const rows = createMemo(() => heightPercent() === undefined
     ? Math.min(fixedRows ?? 24, availableRows())
     : Math.max(minimumRows(), Math.floor(availableRows() * heightPercent()! / 100)))
@@ -76,9 +100,18 @@ const tui: TuiPlugin = async (api, options) => {
   }
   const video = createVideoReader(api, library, {
     columns: bodyWidth, rows, active: () => mode() === "video" && visible() && api.route.current.name === "session",
-    activate: () => selectMode("video"), dialog, close: closeDialog,
+    activate: () => selectMode("video"), dialog, close: closeDialog, collect: collect ? promptVideoCollection : undefined,
+    beforePlay: (signal) => playback.claimVideo({ signal }), releasePlayback: (stopped) => playback.releaseVideo(stopped),
   })
-  function selectMode(next: "novel" | "video") {
+  playback.onPauseVideo = () => video.pauseAndWait()
+  const music = createMusicReader(api, library, playback, { rows, active: () => mode() === "music" && visible() && api.route.current.name === "session", canDialog: () => !ownsDialog, dialog, close: closeDialog })
+  await music.ready
+  moyu?.registerMusicLogin?.((platform) => {
+    if (api.lifecycle.signal.aborted) return
+    selectMode("music"); setVisible(true); api.kv.set(prefix + "visible", true)
+    music.login(platform)
+  })
+  function selectMode(next: "novel" | "video" | "music") {
     save()
     setMode(next)
     api.kv.set(prefix + "mode", next)
@@ -109,6 +142,7 @@ const tui: TuiPlugin = async (api, options) => {
   }
   function turn(direction: number) {
     if (mode() === "video") { video.seek(direction * 10); return }
+    if (mode() === "music") { void music.seek(direction * 10); return }
     if (!book() || busy()) return
     const next = Math.max(0, Math.min(pages().length - 1, page() + direction))
     setOffset(pages()[next].start)
@@ -137,6 +171,14 @@ const tui: TuiPlugin = async (api, options) => {
       onConfirm={(query) => { closeDialog(); void collect?.(query) }}
     />)
   }
+  function promptVideoCollection() {
+    dialog(() => <api.ui.DialogPrompt
+      title="让当前模型搜索 / 采集视频"
+      placeholder="例如：热门；搜索 猫咪；下载这个 B 站链接，1080p"
+      onCancel={closeDialog}
+      onConfirm={(query) => { closeDialog(); void collect?.(`视频 ${query}`) }}
+    />)
+  }
   async function shelf() {
     try {
       const items = await listBooks(booksDir, { keyFile })
@@ -146,12 +188,14 @@ const tui: TuiPlugin = async (api, options) => {
         placeholder="搜索书名，或选择采集 / 打开本地文件"
         options={[
           ...(collect ? [{ title: "＋ 让当前模型采集小说…", value: "moyu:collect", description: "输入书名、作者或目录链接" }] : []),
+          ...(collect ? [{ title: "＋ 视频搜索 / 热门采集…", value: "moyu:video", description: "用当前模型浏览 B 站热门、搜索或下载视频" }] : []),
           { title: "＋ 打开本地文件…", value: "", description: "输入任意 TXT 文件路径" },
           ...items.map((item) => ({ title: item.title, value: item.path, description: item.path })),
         ]}
         onSelect={(item) => {
           closeDialog()
           if (item.value === "moyu:collect") promptCollection()
+          else if (item.value === "moyu:video") promptVideoCollection()
           else if (item.value) void open(String(item.value))
           else promptFile()
         }}
@@ -163,7 +207,7 @@ const tui: TuiPlugin = async (api, options) => {
   function openMoyu() {
     setVisible(true)
     api.kv.set(prefix + "visible", true)
-    return mode() === "video" ? video.shelf() : shelf()
+    return mode() === "music" ? music.queue() : mode() === "video" ? video.shelf() : shelf()
   }
   function chapters() {
     if (mode() !== "novel") selectMode("novel")
@@ -180,6 +224,7 @@ const tui: TuiPlugin = async (api, options) => {
     />)
   }
   function jump() {
+    if (mode() === "music") return music.jump()
     if (mode() === "video") return video.jump()
     if (!book()) return promptFile()
     dialog(() => <api.ui.DialogPrompt
@@ -197,13 +242,93 @@ const tui: TuiPlugin = async (api, options) => {
   }
 
   function setSize(percent?: number) {
-    setHeightPercent(percent)
-    api.kv.set(prefix + "heightPercent", percent ?? null)
+    if (mode() === "video") {
+      commitVideoScale()
+      setVideoHeightPercent(percent)
+      api.kv.set(prefix + "video:heightPercent", percent ?? "auto")
+      resetVideoExpanded()
+    } else {
+      setNovelHeightPercent(percent)
+      api.kv.set(prefix + "heightPercent", percent ?? null)
+    }
     save()
+  }
+  function resetVideoExpanded() {
+    setVideoExpanded(false)
+    api.kv.set(prefix + "video:expanded", false)
+  }
+  function toggleVideoSize() {
+    if (!videoExpanded()) { setExpandedScalePercent(100); api.kv.set(prefix + "video:expandedScalePercent", 100) }
+    setVideoExpanded((previous) => !previous)
+    api.kv.set(prefix + "video:expanded", videoExpanded())
+  }
+  function setViewerWidth(percent?: number) {
+    if (mode() === "video") {
+      commitVideoScale()
+      setVideoWidthPercent(percent)
+      api.kv.set(prefix + "video:widthPercent", percent ?? "auto")
+      resetVideoExpanded()
+    } else {
+      setNovelWidthPercent(percent)
+      api.kv.set(prefix + "widthPercent", percent ?? null)
+    }
+    save()
+  }
+  function commitVideoScale() {
+    if (videoScalePercent() === 100) return
+    const current = normalVideoSize()
+    setVideoWidthPercent(current.width); setVideoHeightPercent(current.height); setVideoScalePercent(100)
+    api.kv.set(prefix + "video:widthPercent", current.width)
+    api.kv.set(prefix + "video:heightPercent", current.height)
+    api.kv.set(prefix + "video:scalePercent", 100)
+  }
+  function scaleVideo(percent: number) {
+    if (videoExpanded()) {
+      const next = scaledVideoSize(75, 100, percent)
+      setExpandedScalePercent(next.percent)
+      api.kv.set(prefix + "video:expandedScalePercent", next.percent)
+    } else {
+      // Freeze automatic dimensions before applying a ratio, so changing the
+      // scale never switches an automatic height to a different baseline.
+      if (videoWidthPercent() === undefined) {
+        const baseline = Math.max(20, Math.min(75, (bodyWidth() + 4) / width() * 100))
+        setVideoWidthPercent(baseline); api.kv.set(prefix + "video:widthPercent", baseline)
+      }
+      if (videoHeightPercent() === undefined) {
+        const baseline = Math.min(100, Math.min(fixedRows ?? 24, availableRows()) / availableRows() * 100)
+        setVideoHeightPercent(baseline); api.kv.set(prefix + "video:heightPercent", baseline)
+      }
+      const next = scaledVideoSize(videoWidthPercent()!, videoHeightPercent()!, percent)
+      setVideoScalePercent(next.percent)
+      api.kv.set(prefix + "video:scalePercent", next.percent)
+    }
+  }
+  function stepVideoScale(direction: number) {
+    const current = videoSize()
+    const next = Math.max(25, Math.min(current.maximum, current.percent + direction * 10))
+    if (next === current.percent) return toast(direction > 0 ? videoExpanded() ? "已达到当前终端可用空间上限" : "已达到当前播放区上限，可使用「大画面」增加空间" : "已达到最小缩放比例")
+    scaleVideo(next)
+  }
+  function customVideoScale() {
+    const maximum = videoSize().maximum
+    dialog(() => <api.ui.DialogPrompt title={`视频缩放 · 输入 25–${maximum}%`} placeholder={`当前 ${videoSize().percent}%，宽高一起调整`} onCancel={closeDialog}
+      onConfirm={(input) => {
+        const value = Number(input.trim().replace(/%$/, ""))
+        if (!input.trim() || !Number.isFinite(value) || value < 25 || value > maximum) return toast(`请输入 25–${maximum} 之间的百分比`, "error")
+        closeDialog(); scaleVideo(value)
+      }} />)
+  }
+  function videoScaleMenu() {
+    const current = videoSize()
+    const presets = [...new Set([...VIDEO_SCALE_PRESETS.filter((value) => value <= current.maximum), current.percent])].sort((a, b) => a - b)
+    dialog(() => <api.ui.DialogSelect title="视频等比例缩放" placeholder="100% 为基准尺寸；宽高一起调整，画面保持原比例" current={String(current.percent)} options={[
+      ...presets.map((value) => ({ title: `缩放 ${value}%${value === 100 ? "（基准）" : ""}`, value: String(value), description: "受终端可用空间和最小尺寸限制" })),
+      { title: "自定义比例…", value: "custom", description: `输入 25–${current.maximum}%` },
+    ]} onSelect={(item) => { closeDialog(); if (item.value === "custom") customVideoScale(); else scaleVideo(Number(item.value)) }} />)
   }
   function customSize() {
     dialog(() => <api.ui.DialogPrompt
-      title="阅读区高度 · 输入 10–100%"
+      title={`${mode() === "video" ? "视频播放区" : "阅读区"}高度 · 输入 10–100%`}
       placeholder="例如 75，按可用正文高度计算"
       onCancel={closeDialog}
       onConfirm={(input) => {
@@ -217,8 +342,8 @@ const tui: TuiPlugin = async (api, options) => {
   function heightSize() {
     const selected = heightPercent() === undefined ? "auto" : String(heightPercent())
     dialog(() => <api.ui.DialogSelect
-      title="阅读区高度"
-      placeholder="点击选择高度，设置自动保存"
+      title={`${mode() === "video" ? "视频播放区" : "阅读区"}高度`}
+      placeholder={mode() === "video" ? "单独保存视频高度，不影响小说阅读" : "点击选择高度，设置自动保存"}
       options={[
         { title: "自动高度", value: "auto", description: "恢复默认正文行数" },
         ...[25, 50, 75, 100].map((value) => ({ title: `高度 ${value}%`, value: String(value), description: "占可用正文高度的比例" })),
@@ -236,31 +361,31 @@ const tui: TuiPlugin = async (api, options) => {
   function widthSize() {
     const selected = widthPercent() === undefined ? "auto" : String(widthPercent())
     dialog(() => <api.ui.DialogSelect
-      title="阅读区宽度"
-      placeholder="点击选择侧栏宽度，按会话可用宽度计算"
+      title={`${mode() === "video" ? "视频播放区" : "阅读区"}宽度`}
+      placeholder={mode() === "video" ? "单独保存视频宽度，主会话至少保留 44 列" : "点击选择侧栏宽度，按会话可用宽度计算"}
       options={[
         { title: "默认宽度", value: "auto", description: "恢复 OpenCode 原有侧栏宽度" },
-        ...[25, 33, 40, 50, 60].map((value) => ({ title: `宽度 ${value}%`, value: String(value), description: "同时保留主会话的输入空间" })),
+        ...(mode() === "video" ? [33, 40, 50, 60, 75] : [25, 33, 40, 50, 60]).map((value) => ({ title: `宽度 ${value}%`, value: String(value), description: "同时保留主会话的输入空间" })),
       ]}
       current={selected}
       onSelect={(item) => {
         closeDialog()
         const percent = item.value === "auto" ? undefined : Number(item.value)
-        setWidthPercent(percent)
-        api.kv.set(prefix + "widthPercent", percent ?? null)
-        save()
+        setViewerWidth(percent)
       }}
     />)
   }
   function size() {
     dialog(() => <api.ui.DialogSelect
-      title="阅读区域大小"
+      title={mode() === "video" ? "视频播放区域大小" : "阅读区域大小"}
       placeholder="点击选择要调整的尺寸"
       options={[
+        ...(mode() === "video" && options?.hostMajor === 2 ? [{ title: videoExpanded() ? "还原视频窗口" : "放大视频窗口", value: "expand", description: "放大时收起侧栏原生信息，点还原恢复" }] : []),
+        ...(mode() === "video" && options?.hostMajor === 2 ? [{ title: "等比例缩放…", value: "scale", description: "宽高一起缩小或放大，也可输入百分比" }] : []),
         ...(options?.hostMajor === 2 ? [{ title: "调整宽度", value: "width", description: "改变侧栏宽度并重新分页" }] : []),
         { title: "调整高度", value: "height", description: "改变正文高度，页码和按钮同步移动" },
       ]}
-      onSelect={(item) => { closeDialog(); item.value === "width" ? widthSize() : heightSize() }}
+      onSelect={(item) => { closeDialog(); if (item.value === "expand") toggleVideoSize(); else if (item.value === "scale") videoScaleMenu(); else item.value === "width" ? widthSize() : heightSize() }}
     />)
   }
 
@@ -282,6 +407,7 @@ const tui: TuiPlugin = async (api, options) => {
     }, 100)
   })
   function removeBook() {
+    if (mode() === "music") return music.remove()
     if (mode() === "video") return video.remove()
     const current = book()
     if (!current?.resourceId) return toast("请先在书架打开要删除的小说")
@@ -310,7 +436,7 @@ const tui: TuiPlugin = async (api, options) => {
     watcher.close()
     clearTimeout(refresh)
     save()
-    const disposing = video.dispose()
+    const disposing = Promise.all([video.dispose(), music.dispose()]).then(() => playback.dispose())
     api.renderer.off("resize", resize)
     if (ownsDialog) closeDialog()
     return disposing
@@ -320,13 +446,33 @@ const tui: TuiPlugin = async (api, options) => {
     if (!api.kv.ready || started) return
     started = true
     const savedSize = Number(api.kv.get<number | null>(prefix + "heightPercent", null))
-    if (Number.isFinite(savedSize) && savedSize >= 10 && savedSize <= 100) setHeightPercent(savedSize)
+    if (Number.isFinite(savedSize) && savedSize >= 10 && savedSize <= 100) setNovelHeightPercent(savedSize)
     const savedWidth = Number(api.kv.get<number | null>(prefix + "widthPercent", null))
-    if (Number.isFinite(savedWidth) && savedWidth >= 20 && savedWidth <= 60) setWidthPercent(savedWidth)
+    if (Number.isFinite(savedWidth) && savedWidth >= 20 && savedWidth <= 60) setNovelWidthPercent(savedWidth)
+    const videoHeight = api.kv.get<number | string>(prefix + "video:heightPercent", 100)
+    if (videoHeight === "auto") setVideoHeightPercent(undefined)
+    else if (Number.isFinite(Number(videoHeight)) && Number(videoHeight) > 0 && Number(videoHeight) <= 100) setVideoHeightPercent(Number(videoHeight))
+    const videoWidth = api.kv.get<number | string>(prefix + "video:widthPercent", 60)
+    if (videoWidth === "auto") setVideoWidthPercent(undefined)
+    else if (Number.isFinite(Number(videoWidth)) && Number(videoWidth) > 0 && Number(videoWidth) <= 75) setVideoWidthPercent(Number(videoWidth))
+    const scale = Number(api.kv.get<number>(prefix + "video:scalePercent", 100))
+    if (Number.isFinite(scale) && scale >= 25 && scale <= 200) setVideoScalePercent(scale)
+    const expandedScale = Number(api.kv.get<number>(prefix + "video:expandedScalePercent", 100))
+    if (Number.isFinite(expandedScale) && expandedScale >= 25 && expandedScale <= 100) setExpandedScalePercent(expandedScale)
+    setVideoExpanded(api.kv.get<boolean>(prefix + "video:expanded", false))
     setVisible(api.kv.get<boolean>(prefix + "visible", true))
-    if (api.kv.get<string>(prefix + "mode", "novel") === "video") selectMode("video")
+    if (api.kv.get<string>(prefix + "mode", "novel") === "video" && !playback.state?.playing && !playback.state?.videoOwner) setMode("video")
+    else if (api.kv.get<string>(prefix + "mode", "novel") === "music") selectMode("music")
     const initial = typeof options?.file === "string" ? options.file : api.kv.get<string>(prefix + "last", "")
     void open(initial || resolve(pluginRoot, "books/夜班便利店.txt"), true)
+  })
+
+  let hadVideo = false
+  createEffect(() => {
+    const showingVideo = mode() === "video" && visible() && api.route.current.name === "session"
+    if (hadVideo === showingVideo) return
+    hadVideo = showingVideo
+    void (showingVideo ? playback.claimVideo() : playback.releaseVideo(video.pauseAndWait())).catch((error) => toast(String(error), "error"))
   })
 
   api.keymap.registerLayer({
@@ -338,6 +484,7 @@ const tui: TuiPlugin = async (api, options) => {
     commands: [
       { name: "moyu.open", title: "摸鱼阅读：打开书架", slashName: "moyu", run: openMoyu },
       { name: "moyu.video", title: "摸鱼视频：打开视频库", slashName: "video", run: () => { selectMode("video"); setVisible(true); return video.shelf() } },
+      { name: "moyu.music", title: "摸鱼音乐：打开聚合播放器", slashName: "music", run: () => { selectMode("music"); setVisible(true); api.kv.set(prefix + "visible", true) } },
       { name: "moyu.shelf", title: "摸鱼阅读：书架 / 打开文件", slashName: "read", run: shelf },
       { name: "moyu.chapters", title: "摸鱼阅读：章节目录", slashName: "chapters", run: chapters },
       { name: "moyu.jump", title: "摸鱼阅读：跳转进度", run: jump },
@@ -359,6 +506,7 @@ const tui: TuiPlugin = async (api, options) => {
 
   function Reader() {
     let viewport: BoxRenderable | undefined
+    let scrollbox: ScrollBoxRenderable | undefined
     let readerNode: BoxRenderable | undefined
     let docking: ReturnType<typeof sidebarDock>
     let mountTimer: ReturnType<typeof setTimeout> | undefined
@@ -371,8 +519,8 @@ const tui: TuiPlugin = async (api, options) => {
     const dock = () => {
       if (options?.hostMajor !== 2 || api.lifecycle.signal.aborted) return
       measure()
-      if (visible() && readerNode && !readerNode.isDestroyed && viewport && !docking) docking = sidebarDock(readerNode, viewport, dock)
-      setHostRows(docking?.measure(visible()) ?? 0)
+      if (visible() && readerNode && !readerNode.isDestroyed && viewport && !docking) docking = sidebarDock(readerNode, viewport, dock, scrollbox)
+      setHostRows(docking?.measure(visible(), mode() === "video" && videoExpanded()) ?? 0)
       if (!visible()) docking = undefined
     }
     createEffect(dock)
@@ -386,6 +534,7 @@ const tui: TuiPlugin = async (api, options) => {
       if (viewport) return
       for (let parent = node.parent; parent; parent = parent.parent) {
         if (!(parent instanceof ScrollBoxRenderable)) continue
+        scrollbox = parent
         viewport = parent.viewport
         const sizing = sidebarLayout(parent)
         setLayout(sizing)
@@ -398,6 +547,7 @@ const tui: TuiPlugin = async (api, options) => {
     }
     onCleanup(() => {
       video.pause()
+      void playback.releaseVideo(video.pauseAndWait()).catch(() => {})
       clearTimeout(mountTimer)
       viewport?.off("resized", measure)
       layout()?.frame?.off("resized", frameResized)
@@ -418,33 +568,57 @@ const tui: TuiPlugin = async (api, options) => {
         if (!activate) return
         event.preventDefault()
         event.stopPropagation()
-        queueMicrotask(() => { if (!api.lifecycle.signal.aborted) props.action() })
+        queueMicrotask(() => {
+          if (api.lifecycle.signal.aborted) return
+          try { void Promise.resolve(props.action()).catch((error) => toast(error instanceof Error ? error.message : String(error), "error")) }
+          catch (error) { toast(error instanceof Error ? error.message : String(error), "error") }
+        })
       }
       return <text fg={props.muted ? theme().textMuted : theme().primary} selectable={false} wrapMode="none"
         onMouseDown={(event) => { if (event.button === 0) { pressed = true; event.preventDefault(); event.stopPropagation() } }}
         onMouseOut={() => { pressed = false }} onMouseDrag={() => { pressed = false }} onMouseUp={click}>{props.label}</text>
     }
     return <Show when={visible()} fallback={<box height={1}><Button label="[显示阅读]" action={toggle} /></box>}>
-      <box ref={(node: BoxRenderable) => { readerNode = node }} flexShrink={0} width="100%" marginBottom={options?.hostMajor === 2 ? "auto" : 0} height={book() || mode() === "video" ? rows() + chromeRows() : undefined} onSizeChange={function(this: BoxRenderable) { readerNode = this; setBodyWidth(Math.max(2, Math.floor(this.width))); observe(this); dock() }}>
+      <box ref={(node: BoxRenderable) => { readerNode = node }} flexShrink={0} width="100%" marginBottom={options?.hostMajor === 2 ? "auto" : 0} height={book() || mode() !== "novel" ? rows() + chromeRows() : undefined} onSizeChange={function(this: BoxRenderable) { readerNode = this; setBodyWidth(Math.max(2, Math.floor(this.width))); observe(this); dock() }}>
         <box flexShrink={0} height={1} flexDirection="row" justifyContent="space-between">
           <text fg={theme().text}><b>随手读</b></text>
           <box flexDirection="row" gap={1}>
             <Button label="[小说]" action={() => selectMode("novel")} muted={mode() !== "novel"} />
             <Button label="[视频]" action={() => selectMode("video")} muted={mode() !== "video"} />
+            <Button label="[音乐]" action={() => selectMode("music")} muted={mode() !== "music"} />
             <Button label="[隐藏]" action={toggle} muted />
           </box>
         </box>
-        <box flexShrink={0} height={1} flexDirection="row" gap={2}>
+        <Show when={mode() === "music"} fallback={<box flexShrink={0} height={1} flexDirection="row" gap={2}>
           <Button label={mode() === "video" ? "[视频库]" : "[书架]"} action={() => mode() === "video" ? video.shelf() : shelf()} />
           <Button label={mode() === "video" ? "[搜索]" : "[目录]"} action={() => mode() === "video" ? video.search() : chapters()} />
           <Show when={mode() === "video"}><Button label="[热门]" action={() => video.popular()} /></Show>
           <Button label="[删除]" action={removeBook} />
+        </box>}>
+          <box flexShrink={0} height={1} flexDirection="row" gap={1}>
+            <Button label="[搜索]" action={music.search} />
+            <Button label="[结果]" action={music.results} />
+            <Button label={`[队列${music.state().queue.length}]`} action={music.queue} />
+            <Button label="[账号]" action={music.accounts} />
+          </box>
+        </Show>
+        <Show when={mode() !== "music"}>
+        <box flexShrink={0} height={1 + gap()} flexDirection="row" gap={mode() === "video" ? 1 : 2}>
+          <Show when={options?.hostMajor === 2}><Button label={`[宽度 ${widthPercent() === undefined ? "自动" : Math.round(widthPercent()! * 10) / 10 + "%"}]`} action={widthSize} /></Show>
+          <Button label={`[高度 ${heightPercent() === undefined ? "自动" : Math.round(heightPercent()! * 10) / 10 + "%"}]`} action={heightSize} />
+          <Show when={mode() === "video" && options?.hostMajor === 2}><Button label={videoExpanded() ? "[还原]" : "[大画面]"} action={toggleVideoSize} /></Show>
         </box>
-        <box flexShrink={0} height={1 + gap()} flexDirection="row" gap={2}>
-          <Show when={options?.hostMajor === 2}><Button label={`[宽度 ${widthPercent() ?? "自动"}${widthPercent() === undefined ? "" : "%"}]`} action={widthSize} /></Show>
-          <Button label={`[高度 ${heightPercent() ?? "自动"}${heightPercent() === undefined ? "" : "%"}]`} action={heightSize} />
-        </box>
-        <Show when={mode() === "novel"} fallback={<video.View Button={Button} gap={gap()} />}>
+        <Show when={mode() === "video" && options?.hostMajor === 2}>
+          <box height={1} flexShrink={0} flexDirection="row" gap={1}>
+            <Button label="[−]" action={() => stepVideoScale(-1)} muted={videoSize().percent <= 25} />
+            <Button label={`[缩放${videoSize().percent}%]`} action={videoScaleMenu} />
+            <Button label="[+]" action={() => stepVideoScale(1)} muted={videoSize().percent >= videoSize().maximum} />
+            <Button label="[重置]" action={() => scaleVideo(100)} />
+          </box>
+        </Show>
+        </Show>
+        <Show when={mode() === "music"} fallback={<Show when={mode() === "video"}><video.View Button={Button} gap={gap()} /></Show>}><music.View Button={Button} /></Show>
+        <Show when={mode() === "novel"}>
         <Show when={book()} fallback={<Button label={busy() ? "正在打开…" : "[点击打开本地小说]"} action={shelf} />}>
           <box flexShrink={0} height={2 + gap()}>
             <Button label={book()?.title ?? ""} action={shelf} muted />

@@ -7,17 +7,28 @@ const aad = Buffer.from("opencode-moyu:library:v1")
 export const defaultKeyFile = (directory) => resolve(directory, "../keys/library.key")
 export class LibraryVault {
   #key
+  #pending
   constructor(keyFile) { this.keyFile = keyFile }
   async key(create = true) {
     if (this.#key) return this.#key
-    try { this.#key = await readFile(this.keyFile) } catch (error) {
+    if (!this.#pending) this.#pending = this.loadKey(create).finally(() => { this.#pending = undefined })
+    return this.#pending
+  }
+  async loadKey(create) {
+    let key
+    try { key = await readFile(this.keyFile) } catch (error) {
       if (error.code !== "ENOENT") throw error
       if (!create) throw new Error("缺少资料库密钥，请恢复原密钥文件")
       await mkdir(dirname(this.keyFile), { recursive: true, mode: 0o700 })
       try { await writeFile(this.keyFile, randomBytes(32), { flag: "wx", mode: 0o600 }) } catch (error) { if (error.code !== "EEXIST") throw error }
-      this.#key = await readFile(this.keyFile)
+      key = await readFile(this.keyFile)
     }
-    if (this.#key.length !== 32) throw new Error("资料库密钥长度异常")
+    // Another process can observe a newly opened wx file before its bytes land.
+    for (let attempt = 0; key.length !== 32 && attempt < 20; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 10)); key = await readFile(this.keyFile)
+    }
+    if (key.length !== 32) throw new Error("资料库密钥长度异常")
+    this.#key = key
     return this.#key
   }
   async seal(value) {

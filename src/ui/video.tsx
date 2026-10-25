@@ -12,6 +12,7 @@ import { InlineImage, imageProtocol, imageFrameSize } from "../media/inline-imag
 import { addLocalVideo } from "../sources/local-video.mjs"
 import { LibraryStore } from "../library/store.mjs"
 import { createVideoIngestion } from "../services/video-ingestion.mjs"
+import { DEFAULT_VIDEO_QUALITY, VIDEO_QUALITIES } from "../media/video-quality.mjs"
 
 type API = Parameters<TuiPlugin>[0]
 type Video = Awaited<ReturnType<typeof addLocalVideo>> & { release?: () => Promise<void> }
@@ -20,7 +21,8 @@ const prefix = "opencode-moyu:video:"
 
 export function createVideoReader(api: API, library: LibraryStore, settings: {
   columns: () => number; rows: () => number; active: () => boolean; activate: () => void
-  dialog: (render: () => JSX.Element) => void; close: () => void
+  dialog: (render: () => JSX.Element) => void; close: () => void; collect?: () => void
+  beforePlay?: (signal: AbortSignal) => Promise<unknown>; releasePlayback?: (stopped: Promise<void>) => Promise<unknown>
 }) {
   const [video, setVideo] = createSignal<Video>()
   const [frame, setFrame] = createSignal<Array<{ text: string; fg?: string; bg?: string }>>([])
@@ -34,6 +36,7 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
   const [presentation, setPresentation] = createSignal(api.kv.get<string>(prefix + "presentation", "auto"))
   const [protocol, setProtocol] = createSignal(imageProtocol(OpenTui, api.renderer))
   const [sourceProgress, setSourceProgress] = createSignal("")
+  const [downloadQuality, setDownloadQuality] = createSignal(DEFAULT_VIDEO_QUALITY)
   let sourceAbort: AbortController | undefined
   const inline = new InlineImage(OpenTui, api.renderer, (cause: unknown) => { setPresentation("pixel"); showError(cause) })
   const useImage = () => presentation() !== "pixel" && protocol() !== "legacy"
@@ -42,6 +45,7 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
   api.renderer.on("capabilities", capabilitiesChanged)
   api.renderer.on("resize", capabilitiesChanged)
   const sources = createVideoIngestion({ directory: library.directory, keyFile: library.vault.keyFile })
+  void sources.settings.downloadQuality().then((value) => { if (!api.lifecycle.signal.aborted) setDownloadQuality(value) }).catch(showError)
   let downloadAbort: AbortController | undefined
   let loadAbort: AbortController | undefined
   let downloadTask: Promise<void> | undefined
@@ -54,13 +58,18 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
     return colors.get(value)
   }
   const player = new PixelPlayer({
+    beforePlay: async (signal: AbortSignal) => { await settings.beforePlay?.(signal) },
     frameSize: (width: number, height: number, columns: number, rows: number) => useImage() ? imageFrameSize(width, height, columns, rows, api.renderer, protocol()) : pixelSize(width, height, columns, rows),
     onFrame: (bytes: Buffer, size: { width: number; height: number }) => {
       if (useImage()) { inline.present(bytes, size); return }
       setFrameSize({ width: size.width, height: size.height / 2 })
       setFrame(pixelRuns(bytes, size.width, size.height).map((run) => ({ text: run.text, fg: color(run.fg), bg: color(run.bg) })))
     },
-    onState: setState,
+    onState: (next: { position: number; playing: boolean; muted: boolean; loading: boolean }) => {
+      const stopped = state().playing && !next.playing
+      setState(next)
+      if (stopped) void settings.releasePlayback?.(player.stopping.then(() => {})).catch(showError)
+    },
     onError: (message: string) => { setError(message); api.ui.toast({ title: "像素影院", message, variant: "error" }) },
   })
   function save() {
@@ -147,7 +156,7 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
     finally { if (downloadAbort === abort) { downloadAbort = undefined; setDownloadProgress("") } }
   }
   function promptUrl() {
-    settings.dialog(() => <api.ui.DialogPrompt title="导入 B 站 / YouTube 视频" placeholder="完整视频链接或 BV 号，优先 480p / 256 MiB / 60 分钟" onCancel={settings.close}
+    settings.dialog(() => <api.ui.DialogPrompt title="导入 B 站 / YouTube 视频" placeholder={`完整视频链接或 BV 号，优先 ${downloadQuality()}p / 256 MiB / 60 分钟`} onCancel={settings.close}
       onConfirm={(url) => { settings.close(); void download(url) }} />)
   }
   async function querySource<T>(label: string, request: (signal: AbortSignal) => Promise<T>, show: (result: T) => void) {
@@ -192,6 +201,23 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
         { title: "像素风", value: "pixel", description: "保留原来的低开销字符画面" },
       ]} onSelect={(item) => { settings.close(); setPresentation(String(item.value)); api.kv.set(prefix + "presentation", item.value) }} />)
   }
+  async function downloadQualityMenu() {
+    try {
+      const current = await sources.settings.downloadQuality()
+      if (api.lifecycle.signal.aborted) return
+      setDownloadQuality(current)
+      settings.dialog(() => <api.ui.DialogSelect title="视频下载清晰度" placeholder="来源支持时优先所选清晰度，旧视频需重新导入；每个视频最多 256 MiB" current={current}
+        options={[...VIDEO_QUALITIES].reverse().map((value) => ({ title: `${value}p${value === 1080 ? " 高清（推荐）" : value === 720 ? " 高清" : " 流畅"}`, value, description: value === 1080 ? "优先下载更清晰的源视频，实际以来源提供为准" : value === 720 ? "兼顾清晰度、下载时间与文件大小" : "节省空间，适合较慢网络" }))}
+        onSelect={(item) => {
+          settings.close()
+          void sources.settings.saveDownloadQuality(item.value).then((value) => {
+            if (api.lifecycle.signal.aborted) return
+            setDownloadQuality(value)
+            api.ui.toast({ message: `下载清晰度已设为 ${value}p，重新导入同一链接可获取高清副本`, variant: "info" })
+          }).catch(showError)
+        }} />)
+    } catch (cause) { showError(cause) }
+  }
   async function sourceSettings() {
     try {
       const status = await sources.settings.status()
@@ -220,9 +246,11 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
           { title: "＋ B 站 / YouTube 视频链接…", value: "url", description: "下载可公开访问的视频，加密入库" },
           { title: "搜索在线视频…", value: "search", description: "哔哩哔哩 / YouTube" },
           { title: "浏览 B 站热门…", value: "popular", description: "直接选视频，无需链接或 API Key" },
+          ...(settings.collect ? [{ title: "让当前模型搜索 / 采集视频…", value: "collect", description: "支持热门、关键词搜索、视频链接和下载清晰度" }] : []),
           { title: "侧栏视频画质…", value: "quality", description: qualityLabel() },
+          { title: "视频下载清晰度…", value: "download-quality", description: `优先 ${downloadQuality()}p · 旧视频可重新导入升级` },
           { title: "视频来源设置…", value: "settings", description: "填写或移除 YouTube API Key" },
-          ...resources.map((item) => ({ title: item.title, value: item.id, description: mediaTime(item.metadata.duration) + (item.metadata.managedMedia ? " · " + item.source.adapter + " · 加密缓存" : " · 本地文件") })),
+          ...resources.map((item) => ({ title: item.title, value: item.id, description: `${mediaTime(item.metadata.duration)} · ${Math.round(item.metadata.width)}×${Math.round(item.metadata.height)}` + (item.metadata.managedMedia ? " · " + item.source.adapter + " · 加密缓存" : " · 本地文件") })),
         ]}
         onSelect={(item) => {
           settings.close()
@@ -230,7 +258,9 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
           else if (item.value === "url") promptUrl()
           else if (item.value === "search") searchPlatform()
           else if (item.value === "popular") popular()
+          else if (item.value === "collect") settings.collect?.()
           else if (item.value === "quality") quality()
+          else if (item.value === "download-quality") void downloadQualityMenu()
           else if (item.value === "settings") void sourceSettings()
           else void load("", resources.find((saved) => saved.id === item.value))
         }} />)
@@ -305,7 +335,7 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
     return <>
       <box height={2 + props.gap} flexShrink={0}>
         <Button label={busy() ? "正在打开视频…" : video()?.title ?? "请选择本地视频"} action={shelf} />
-        <Show when={downloadProgress() || sourceProgress()} fallback={<text height={1} wrapMode="none">{error() ? "播放异常，可重新打开视频" : !video() ? `${qualityLabel()} · 默认静音` : state().loading ? "正在解码…" : `${state().playing ? "播放中" : "已暂停"} · ${qualityLabel()}`}</text>}>
+        <Show when={downloadProgress() || sourceProgress()} fallback={<text height={1} wrapMode="none">{error() ? "播放异常，可重新打开视频" : !video() ? `${qualityLabel()} · 默认静音` : state().loading ? "正在解码…" : `${state().playing ? "播放中" : "已暂停"} · ${Math.round(video()!.width)}×${Math.round(video()!.height)} · ${qualityLabel()}`}</text>}>
           <Button label={`[取消] ${downloadProgress() || sourceProgress()}`} action={() => { downloadAbort?.abort(); sourceAbort?.abort() }} />
         </Show>
       </box>
@@ -321,9 +351,9 @@ export function createVideoReader(api: API, library: LibraryStore, settings: {
           <Button label={state().muted ? "[开启声音]" : "[静音]"} action={mute} />
         </box>
         <box height={1} flexDirection="row" justifyContent="space-between"><Button label="[后退10秒]" action={() => seek(-10)} /><Button label="[前进10秒]" action={() => seek(10)} /></box>
-        <box height={1}><Button label={`[画质：${qualityLabel()}]`} action={quality} /></box>
+        <box height={1} flexDirection="row" gap={1}><Button label={`[显示：${qualityLabel()}]`} action={quality} /><Button label={`[下载${downloadQuality()}p]`} action={() => void downloadQualityMenu()} /></box>
       </box>
     </>
   }
-  return { View, shelf, remove, pause, restore, dispose, jump, seek, search: searchPlatform, popular }
+  return { View, shelf, remove, pause, pauseAndWait: () => player.pauseAndWait(), restore, dispose, jump, seek, search: searchPlatform, popular }
 }

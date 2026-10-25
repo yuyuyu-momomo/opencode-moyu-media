@@ -743,8 +743,8 @@ var require_helpers = __commonJS({
     function req(url2, opts = {}) {
       const href = typeof url2 === "string" ? url2 : url2.href;
       const req2 = (href.startsWith("https:") ? https2 : http2).request(url2, opts);
-      const promise2 = new Promise((resolve4, reject) => {
-        req2.once("response", resolve4).once("error", reject).end();
+      const promise2 = new Promise((resolve5, reject) => {
+        req2.once("response", resolve5).once("error", reject).end();
       });
       req2.then = promise2.then.bind(promise2);
       return req2;
@@ -921,7 +921,7 @@ var require_parse_proxy_response = __commonJS({
     var debug_1 = __importDefault(require_src());
     var debug = (0, debug_1.default)("https-proxy-agent:parse-proxy-response");
     function parseProxyResponse(socket) {
-      return new Promise((resolve4, reject) => {
+      return new Promise((resolve5, reject) => {
         let buffersLength = 0;
         const buffers = [];
         function read() {
@@ -987,7 +987,7 @@ var require_parse_proxy_response = __commonJS({
           }
           debug("got proxy server response: %o %o", firstLine, headers);
           cleanup();
-          resolve4({
+          resolve5({
             connect: {
               statusCode,
               statusText,
@@ -3176,12 +3176,12 @@ var $ZodCheckUpperCase = /* @__PURE__ */ $constructor("$ZodCheckUpperCase", (ins
 var $ZodCheckIncludes = /* @__PURE__ */ $constructor("$ZodCheckIncludes", (inst, def) => {
   $ZodCheck.init(inst, def);
   const escapedRegex = escapeRegex(def.includes);
-  const pattern = new RegExp(typeof def.position === "number" ? `^.{${def.position}}${escapedRegex}` : escapedRegex);
-  def.pattern = pattern;
+  const pattern2 = new RegExp(typeof def.position === "number" ? `^.{${def.position}}${escapedRegex}` : escapedRegex);
+  def.pattern = pattern2;
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
-    bag.patterns.add(pattern);
+    bag.patterns.add(pattern2);
   });
   inst._zod.check = (payload) => {
     if (payload.value.includes(def.includes, def.position))
@@ -3199,12 +3199,12 @@ var $ZodCheckIncludes = /* @__PURE__ */ $constructor("$ZodCheckIncludes", (inst,
 });
 var $ZodCheckStartsWith = /* @__PURE__ */ $constructor("$ZodCheckStartsWith", (inst, def) => {
   $ZodCheck.init(inst, def);
-  const pattern = new RegExp(`^${escapeRegex(def.prefix)}.*`);
-  def.pattern ?? (def.pattern = pattern);
+  const pattern2 = new RegExp(`^${escapeRegex(def.prefix)}.*`);
+  def.pattern ?? (def.pattern = pattern2);
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
-    bag.patterns.add(pattern);
+    bag.patterns.add(pattern2);
   });
   inst._zod.check = (payload) => {
     if (payload.value.startsWith(def.prefix))
@@ -3222,12 +3222,12 @@ var $ZodCheckStartsWith = /* @__PURE__ */ $constructor("$ZodCheckStartsWith", (i
 });
 var $ZodCheckEndsWith = /* @__PURE__ */ $constructor("$ZodCheckEndsWith", (inst, def) => {
   $ZodCheck.init(inst, def);
-  const pattern = new RegExp(`.*${escapeRegex(def.suffix)}$`);
-  def.pattern ?? (def.pattern = pattern);
+  const pattern2 = new RegExp(`.*${escapeRegex(def.suffix)}$`);
+  def.pattern ?? (def.pattern = pattern2);
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
     bag.patterns ?? (bag.patterns = /* @__PURE__ */ new Set());
-    bag.patterns.add(pattern);
+    bag.patterns.add(pattern2);
   });
   inst._zod.check = (payload) => {
     if (payload.value.endsWith(def.suffix))
@@ -4720,8 +4720,8 @@ var $ZodOptional = /* @__PURE__ */ $constructor("$ZodOptional", (inst, def) => {
     return def.innerType._zod.values ? /* @__PURE__ */ new Set([...def.innerType._zod.values, void 0]) : void 0;
   });
   defineLazy(inst._zod, "pattern", () => {
-    const pattern = def.innerType._zod.pattern;
-    return pattern ? new RegExp(`^(${cleanRegex(pattern.source)})?$`) : void 0;
+    const pattern2 = def.innerType._zod.pattern;
+    return pattern2 ? new RegExp(`^(${cleanRegex(pattern2.source)})?$`) : void 0;
   });
   inst._zod.parse = (payload, ctx) => {
     if (def.innerType._zod.optin === "optional") {
@@ -4741,8 +4741,8 @@ var $ZodNullable = /* @__PURE__ */ $constructor("$ZodNullable", (inst, def) => {
   defineLazy(inst._zod, "optin", () => def.innerType._zod.optin);
   defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
   defineLazy(inst._zod, "pattern", () => {
-    const pattern = def.innerType._zod.pattern;
-    return pattern ? new RegExp(`^(${cleanRegex(pattern.source)}|null)$`) : void 0;
+    const pattern2 = def.innerType._zod.pattern;
+    return pattern2 ? new RegExp(`^(${cleanRegex(pattern2.source)}|null)$`) : void 0;
   });
   defineLazy(inst._zod, "values", () => {
     return def.innerType._zod.values ? /* @__PURE__ */ new Set([...def.innerType._zod.values, null]) : void 0;
@@ -5447,8 +5447,8 @@ function az_default() {
 }
 
 // node_modules/zod/v4/locales/be.js
-function getBelarusianPlural(count, one, few, many) {
-  const absCount = Math.abs(count);
+function getBelarusianPlural(count2, one, few, many) {
+  const absCount = Math.abs(count2);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
@@ -8106,8 +8106,8 @@ var parsedTypeFromType = (t, data2 = void 0) => {
   }
   return t;
 };
-var capitalizeFirstCharacter = (text3) => {
-  return text3.charAt(0).toUpperCase() + text3.slice(1);
+var capitalizeFirstCharacter = (text4) => {
+  return text4.charAt(0).toUpperCase() + text4.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -9237,8 +9237,8 @@ function pt_default() {
 }
 
 // node_modules/zod/v4/locales/ru.js
-function getRussianPlural(count, one, few, many) {
-  const absCount = Math.abs(count);
+function getRussianPlural(count2, one, few, many) {
+  const absCount = Math.abs(count2);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
@@ -11265,12 +11265,12 @@ function _length(length, params) {
     length
   });
 }
-function _regex(pattern, params) {
+function _regex(pattern2, params) {
   return new $ZodCheckRegex({
     check: "string_format",
     format: "regex",
     ...normalizeParams(params),
-    pattern
+    pattern: pattern2
   });
 }
 function _lowercase(params) {
@@ -12092,11 +12092,11 @@ var JSONSchemaGenerator = class {
           }
           case "template_literal": {
             const json2 = _json;
-            const pattern = schema._zod.pattern;
-            if (!pattern)
+            const pattern2 = schema._zod.pattern;
+            if (!pattern2)
               throw new Error("Pattern not found in template literal");
             json2.type = "string";
-            json2.pattern = pattern.source;
+            json2.pattern = pattern2.source;
             break;
           }
           case "pipe": {
@@ -13592,7 +13592,7 @@ function tool(input) {
 tool.schema = external_exports;
 
 // src/server/index.ts
-import { dirname as dirname3, resolve as resolve3 } from "node:path";
+import { dirname as dirname4, resolve as resolve4 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/services/ingestion.mjs
@@ -13619,13 +13619,21 @@ var aad = Buffer.from("opencode-moyu:library:v1");
 var defaultKeyFile = (directory) => resolve(directory, "../keys/library.key");
 var LibraryVault = class {
   #key;
+  #pending;
   constructor(keyFile) {
     this.keyFile = keyFile;
   }
   async key(create = true) {
     if (this.#key) return this.#key;
+    if (!this.#pending) this.#pending = this.loadKey(create).finally(() => {
+      this.#pending = void 0;
+    });
+    return this.#pending;
+  }
+  async loadKey(create) {
+    let key;
     try {
-      this.#key = await readFile(this.keyFile);
+      key = await readFile(this.keyFile);
     } catch (error45) {
       if (error45.code !== "ENOENT") throw error45;
       if (!create) throw new Error("\u7F3A\u5C11\u8D44\u6599\u5E93\u5BC6\u94A5\uFF0C\u8BF7\u6062\u590D\u539F\u5BC6\u94A5\u6587\u4EF6");
@@ -13635,9 +13643,14 @@ var LibraryVault = class {
       } catch (error46) {
         if (error46.code !== "EEXIST") throw error46;
       }
-      this.#key = await readFile(this.keyFile);
+      key = await readFile(this.keyFile);
     }
-    if (this.#key.length !== 32) throw new Error("\u8D44\u6599\u5E93\u5BC6\u94A5\u957F\u5EA6\u5F02\u5E38");
+    for (let attempt = 0; key.length !== 32 && attempt < 20; attempt++) {
+      await new Promise((resolve5) => setTimeout(resolve5, 10));
+      key = await readFile(this.keyFile);
+    }
+    if (key.length !== 32) throw new Error("\u8D44\u6599\u5E93\u5BC6\u94A5\u957F\u5EA6\u5F02\u5E38");
+    this.#key = key;
     return this.#key;
   }
   async seal(value) {
@@ -13702,9 +13715,9 @@ var LibraryStore = class {
   async writeJob(job) {
     await atomicWrite(this.jobPath(job.id), await this.vault.seal(job));
   }
-  async writePart(id, index2, text3) {
+  async writePart(id, index2, text4) {
     await mkdir2(join(this.internal, "parts", id), { recursive: true });
-    await atomicWrite(this.partPath(id, index2), await this.vault.seal({ text: text3 }));
+    await atomicWrite(this.partPath(id, index2), await this.vault.seal({ text: text4 }));
   }
   async putResource(resource) {
     await this.ready();
@@ -13729,10 +13742,10 @@ var LibraryStore = class {
   async readPart(id, index2) {
     return (await this.vault.unseal(await readFile2(this.partPath(id, index2)))).text;
   }
-  async writeBook(id, title, text3) {
+  async writeBook(id, title, text4) {
     await this.ready();
     const path = join(this.directory, id + ".moyubook");
-    await atomicWrite(path, await this.vault.seal({ schemaVersion: 1, resourceId: id, title, text: text3 }));
+    await atomicWrite(path, await this.vault.seal({ schemaVersion: 1, resourceId: id, title, text: text4 }));
     return path;
   }
   async importLocal(book) {
@@ -13803,8 +13816,8 @@ function decodeBook(bytes) {
     return new TextDecoder("gb18030", { fatal: true }).decode(bytes);
   }
 }
-function cleanText(text3) {
-  return text3.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "").replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\r\n?/g, "\n").replace(/\t/g, "    ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "").replace(/^\uFEFF/, "");
+function cleanText(text4) {
+  return text4.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "").replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").replace(/\r\n?/g, "\n").replace(/\t/g, "    ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "").replace(/^\uFEFF/, "");
 }
 async function listBooks(directory, { keyFile } = {}) {
   const entries = await readdir2(directory, { withFileTypes: true });
@@ -13831,7 +13844,9 @@ function httpUrl2(input) {
   return url2;
 }
 function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, timeoutMs = 15e3, useProxy = true, maxRedirects = 4 } = {}) {
-  return async function readPage(input, { signal, headers = {} } = {}) {
+  return async function readPage(input, { signal, headers = {}, method = "GET", body, asBytes = false, redirect = "follow" } = {}) {
+    if (!["GET", "POST"].includes(method)) throw new Error("\u4E0D\u652F\u6301\u7684 HTTP \u8BF7\u6C42\u65B9\u5F0F");
+    if (!["follow", "manual"].includes(redirect)) throw new Error("\u4E0D\u652F\u6301\u7684\u91CD\u5B9A\u5411\u5904\u7406\u65B9\u5F0F");
     let url2 = httpUrl2(input);
     const initialOrigin = url2.origin;
     for (let redirects = 0; redirects <= maxRedirects; redirects++) {
@@ -13849,8 +13864,9 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
       });
       const proxy = !useProxy || bypass ? void 0 : url2.protocol === "https:" ? process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy : process.env.HTTP_PROXY || process.env.http_proxy;
       const agent = proxy ? new import_https_proxy_agent.HttpsProxyAgent(proxy) : void 0;
-      const result = await new Promise((resolve4, reject) => {
-        const request = (url2.protocol === "https:" ? https : http).get(url2, {
+      const result = await new Promise((resolve5, reject) => {
+        const request = (url2.protocol === "https:" ? https : http).request(url2, {
+          method,
           signal,
           agent,
           lookup: (_host, options, callback) => options?.all ? callback(null, [pinned]) : callback(null, pinned.address, pinned.family),
@@ -13860,7 +13876,7 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
             const status = response.statusCode ?? 0;
             if ([301, 302, 303, 307, 308].includes(status) && response.headers.location) {
               response.resume();
-              resolve4({ redirect: response.headers.location });
+              resolve5({ url: url2.href, redirect: response.headers.location, status, cookies: response.headers["set-cookie"] ?? [] });
               return;
             }
             if (status < 200 || status >= 300) {
@@ -13868,7 +13884,7 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
               throw new Error(`\u6765\u6E90\u8FD4\u56DE HTTP ${status}\uFF1B\u505C\u6B62\u6293\u53D6`);
             }
             const contentType = String(response.headers["content-type"] ?? "text/html");
-            if (!/^(text\/|application\/(xhtml\+xml|xml|json))/i.test(contentType)) {
+            if (!asBytes && !/^(text\/|application\/(xhtml\+xml|xml|json))/i.test(contentType)) {
               response.resume();
               throw new Error(`\u5F53\u524D\u6587\u5B57\u6765\u6E90\u4E0D\u652F\u6301\uFF1A${contentType}`);
             }
@@ -13885,9 +13901,14 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
               chunks.push(chunk);
             }
             const bytes = Buffer.concat(chunks);
+            const cookies = response.headers["set-cookie"] ?? [];
+            if (asBytes) {
+              resolve5({ url: url2.href, bytes, contentType, cookies });
+              return;
+            }
             const declared = contentType.match(/charset\s*=\s*["']?([^\s;"']+)/i)?.[1] ?? bytes.subarray(0, 4096).toString("latin1").match(/charset\s*=\s*["']?([\w-]+)/i)?.[1];
-            const text3 = declared ? new TextDecoder(declared).decode(bytes) : decodeBook(bytes);
-            resolve4({ url: url2.href, text: text3, contentType });
+            const text4 = declared ? new TextDecoder(declared).decode(bytes) : decodeBook(bytes);
+            resolve5({ url: url2.href, text: text4, contentType, cookies });
           } catch (error45) {
             reject(error45);
           }
@@ -13896,9 +13917,13 @@ function createHttpClient({ allowPrivate = false, maxBytes = 2 * 1024 * 1024, ti
         const deadline = setTimeout(() => request.destroy(new Error("\u6765\u6E90\u8BF7\u6C42\u8D85\u8FC7\u603B\u65F6\u9650")), timeoutMs);
         request.on("close", () => clearTimeout(deadline));
         request.on("error", reject);
+        request.end(body);
       });
       if (result.redirect) {
-        url2 = httpUrl2(new URL(result.redirect, url2).href);
+        if (redirect === "manual") return result;
+        const next2 = httpUrl2(new URL(result.redirect, url2).href);
+        if (method !== "GET" && next2.origin !== url2.origin) throw new Error("\u4E0D\u80FD\u5C06\u767B\u5F55\u8BF7\u6C42\u91CD\u5B9A\u5411\u5230\u5176\u4ED6\u7AD9\u70B9");
+        url2 = next2;
         continue;
       }
       return result;
@@ -14412,11 +14437,11 @@ var DomHandler = class {
     this.lastNode = null;
   }
   oncdatastart() {
-    const text3 = new Text2("");
-    const node = new CDATA2([text3]);
+    const text4 = new Text2("");
+    const node = new CDATA2([text4]);
     this.addNode(node);
-    text3.parent = node;
-    this.lastNode = text3;
+    text4.parent = node;
+    this.lastNode = text4;
   }
   oncdataend() {
     this.lastNode = null;
@@ -18621,13 +18646,13 @@ function getChildFunc(next2, adapter) {
   };
 }
 var filters = {
-  contains(next2, text3, { adapter }) {
+  contains(next2, text4, { adapter }) {
     return function contains2(elem) {
-      return next2(elem) && adapter.getText(elem).includes(text3);
+      return next2(elem) && adapter.getText(elem).includes(text4);
     };
   },
-  icontains(next2, text3, { adapter }) {
-    const itext = text3.toLowerCase();
+  icontains(next2, text4, { adapter }) {
+    const itext = text4.toLowerCase();
     return function icontains(elem) {
       return next2(elem) && adapter.getText(elem).toLowerCase().includes(itext);
     };
@@ -20418,9 +20443,9 @@ function parseContent(html3, selector) {
   body.find("p,div,section,h1,h2,h3,li").each((_index, element) => {
     $(element).append("\n");
   });
-  const text3 = cleanText(body.text()).split("\n").map((line) => line.replace(/[ \t]+/g, " ").trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
-  if (text3.length < 30) throw new Error("\u53EF\u63D0\u53D6\u7684\u6B63\u6587\u4E0D\u8DB3\uFF1B\u8BF7\u6307\u5B9A\u6B63\u6587\u9009\u62E9\u5668\uFF0C\u6216\u6362\u7528\u53EF\u76F4\u63A5\u8BBF\u95EE\u7684\u6587\u5B57\u9875\u9762");
-  return { title, text: text3, mime: "text/plain" };
+  const text4 = cleanText(body.text()).split("\n").map((line) => line.replace(/[ \t]+/g, " ").trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (text4.length < 30) throw new Error("\u53EF\u63D0\u53D6\u7684\u6B63\u6587\u4E0D\u8DB3\uFF1B\u8BF7\u6307\u5B9A\u6B63\u6587\u9009\u62E9\u5668\uFF0C\u6216\u6362\u7528\u53EF\u76F4\u63A5\u8BBF\u95EE\u7684\u6587\u5B57\u9875\u9762");
+  return { title, text: text4, mime: "text/plain" };
 }
 var htmlNovel = {
   id: "html-novel",
@@ -20570,6 +20595,19 @@ import { promisify as promisify2 } from "node:util";
 // src/media/settings.mjs
 import { readFile as readFile4, unlink as unlink2, mkdir as mkdir3 } from "node:fs/promises";
 import { join as join2 } from "node:path";
+
+// src/media/video-quality.mjs
+var VIDEO_QUALITIES = Object.freeze([480, 720, 1080]);
+var DEFAULT_VIDEO_QUALITY = 1080;
+function videoQuality(value = DEFAULT_VIDEO_QUALITY) {
+  if (!VIDEO_QUALITIES.includes(value)) throw new Error("\u8BF7\u9009\u62E9 480p\u3001720p \u6216 1080p \u4E0B\u8F7D\u6E05\u6670\u5EA6");
+  return value;
+}
+function videoFormatArgs(quality = DEFAULT_VIDEO_QUALITY) {
+  return ["--format", "bv*+ba/bv*", "--format-sort", `res:${videoQuality(quality)},vcodec:h264,acodec:m4a`];
+}
+
+// src/media/settings.mjs
 var MediaSettings = class {
   constructor(library) {
     this.library = library;
@@ -20598,6 +20636,21 @@ var MediaSettings = class {
       if (error45.code !== "ENOENT") throw error45;
     });
     return this.status();
+  }
+  async downloadQuality() {
+    try {
+      const settings = await this.library.vault.unseal(await readFile4(join2(this.library.internal, "settings", "video.enc")));
+      return videoQuality(settings.downloadQuality);
+    } catch (error45) {
+      if (error45.code !== "ENOENT") throw error45;
+    }
+    return DEFAULT_VIDEO_QUALITY;
+  }
+  async saveDownloadQuality(input) {
+    const downloadQuality = videoQuality(input);
+    await mkdir3(join2(this.library.internal, "settings"), { recursive: true, mode: 448 });
+    await atomicWrite(join2(this.library.internal, "settings", "video.enc"), await this.library.vault.seal({ downloadQuality }));
+    return downloadQuality;
   }
 };
 
@@ -20846,7 +20899,7 @@ function createVideoPlatforms({ settings, read = createHttpClient({ maxBytes: 10
 
 // src/services/video-ingestion.mjs
 var execute2 = promisify2(execFile2);
-var VIDEO_FORMAT_ARGS = Object.freeze(["--format", "bv*+ba/bv*", "--format-sort", "res:480,vcodec:h264,acodec:m4a"]);
+var VIDEO_FORMAT_ARGS = Object.freeze(videoFormatArgs());
 async function downloaderBinary() {
   const paths = process.env.MOYU_YTDLP ? [process.env.MOYU_YTDLP] : [
     join5(homedir3(), ".local/share/opencode-moyu/media/bin", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp"),
@@ -20872,14 +20925,14 @@ function downloadFailure(message, platform) {
   if (/requested format is not available/i.test(message)) return "\u6765\u6E90\u672A\u63D0\u4F9B\u5F53\u524D\u53EF\u4E0B\u8F7D\u7684\u89C6\u9891\u683C\u5F0F\uFF0C\u672A\u5165\u5E93";
   return "\u89C6\u9891\u6765\u6E90\u83B7\u53D6\u5931\u8D25\uFF1A" + safeError(message);
 }
-async function downloadVideo(url2, directory, { signal, onProgress = (_value) => {
+async function downloadVideo(url2, directory, { signal, quality, onProgress = (_value) => {
 }, binary = downloaderBinary, launch = spawn2 } = {}) {
   const target = videoUrl(url2);
   signal?.throwIfAborted();
   const executable = await binary(), ffmpeg = await mediaBinary("ffmpeg");
   signal?.throwIfAborted();
-  const args = ["--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-playlist", "--playlist-items", "1", "--no-remote-components", "--js-runtimes", "node", "--socket-timeout", "15", "--retries", "0", "--extractor-retries", "0", "--fragment-retries", "0", "--abort-on-unavailable-fragments", "--concurrent-fragments", "1", "--match-filters", "!is_live & duration <= 3600", "--max-filesize", String(MAX_VIDEO_BYTES), ...VIDEO_FORMAT_ARGS, "--merge-output-format", "mp4/mkv", "--ffmpeg-location", dirname2(ffmpeg), "--no-mtime", "--newline", "--progress", "--progress-template", "download:MOYU_PROGRESS:%(progress._percent_str)s", "--print", "before_dl:MOYU_META:%(title)j", "--no-simulate", "--paths", directory, "--output", "video.%(ext)s", "--", target.url];
-  return new Promise((resolve4, reject) => {
+  const args = ["--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-playlist", "--playlist-items", "1", "--no-remote-components", "--js-runtimes", "node", "--socket-timeout", "15", "--retries", "0", "--extractor-retries", "0", "--fragment-retries", "0", "--abort-on-unavailable-fragments", "--concurrent-fragments", "1", "--match-filters", "!is_live & duration <= 3600", "--max-filesize", String(MAX_VIDEO_BYTES), ...videoFormatArgs(quality), "--merge-output-format", "mp4/mkv", "--ffmpeg-location", dirname2(ffmpeg), "--no-mtime", "--newline", "--progress", "--progress-template", "download:MOYU_PROGRESS:%(progress._percent_str)s", "--print", "before_dl:MOYU_META:%(title)j", "--no-simulate", "--paths", directory, "--output", "video.%(ext)s", "--", target.url];
+  return new Promise((resolve5, reject) => {
     const child = launch(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" });
     let stderr = "", partial2 = "", title = "", failure, finished = false;
     const terminate = (error45) => {
@@ -20937,18 +20990,18 @@ async function downloadVideo(url2, directory, { signal, onProgress = (_value) =>
         checking = false;
       }
     }, 500);
-    const clean = () => {
+    const clean2 = () => {
       finished = true;
       clearTimeout(deadline);
       clearInterval(quota);
       signal?.removeEventListener("abort", abort);
     };
     child.once("error", (error45) => {
-      clean();
+      clean2();
       reject(new Error("\u4E0B\u8F7D\u5668\u65E0\u6CD5\u542F\u52A8\uFF1A" + safeError(error45.message)));
     });
     child.once("close", async (code) => {
-      clean();
+      clean2();
       if (failure) return reject(failure);
       if (code !== 0) return reject(new Error(downloadFailure(stderr || "\u4E0B\u8F7D\u5668\u9000\u51FA " + code, target.platform)));
       try {
@@ -20956,7 +21009,7 @@ async function downloadVideo(url2, directory, { signal, onProgress = (_value) =>
         if (names.length !== 1) throw new Error("\u672A\u53D6\u5F97\u5B8C\u6574\u89C6\u9891\uFF0C\u53EF\u80FD\u53D7\u767B\u5F55\u3001\u65F6\u957F\u3001\u5927\u5C0F\u6216\u683C\u5F0F\u9650\u5236");
         const path = join5(directory, names[0]);
         if ((await stat4(path)).size > MAX_VIDEO_BYTES) throw new Error("\u89C6\u9891\u8D85\u8FC7 256 MiB \u9650\u5236");
-        resolve4({ path, title });
+        resolve5({ path, title });
       } catch (error45) {
         reject(error45);
       }
@@ -20979,16 +21032,18 @@ function createVideoIngestion({ directory, keyFile, read, download = downloadVid
       }
     }
   }
-  async function importVideo({ url: url2, signal, onProgress = (_value) => {
+  async function importVideo({ url: url2, signal, quality = void 0, onProgress = (_value) => {
   } }) {
-    const target = videoUrl(url2), id = stableId("video:" + target.url);
-    return store.withJobLock(id, async () => {
+    const target = videoUrl(url2);
+    quality = videoQuality(quality ?? await settings.downloadQuality());
+    const lockId = stableId("video:" + target.url), id = stableId("video:" + target.url + ":" + quality);
+    return store.withJobLock(lockId, async () => {
       signal?.throwIfAborted();
-      const existing = (await store.resources()).find((item) => item.id === id);
-      if (existing) {
+      const existing = (await store.resources()).filter((item) => item.kind === "video" && item.source.url === target.url && item.metadata.managedMedia && Math.max(item.metadata.downloadQuality ?? 480, Math.min(item.metadata.width || 0, item.metadata.height || 0)) >= quality).sort((a, b) => Math.min(b.metadata.width, b.metadata.height) - Math.min(a.metadata.width, a.metadata.height));
+      for (const resource of existing) {
         try {
-          await access2(cache.path(id));
-          return { resource: existing, cached: true };
+          await access2(cache.path(resource.id));
+          return { resource, cached: true };
         } catch (error45) {
           if (error45.code !== "ENOENT") throw error45;
         }
@@ -21006,14 +21061,14 @@ function createVideoIngestion({ directory, keyFile, read, download = downloadVid
             signal?.throwIfAborted();
           }
         }
-        const media = await download(target.url, work, { signal, onProgress });
+        const media = await download(target.url, work, { signal, quality, onProgress });
         signal?.throwIfAborted();
         const info = await inspectVideo(media.path);
         signal?.throwIfAborted();
         onProgress({ phase: "encrypting", percent: 99 });
         const path = await cache.seal(id, media.path);
         signal?.throwIfAborted();
-        const resource = { schemaVersion: 1, id, kind: "video", title: media.title || details?.title || info.title, source: { adapter: target.platform, url: target.url }, assets: [{ role: "media", mime: "application/x-moyu-video", path }], metadata: { author: details?.author, description: details?.description, views: details?.views, metadataFetched: Boolean(details), width: info.width, height: info.height, duration: info.duration, hasAudio: info.hasAudio, managedMedia: true, extension: extname3(media.path) }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+        const resource = { schemaVersion: 1, id, kind: "video", title: media.title || details?.title || info.title, source: { adapter: target.platform, url: target.url }, assets: [{ role: "media", mime: "application/x-moyu-video", path }], metadata: { author: details?.author, description: details?.description, views: details?.views, metadataFetched: Boolean(details), width: info.width, height: info.height, duration: info.duration, hasAudio: info.hasAudio, managedMedia: true, downloadQuality: quality, extension: extname3(media.path) }, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
         await store.putResource(resource);
         return { resource, cached: false };
       } catch (error45) {
@@ -21027,15 +21082,733 @@ function createVideoIngestion({ directory, keyFile, read, download = downloadVid
   return { store, settings, cache, platforms, importVideo, cleanup };
 }
 
+// src/music/service.mjs
+import { writeFile as writeFile4 } from "node:fs/promises";
+import { join as join8 } from "node:path";
+
+// src/music/providers.mjs
+import { createCipheriv as createCipheriv3, createHash as createHash4, randomBytes as randomBytes5 } from "node:crypto";
+
+// src/music/qq-login.mjs
+import { randomBytes as randomBytes3 } from "node:crypto";
+var loginOrigin = "https://ssl.ptlogin2.qq.com";
+var musicOrigin = "https://y.qq.com/";
+var redirectUri = musicOrigin + "portal/wx_redirect.html?login_type=1&surl=https://y.qq.com/";
+var paramsUrl = (base, params) => {
+  const url2 = new URL(base);
+  url2.search = new URLSearchParams(params).toString();
+  return url2.href;
+};
+function qqHash(value, seed = 0) {
+  let hash2 = seed;
+  for (const char of value) hash2 = hash2 * 33 + char.charCodeAt(0) | 0;
+  return hash2 & 2147483647;
+}
+function parseQQCallback(text4) {
+  const match = /^\s*ptuiCB\s*\(([^]*)\)\s*;?\s*$/.exec(text4);
+  if (!match || text4.length > 16384) throw new Error("QQ\u626B\u7801\u54CD\u5E94\u683C\u5F0F\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u4E8C\u7EF4\u7801");
+  const args = [], pattern2 = /\s*'((?:\\.|[^'\\])*)'\s*(,|$)/gy;
+  let offset = 0;
+  while (offset < match[1].length) {
+    pattern2.lastIndex = offset;
+    const item = pattern2.exec(match[1]);
+    if (!item || args.length >= 8) throw new Error("QQ\u626B\u7801\u54CD\u5E94\u683C\u5F0F\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u4E8C\u7EF4\u7801");
+    args.push(item[1].replace(/\\(?:x([\da-f]{2})|u([\da-f]{4})|(['"\\/])|([nrt]))/gi, (_all, hex3, unicode, literal2, control) => hex3 || unicode ? String.fromCharCode(parseInt(hex3 || unicode, 16)) : literal2 || { n: "\n", r: "\r", t: "	" }[control]));
+    offset = pattern2.lastIndex;
+    if (!item[2]) break;
+    if (offset === match[1].length) throw new Error("QQ\u626B\u7801\u54CD\u5E94\u683C\u5F0F\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u4E8C\u7EF4\u7801");
+  }
+  if (args.length < 3 || !/^\d{1,6}$/.test(args[0])) throw new Error("QQ\u626B\u7801\u54CD\u5E94\u683C\u5F0F\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u751F\u6210\u4E8C\u7EF4\u7801");
+  return { code: Number(args[0]), callback: args[2], nickname: args[5] || "" };
+}
+function qqResponseCookies(headers = [], target) {
+  const jar = /* @__PURE__ */ new Map(), values = /* @__PURE__ */ Object.create(null), destination = target ? new URL(target) : void 0;
+  for (const header of headers) for (const cookie of header.split(/,(?=\s*[\w-]+=)/)) {
+    const match = /^\s*([\w-]+)=([^;]*)/.exec(cookie);
+    if (!match || /[\x00-\x20\x7f-\uffff]/.test(match[2])) continue;
+    const domain2 = /;\s*domain=([^;]+)/i.exec(cookie)?.[1].trim().replace(/^\./, "").toLowerCase() || "";
+    const path = /;\s*path=([^;]+)/i.exec(cookie)?.[1].trim() || "/";
+    const expires = /;\s*expires=([^;]+)/i.exec(cookie)?.[1];
+    const maxAge = /;\s*max-age=([^;]+)/i.exec(cookie)?.[1];
+    const key = `${match[1]}
+${domain2}
+${path}`;
+    if (!match[2] || maxAge !== void 0 && Number(maxAge) <= 0 || expires && Date.parse(expires) <= Date.now()) {
+      jar.delete(key);
+      continue;
+    }
+    jar.set(key, { name: match[1], value: match[2], domain: domain2, path });
+  }
+  const candidates = [...jar.values()].filter((item) => !destination || (!item.domain || destination.hostname === item.domain || destination.hostname.endsWith("." + item.domain)) && (destination.pathname === item.path || destination.pathname.startsWith(item.path.endsWith("/") ? item.path : item.path + "/")));
+  candidates.sort((a, b) => a.domain.length - b.domain.length || a.path.length - b.path.length);
+  for (const item of candidates) values[item.name] = item.value;
+  return values;
+}
+var bodyText = (response) => response.text ?? response.bytes?.toString("utf8") ?? "";
+var safeText = (value) => String(value || "").replace(/[\x00-\x1f\x7f-\x9f]/g, "").slice(0, 80);
+function createQQLogin(request) {
+  async function read(url2, options = {}) {
+    const response = await request(url2, { ...options, asBytes: true, redirect: "manual", headers: { "User-Agent": "Mozilla/5.0", Referer: "https://xui.ptlogin2.qq.com/", ...options.headers } });
+    options.signal?.throwIfAborted();
+    return response;
+  }
+  async function begin({ signal } = {}) {
+    const response = await read(paramsUrl(loginOrigin + "/ptqrshow", { appid: "716027609", e: "2", l: "M", s: "3", d: "72", v: "4", t: String(Math.random()), daid: "383", pt_3rd_aid: "100497308" }), { signal });
+    const cookies = qqResponseCookies(response.cookies), bytes = response.bytes;
+    if (!cookies.qrsig || !bytes || bytes.length > 1024 * 1024 || bytes.length < 8 || !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error("QQ\u672A\u8FD4\u56DE\u6709\u6548\u4E8C\u7EF4\u7801\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+    return { platform: "qq", qrsig: cookies.qrsig, state: randomBytes3(18).toString("hex"), image: "data:image/png;base64," + bytes.toString("base64") };
+  }
+  async function authorize(session, callback, signal, onProgress) {
+    let url2;
+    try {
+      url2 = new URL(callback);
+    } catch {
+      throw new Error("QQ\u6388\u6743\u5730\u5740\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    }
+    if (url2.protocol !== "https:" || url2.port || url2.username || url2.password || !["ssl.ptlogin2.graph.qq.com", "ssl.ptlogin2.qq.com", "ptlogin2.qq.com", "ptlogin2.music.qq.com"].includes(url2.hostname) || url2.pathname !== "/check_sig") throw new Error("QQ\u6388\u6743\u5730\u5740\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    const uin = url2.searchParams.get("uin"), sig = url2.searchParams.get("ptsigx");
+    if (!/^\d{5,20}$/.test(uin || "") || !sig || sig.length > 512 || /[^\x21-\x7e]/.test(sig)) throw new Error("QQ\u6388\u6743\u53C2\u6570\u4E0D\u5B8C\u6574\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    const checked2 = await read(paramsUrl("https://ssl.ptlogin2.graph.qq.com/check_sig", { uin, ptsigx: sig, pttype: "1", service: "ptqrlogin", nodirect: "0", s_url: "https://graph.qq.com/oauth2.0/login_jump", ptlang: "2052", ptredirect: "100", aid: "716027609", daid: "383", j_later: "0", low_login_hour: "0", regmaster: "0", pt_login_type: "3", pt_aid: "0", pt_aaid: "16", pt_light: "0", pt_3rd_aid: "100497308" }), { signal });
+    const sso = qqResponseCookies(checked2.cookies, "https://graph.qq.com/oauth2.0/authorize");
+    if (!sso.p_skey) throw new Error("QQ\u6388\u6743\u5C1A\u672A\u5B8C\u6210\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801\u5E76\u5728\u624B\u673A\u786E\u8BA4");
+    const gtk = qqHash(sso.p_skey, 5381);
+    const cookie = Object.entries(sso).map(([key, value]) => `${key}=${value}`).join("; ");
+    const authorization = await read("https://graph.qq.com/oauth2.0/authorize", { signal, method: "POST", body: new URLSearchParams({ response_type: "code", client_id: "100497308", redirect_uri: redirectUri, scope: "get_user_info", state: session.state, switch: "", from_ptlogin: "1", src: "1", update_auth: "1", openapi: "1010_1030", g_tk: String(gtk), auth_time: String(Date.now()), ui: session.state }).toString(), headers: { Cookie: cookie, "Content-Type": "application/x-www-form-urlencoded", Referer: "https://graph.qq.com/" } });
+    let location;
+    try {
+      location = new URL(authorization.redirect);
+    } catch {
+      throw new Error("QQ\u6388\u6743\u672A\u8FD4\u56DE\u767B\u5F55\u7ED3\u679C\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    }
+    if (location.origin === "https://graph.qq.com" && location.pathname === "/oauth2.0/show") throw new Error("QQ\u6388\u6743\u672A\u5B8C\u6210\uFF0C\u5E73\u53F0\u8FD4\u56DE\u4E86\u767B\u5F55\u9875\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    const code = location.searchParams.get("code");
+    if (location.origin !== "https://y.qq.com" || location.pathname !== "/portal/wx_redirect.html" || location.searchParams.get("state") !== session.state || !/^[\w-]{8,512}$/.test(code || "")) throw new Error("QQ\u6388\u6743\u7ED3\u679C\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    onProgress("exchanging");
+    const result = await read("https://u.y.qq.com/cgi-bin/musicu.fcg", { signal, method: "POST", body: JSON.stringify({ comm: { ct: 24, cv: 4747474, platform: "yqq.json", format: "json", g_tk: gtk, tmeLoginType: 2 }, req: { module: "QQConnectLogin.LoginServer", method: "QQLogin", param: { code } } }), headers: { "Content-Type": "application/json", Referer: musicOrigin } });
+    let data2;
+    try {
+      data2 = JSON.parse(bodyText(result));
+    } catch {
+      throw new Error("QQ\u97F3\u4E50\u6388\u6743\u7ED3\u679C\u5F02\u5E38\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    }
+    const info = data2.req?.data, cookies = qqResponseCookies(result.cookies);
+    if (data2.code || data2.req?.code) throw new Error(`QQ\u97F3\u4E50\u62D2\u7EDD\u4E86\u672C\u6B21\u6388\u6743${Number.isInteger(data2.req?.code) ? `\uFF08${data2.req.code}\uFF09` : ""}\uFF0C\u8BF7\u5728\u5B98\u65B9\u5BA2\u6237\u7AEF\u68C0\u67E5\u8D26\u53F7\u72B6\u6001`);
+    const musicid = String(info?.str_musicid || info?.musicid || cookies.uin?.replace(/^o/, "") || ""), musickey = info?.musickey || cookies.qqmusic_key || cookies.qm_keyst;
+    if (!/^\d{5,24}$/.test(musicid) || typeof musickey !== "string" || !/^[\x21-\x3a\x3c-\x7e]{1,8192}$/.test(musickey)) throw new Error("QQ\u97F3\u4E50\u672A\u8FD4\u56DE\u5B8C\u6574\u767B\u5F55\u6001\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+    return { cookie: `uin=${musicid}; qqmusic_key=${musickey}`, nickname: safeText(info?.nick || info?.nickname) };
+  }
+  async function check2(session, { signal, onProgress = (_status) => {
+  } } = {}) {
+    const response = await read(paramsUrl(loginOrigin + "/ptqrlogin", { u1: "https://graph.qq.com/oauth2.0/login_jump", ptqrtoken: String(qqHash(session.qrsig)), ptredirect: "0", h: "1", t: "1", g: "1", from_ui: "1", ptlang: "2052", action: `0-0-${Date.now()}`, js_ver: "20102616", js_type: "1", pt_uistyle: "40", aid: "716027609", daid: "383", pt_3rd_aid: "100497308", has_onekey: "1" }), { signal, headers: { Cookie: `qrsig=${session.qrsig}` } });
+    const result = parseQQCallback(bodyText(response));
+    if (result.code === 66) return { status: "waiting" };
+    if (result.code === 67) return { status: "scanned" };
+    if (result.code === 65) return { status: "expired" };
+    if (result.code !== 0) return { status: "failed" };
+    onProgress("authorizing");
+    const account = await authorize(session, result.callback, signal, onProgress);
+    return { status: "authorized", ...account, nickname: account.nickname || safeText(result.nickname) };
+  }
+  return { begin, check: check2 };
+}
+
+// src/music/playlists.mjs
+import { createHash as createHash3, randomBytes as randomBytes4 } from "node:crypto";
+var locations = {
+  netease: (id) => `https://music.163.com/#/playlist?id=${id}`,
+  qq: (id) => id === "liked" ? void 0 : `https://y.qq.com/n/ryqq/playlist/${id}`,
+  kugou: (id) => /^\d+$/.test(id) ? `https://www.kugou.com/yy/special/single/${id}.html` : void 0
+};
+var text3 = (value) => String(value ?? "").replace(/<[^>]*>/g, "").replace(/&#(x[\da-f]+|\d+);/gi, (_s, code) => {
+  const n = code[0].toLowerCase() === "x" ? parseInt(code.slice(1), 16) : Number(code);
+  return n > 0 && n <= 1114111 ? String.fromCodePoint(n) : "";
+}).replace(/&amp;/g, "&").replace(/[\x00-\x1f\x7f-\x9f]/g, " ").trim().slice(0, 180);
+var count = (value) => value !== void 0 && value !== null && Number.isFinite(Number(value)) && Number(value) >= 0 ? Math.min(1e7, Math.trunc(Number(value))) : void 0;
+function musicPlaylist(input) {
+  const platform = input?.platform, id = String(input?.id ?? "");
+  const liked = platform === "qq" && id === "liked";
+  if (!Object.hasOwn(locations, platform) || !liked && !(platform === "kugou" ? /^[\w-]{1,120}$/ : /^[1-9]\d{0,23}$/).test(id)) throw new Error("\u65E0\u6548\u6B4C\u5355\u5E73\u53F0\u6216 ID");
+  if (platform === "qq" && !liked && !Number.isSafeInteger(Number(id))) throw new Error("\u65E0\u6548\u6B4C\u5355 ID");
+  const legacyId = platform === "kugou" && /^[1-9]\d{0,23}$/.test(String(input.legacyId ?? "")) ? String(input.legacyId) : void 0;
+  return { platform, id, title: liked ? "\u6211\u559C\u6B22" : text3(input.title) || "\u6B4C\u5355 " + id, creator: text3(input.creator), count: count(input.count), legacyId, sourceUrl: locations[platform](legacyId || id) };
+}
+function pageOptions(page = 1, limit = 20) {
+  if (!Number.isInteger(page) || page < 1 || page > 500 || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("\u6B4C\u5355\u5206\u9875\u8303\u56F4\u4E0D\u6B63\u786E");
+  return { page, limit, offset: (page - 1) * limit };
+}
+function listPage(list, map3, options, total, more) {
+  if (!Array.isArray(list)) throw new Error("\u5E73\u53F0\u672A\u8FD4\u56DE\u6B4C\u5355\u5217\u8868\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+  const playlists = list.slice(0, options.limit).flatMap((item) => {
+    try {
+      return [musicPlaylist(map3(item))];
+    } catch {
+      return [];
+    }
+  });
+  return { playlists, page: options.page, limit: options.limit, total: count(total), hasMore: more !== void 0 ? Boolean(more) : count(total) !== void 0 ? options.offset + list.length < Number(total) : list.length >= options.limit };
+}
+function checked(data2, key) {
+  const result = key ? data2[key] : data2;
+  const denied = (code) => code !== void 0 && ![0, 200].includes(Number(code));
+  if (denied(data2.code) || key && !result || denied(result?.code)) throw new Error("\u5E73\u53F0\u62D2\u7EDD\u4E86\u97F3\u4E50\u67E5\u8BE2\uFF0C\u8BF7\u68C0\u67E5\u767B\u5F55\u72B6\u6001\u6216\u8D44\u6E90\u53EF\u89C1\u6027");
+  return key ? result.data : result;
+}
+function createPlaylistProviders({ json: json2, netease, parseSongs, normalizeTrack, cookies, page: readPage }) {
+  const kgMid = randomBytes4(16).toString("hex");
+  async function qq(module, method, param, cookie, signal, comm = {}) {
+    const values = cookies(cookie), uin = (values.uin || values.wxuin || "0").replace(/^o/, ""), key = values.qqmusic_key || values.qm_keyst || "";
+    let gtk = 5381;
+    for (const c of key) gtk = gtk * 33 + c.charCodeAt(0) & 2147483647;
+    const { data: data2 } = await json2("https://u.y.qq.com/cgi-bin/musicu.fcg", { signal, method: "POST", body: JSON.stringify({ comm: { ct: 24, cv: 4747474, uin, authst: key, g_tk: gtk, tmeLoginType: 2, format: "json", ...comm }, req: { module, method, param } }), headers: { Cookie: cookie, Referer: "https://y.qq.com/", "Content-Type": "application/json" } });
+    return checked(data2, "req");
+  }
+  async function kg(path, params, body, router, cookie, signal) {
+    const values = cookies(cookie), query = { dfid: values.dfid || "-", mid: values.mid || values.kg_mid || kgMid, uuid: "-", appid: 1005, clientver: 20489, clienttime: Math.floor(Date.now() / 1e3), ...values.token ? { token: values.token, userid: values.userid || 0 } : {}, ...params };
+    const payload = body ? JSON.stringify(body) : "", salt = "OIlwieks28dk2k092lksi2UIkp";
+    query.signature = createHash3("md5").update(salt + Object.keys(query).sort().map((key) => `${key}=${query[key]}`).join("") + payload + salt).digest("hex");
+    const url2 = new URL("https://gateway.kugou.com" + path);
+    url2.search = new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)])).toString();
+    const { data: data2 } = await json2(url2.href, { signal, method: body ? "POST" : "GET", body: payload || void 0, headers: { "Content-Type": "application/json", ...router ? { "x-router": router } : {} } });
+    if (data2.status !== 1 || data2.error_code) throw new Error("\u9177\u72D7\u62D2\u7EDD\u4E86\u6B4C\u5355\u67E5\u8BE2\uFF0C\u8BF7\u68C0\u67E5\u767B\u5F55\u72B6\u6001\u6216\u6B4C\u5355\u53EF\u89C1\u6027");
+    return data2.data;
+  }
+  async function qqMine(cookie, signal, offset, limit) {
+    const values = cookies(cookie), uin = (values.uin || values.wxuin || "").replace(/^o/, "");
+    if (!uin || !(values.qqmusic_key || values.qm_keyst)) throw new Error("\u8BF7\u5148\u767B\u5F55 QQ\u97F3\u4E50");
+    const url2 = new URL("https://c.y.qq.com/rsc/fcgi-bin/fcg_user_created_diss");
+    url2.search = new URLSearchParams({ ct: "24", cv: "4747474", format: "json", platform: "yqq.json", uin, hostuin: uin, sin: String(offset), size: String(limit) }).toString();
+    const { data: data2 } = await json2(url2.href, { signal, headers: { Cookie: cookie, Referer: "https://y.qq.com/" } });
+    return checked(data2).data;
+  }
+  async function playlists(platform, { mode = "search", query = "", collection = "created", page = 1, limit = 5, cookie = "", signal } = {}) {
+    const options = pageOptions(page, limit), values = cookies(cookie);
+    if (!["search", "mine"].includes(mode) || !["created", "favorite"].includes(collection)) throw new Error("\u65E0\u6548\u6B4C\u5355\u67E5\u8BE2\u65B9\u5F0F");
+    if (mode === "search" && (!query.trim() || query.length > 120)) throw new Error("\u8BF7\u8F93\u5165 1\u2013120 \u5B57\u7684\u6B4C\u5355\u540D\u79F0");
+    if (platform === "qq") {
+      if (mode === "search") {
+        const data3 = await qq("music.search.SearchCgiService", "DoSearchForQQMusicDesktop", { grp: 1, num_per_page: limit, page_num: page, query, search_type: 3 }, cookie, signal, { ct: 19, cv: 1859 });
+        return listPage(data3.body?.songlist?.list, (item) => ({ platform, id: item.dissid, title: item.dissname, creator: item.creator?.name, count: item.song_count }), options, data3.meta?.sum);
+      }
+      const rawLimit = page === 1 ? limit - 1 : limit, rawOffset = Math.max(0, options.offset - 1);
+      const mine = await qqMine(cookie, signal, collection === "favorite" ? 0 : rawOffset, collection === "favorite" ? 1 : Math.max(1, rawLimit));
+      if (collection === "favorite") {
+        if (!mine?.encrypt_uin) throw new Error("QQ\u97F3\u4E50\u767B\u5F55\u6001\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+        const data3 = await qq("music.musicasset.PlaylistFavRead", "CgiGetPlaylistFavInfo", { uin: mine.encrypt_uin, offset: options.offset, size: limit }, cookie, signal);
+        return listPage(data3.v_list, (item) => ({ platform, id: item.tid ?? item.id, title: item.title, creator: item.nickname, count: item.songnum }), options, data3.total, data3.hasmore);
+      }
+      const result = listPage(mine?.disslist?.slice(0, rawLimit), (item) => ({ platform, id: item.tid, title: item.diss_name, count: item.song_cnt }), { ...options, offset: rawOffset, limit: rawLimit }, mine?.totoal ?? mine?.total);
+      if (page === 1) result.playlists.unshift(musicPlaylist({ platform, id: "liked" }));
+      return { ...result, limit };
+    }
+    if (platform === "netease") {
+      if (mode === "search") {
+        const url2 = new URL("https://music.163.com/api/search/get/web");
+        url2.search = new URLSearchParams({ s: query, type: "1000", offset: String(options.offset), limit: String(limit) }).toString();
+        const { data: data4 } = await json2(url2.href, { signal, headers: { Cookie: cookie, Referer: "https://music.163.com/" } });
+        checked(data4);
+        return listPage(data4.result?.playlists ?? [], (item) => ({ platform, id: item.id, title: item.name, creator: item.creator?.nickname, count: item.trackCount }), options, data4.result?.playlistCount ?? 0);
+      }
+      if (!values.MUSIC_U) throw new Error("\u8BF7\u5148\u767B\u5F55\u7F51\u6613\u4E91");
+      const account = checked((await netease("nuser/account/get", {}, cookie, signal)).data);
+      if (!account.account?.id) throw new Error("\u7F51\u6613\u4E91\u767B\u5F55\u6001\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+      const data3 = checked((await netease("user/playlist", { uid: account.account.id, offset: options.offset, limit }, cookie, signal)).data);
+      const list = data3.playlist?.filter((item) => collection === "favorite" ? item.subscribed : !item.subscribed);
+      return listPage(list, (item) => ({ platform, id: item.id, title: item.name, creator: item.creator?.nickname, count: item.trackCount }), options, void 0, data3.more);
+    }
+    if (platform !== "kugou") throw new Error("\u4E0D\u652F\u6301\u7684\u6B4C\u5355\u5E73\u53F0");
+    if (mode === "search") {
+      const data3 = await kg("/v1/search/special", { albumhide: 0, iscorrection: 1, keyword: query, nocollect: 0, page, pagesize: limit, platform: "AndroidFilter" }, void 0, "complexsearch.kugou.com", cookie, signal);
+      return listPage(data3.lists, (item) => ({ platform, id: item.gid || item.specialid, legacyId: item.specialid, title: item.specialname, creator: item.nickname, count: item.song_count }), options, data3.total);
+    }
+    if (!values.userid || !values.token) throw new Error("\u8BF7\u5148\u767B\u5F55\u9177\u72D7");
+    if (collection === "favorite") throw new Error("\u9177\u72D7\u76EE\u524D\u8FD4\u56DE\u521B\u5EFA\u548C\u6536\u85CF\u7684\u5408\u5E76\u5217\u8868\uFF0C\u8BF7\u9009\u62E9\u201C\u6211\u7684\u6B4C\u5355\u201D");
+    const data2 = await kg("/v7/get_all_list", { plat: 1, userid: Number(values.userid) }, { userid: values.userid, token: values.token, total_ver: 979, type: 2, page, pagesize: limit }, "cloudlist.service.kugou.com", cookie, signal);
+    return listPage(data2.info ?? data2.list ?? data2.lists, (item) => ({ platform, id: item.global_collection_id || item.gid, title: item.name || item.list_name, count: item.count ?? item.songcount }), options, data2.total);
+  }
+  async function playlist(platform, id, { page = 1, limit = 20, cookie = "", signal } = {}) {
+    const initial = musicPlaylist({ platform, id }), options = pageOptions(page, limit);
+    if (platform === "kugou" && /^\d+$/.test(id)) {
+      const response = await readPage(initial.sourceUrl, { signal, asBytes: true });
+      const html3 = (response.text ?? response.bytes.toString("utf8")).replace(/\\"/g, '"');
+      const globalId = /["']global_collection_id["']\s*:\s*["'](collection_[\w-]+)["']/.exec(html3)?.[1];
+      if (!globalId) throw new Error("\u672A\u89E3\u6790\u5230\u9177\u72D7\u6B4C\u5355\uFF0C\u8BF7\u5728\u6B4C\u5355\u641C\u7D22\u4E2D\u6309\u540D\u79F0\u9009\u62E9");
+      const result = await playlist(platform, globalId, { page, limit, cookie, signal });
+      return { ...result, info: musicPlaylist({ ...result.info, legacyId: id }) };
+    }
+    let info, tracks, total, hasMore, rawCount;
+    if (platform === "qq") {
+      const liked = id === "liked", mine = liked ? await qqMine(cookie, signal, 0, 1) : void 0;
+      if (liked && !mine?.encrypt_uin) throw new Error("QQ\u97F3\u4E50\u767B\u5F55\u6001\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+      const data2 = await qq("music.srfDissInfo.DissInfo", "CgiGetDiss", { disstid: liked ? 0 : Number(id), dirid: liked ? 201 : 0, tag: liked, song_begin: options.offset, song_num: limit, userinfo: liked, orderlist: true, onlysonglist: false, ...liked ? { enc_host_uin: mine.encrypt_uin } : {} }, cookie, signal);
+      if (data2.code || !Array.isArray(data2.songlist)) throw new Error("QQ\u97F3\u4E50\u672A\u8FD4\u56DE\u6B4C\u66F2\uFF0C\u8BF7\u68C0\u67E5\u6B4C\u5355\u53EF\u89C1\u6027");
+      info = { ...initial, title: data2.dirinfo?.title || data2.dirinfo?.dissname, creator: data2.dirinfo?.creator?.nick, count: data2.total_song_num };
+      rawCount = data2.songlist.length;
+      tracks = parseSongs(platform, { data: { song: { list: data2.songlist.slice(0, limit) } } });
+      total = data2.total_song_num;
+      hasMore = Boolean(data2.hasmore);
+    } else if (platform === "netease") {
+      const data2 = checked((await netease("v3/playlist/detail", { id, n: 1e3, s: 0 }, cookie, signal)).data), source = data2.playlist;
+      if (!source || !Array.isArray(source.trackIds)) throw new Error("\u7F51\u6613\u4E91\u672A\u8FD4\u56DE\u6B4C\u66F2\uFF0C\u8BF7\u68C0\u67E5\u6B4C\u5355\u53EF\u89C1\u6027");
+      info = { ...initial, title: source.name, creator: source.creator?.nickname, count: source.trackCount };
+      const ids = source.trackIds.slice(options.offset, options.offset + limit).map((track) => ({ id: track.id }));
+      const songs = ids.length ? checked((await netease("v3/song/detail", { c: JSON.stringify(ids) }, cookie, signal)).data).songs : [];
+      rawCount = ids.length;
+      tracks = parseSongs(platform, { result: { songs } });
+      total = source.trackCount ?? source.trackIds.length;
+      hasMore = options.offset + ids.length < source.trackIds.length;
+    } else {
+      const data2 = await kg("/pubsongs/v2/get_other_list_file_nofilt", { area_code: 1, begin_idx: options.offset, plat: 1, type: 1, mode: 1, personal_switch: 1, extend_fields: "abtags,hot_cmt,popularization", pagesize: limit, global_collection_id: id }, void 0, void 0, cookie, signal);
+      if (!Array.isArray(data2.songs)) throw new Error("\u9177\u72D7\u672A\u8FD4\u56DE\u6B4C\u66F2\uFF0C\u8BF7\u68C0\u67E5\u6B4C\u5355\u53EF\u89C1\u6027");
+      let detail = data2.list_info || {};
+      if (!detail.name && !detail.specialname) {
+        const metadata = await kg("/v3/get_list_info", {}, { data: [{ global_collection_id: id }], userid: Number(cookies(cookie).userid || 0), token: cookies(cookie).token || "" }, "pubsongs.kugou.com", cookie, signal);
+        detail = Array.isArray(metadata) ? metadata[0] || {} : metadata;
+      }
+      info = { ...initial, title: detail.name || detail.list_name || detail.specialname, creator: detail.nickname || detail.username, count: data2.count };
+      rawCount = data2.songs.length;
+      total = data2.count;
+      hasMore = options.offset + rawCount < Number(total);
+      tracks = data2.songs.slice(0, limit).flatMap((song) => {
+        try {
+          const parts = String(song.name || "").split(" - "), artist = song.singerinfo?.map((item) => item.name).join(" / ") || (parts.length > 1 ? parts.shift() : "");
+          if (parts.length > 1 && parts[0] === song.singerinfo?.[0]?.name) parts.shift();
+          return [normalizeTrack({ platform, id: song.hash, title: parts.join(" - "), artist, album: song.albuminfo?.name, albumId: song.album_id, duration: song.timelen / 1e3 })];
+        } catch {
+          return [];
+        }
+      });
+    }
+    return { info: musicPlaylist(info), tracks, page, limit, total: count(total), hasMore, unavailable: Math.max(0, Math.min(rawCount, limit) - tracks.length) };
+  }
+  async function radio({ limit = 5, exclude = [], cookie = "", signal } = {}) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10) throw new Error("\u63A8\u8350\u6570\u91CF\u5E94\u4E3A 1\u201310 \u9996");
+    const values = cookies(cookie);
+    if (!(values.uin || values.wxuin) || !(values.qqmusic_key || values.qm_keyst)) throw new Error("\u8BF7\u5148\u767B\u5F55 QQ\u97F3\u4E50\uFF0C\u518D\u542C\u79C1\u4EBA\u7535\u53F0");
+    const data2 = await qq("music.radioProxy.MbTrackRadioSvr", "get_radio_track", { id: 99, num: limit, from: 0, scene: 0, song_ids: [] }, cookie, signal);
+    if (!Array.isArray(data2.tracks)) throw new Error("QQ\u97F3\u4E50\u6682\u672A\u8FD4\u56DE\u4E2A\u6027\u63A8\u8350\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+    const seen = new Set(exclude.slice(-100)), raw = data2.tracks.slice(0, limit);
+    const tracks = parseSongs("qq", { data: { song: { list: raw } } }).filter((track) => {
+      if (seen.has(track.id)) return false;
+      seen.add(track.id);
+      return true;
+    });
+    return { tracks };
+  }
+  return { playlists, playlist, radio };
+}
+
+// src/music/providers.mjs
+var MUSIC_PLATFORMS = Object.freeze([
+  { id: "netease", name: "\u7F51\u6613\u4E91", qr: true, home: "https://music.163.com/" },
+  { id: "qq", name: "QQ\u97F3\u4E50", qr: true, home: "https://y.qq.com/" },
+  { id: "kugou", name: "\u9177\u72D7", qr: true, home: "https://www.kugou.com/" }
+]);
+function musicPlatform(id) {
+  const platform = MUSIC_PLATFORMS.find((item) => item.id === id);
+  if (!platform) throw new Error("\u4E0D\u652F\u6301\u7684\u97F3\u4E50\u5E73\u53F0");
+  return platform;
+}
+var trackKey = (track) => track.platform + ":" + track.id;
+var clean = (value) => String(value ?? "").replace(/<[^>]*>/g, "").replace(/&(?:amp|lt|gt|quot|#39);/g, (s) => ({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" })[s]).replace(/[\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 180).trim();
+function musicTrack(input) {
+  const platform = musicPlatform(input?.platform).id, id = String(input.id ?? "");
+  if (!(platform === "netease" ? /^\d{1,24}$/ : platform === "kugou" ? /^[a-f0-9]{32}$/i : /^[a-z0-9]{1,40}$/i).test(id)) throw new Error("\u65E0\u6548\u6B4C\u66F2 ID");
+  const duration3 = Number(input.duration);
+  return {
+    platform,
+    id,
+    title: clean(input.title) || "\u672A\u77E5\u6B4C\u66F2",
+    artist: clean(input.artist) || "\u672A\u77E5\u6B4C\u624B",
+    album: clean(input.album),
+    duration: Number.isFinite(duration3) && duration3 > 0 ? Math.min(duration3, 86400) : 0,
+    albumId: /^\d{1,24}$/.test(String(input.albumId)) ? String(input.albumId) : "",
+    mediaId: /^[a-z0-9]{1,40}$/i.test(input.mediaId ?? "") ? input.mediaId : "",
+    sourceUrl: platform === "netease" ? `https://music.163.com/#/song?id=${id}` : platform === "qq" ? `https://y.qq.com/n/ryqq/songDetail/${id}` : `https://www.kugou.com/song/#hash=${id}`
+  };
+}
+function parseSearch(platform, data2) {
+  const list = platform === "netease" ? data2.result?.songs : platform === "qq" ? data2.data?.song?.list : data2.data?.lists;
+  if (!Array.isArray(list)) throw new Error("\u641C\u7D22\u63A5\u53E3\u672A\u8FD4\u56DE\u6B4C\u66F2\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+  return list.flatMap((song) => {
+    try {
+      return [musicTrack(platform === "netease" ? { platform, id: song.id, title: song.name, artist: (song.ar ?? song.artists ?? []).map((s) => s.name).join(" / "), album: (song.al ?? song.album)?.name, duration: (song.dt ?? song.duration) / 1e3 } : platform === "qq" ? { platform, id: song.mid ?? song.songmid, title: song.name ?? song.songname, artist: (song.singer ?? []).map((s) => s.name).join(" / "), album: song.album?.name ?? song.albumname, duration: song.interval, mediaId: song.file?.media_mid ?? song.media_mid } : { platform, id: song.FileHash, title: song.SongName, artist: song.SingerName, album: song.AlbumName, albumId: song.AlbumID, duration: song.Duration })];
+    } catch {
+      return [];
+    }
+  });
+}
+function cookieValues(cookie = "") {
+  return Object.fromEntries(cookie.split(";").map((s) => s.trim()).filter(Boolean).map((s) => {
+    const at = s.indexOf("=");
+    return [s.slice(0, at), s.slice(at + 1)];
+  }).filter(([key]) => /^[\w-]+$/.test(key)));
+}
+var md5 = (text4) => createHash4("md5").update(text4).digest("hex");
+function neteaseForm(payload, secret = randomBytes5(12).toString("base64")) {
+  const encrypt = (text4, key) => {
+    const cipher = createCipheriv3("aes-128-cbc", key, "0102030405060708");
+    return Buffer.concat([cipher.update(text4), cipher.final()]).toString("base64");
+  };
+  const modulus = BigInt("0x00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7");
+  let value = BigInt("0x" + Buffer.from(secret).reverse().toString("hex")), exponent = 65537n, encoded = 1n;
+  while (exponent) {
+    if (exponent & 1n) encoded = encoded * value % modulus;
+    value = value * value % modulus;
+    exponent >>= 1n;
+  }
+  return new URLSearchParams({ params: encrypt(encrypt(JSON.stringify(payload), "0CoJUm6Qyw8W8jud"), secret), encSecKey: encoded.toString(16).padStart(256, "0") }).toString();
+}
+function kugouSignature(params) {
+  const salt = "NVPh5oo715z5DIWAeQlhMDsWXXQV4hwt";
+  return md5(salt + Object.keys(params).map((key) => `${key}=${params[key]}`).sort().join("") + salt);
+}
+var urlWith = (base, params) => {
+  const url2 = new URL(base);
+  for (const [key, value] of Object.entries(params)) url2.searchParams.set(key, String(value));
+  return url2.href;
+};
+function playResult(url2, preview = false, duration3) {
+  if (!url2) throw new Error("\u5E73\u53F0\u672A\u63D0\u4F9B\u64AD\u653E\u5730\u5740\uFF0C\u8BF7\u68C0\u67E5\u767B\u5F55\u3001\u4F1A\u5458\u6216\u5730\u533A\u6743\u9650");
+  return { url: httpUrl2(url2).href, preview: Boolean(preview), duration: Number(duration3) || 0 };
+}
+function createMusicProviders({ request = createHttpClient() } = {}) {
+  const kugouMid = randomBytes5(16).toString("hex");
+  const qqLogin = createQQLogin(request);
+  async function json2(url2, options = {}) {
+    const result = await request(url2, { ...options, asBytes: true, headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json,text/plain,*/*", ...options.headers } });
+    let data2;
+    try {
+      data2 = JSON.parse(result.text ?? result.bytes.toString("utf8"));
+    } catch {
+      throw new Error("\u5E73\u53F0\u8FD4\u56DE\u4E86\u975E JSON \u54CD\u5E94\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+    }
+    return { data: data2, cookies: result.cookies || [] };
+  }
+  const netease = (path, payload, cookie = "", signal) => json2("https://music.163.com/weapi/" + path, { method: "POST", body: neteaseForm({ ...payload, csrf_token: cookieValues(cookie).__csrf || "" }), signal, headers: { Referer: "https://music.163.com/", Cookie: cookie, "Content-Type": "application/x-www-form-urlencoded" } });
+  async function kugou(path, params, session, signal) {
+    const query = { dfid: "-", mid: session.mid, uuid: "-", appid: 1005, clientver: 20489, clienttime: Math.floor(Date.now() / 1e3), ...params };
+    query.signature = kugouSignature(query);
+    return json2(urlWith("https://login-user.kugou.com" + path, query), { signal, headers: { Referer: "https://h5.kugou.com/", mid: session.mid } });
+  }
+  async function search(platform, query, { limit = 8, cookie = "", signal } = {}) {
+    musicPlatform(platform);
+    if (!String(query).trim() || query.length > 120) throw new Error("\u8BF7\u8F93\u5165 1\u2013120 \u5B57\u7684\u6B4C\u66F2\u6216\u6B4C\u624B\u540D\u79F0");
+    limit = Math.max(1, Math.min(30, Math.trunc(Number(limit)) || 8));
+    const url2 = platform === "netease" ? urlWith("https://music.163.com/api/search/get/web", { s: query, type: 1, limit, offset: 0 }) : platform === "qq" ? urlWith("https://c.y.qq.com/soso/fcgi-bin/client_search_cp", { w: query, format: "json", p: 1, n: limit }) : urlWith("https://songsearch.kugou.com/song_search_v2", { keyword: query, page: 1, pagesize: limit });
+    const { data: data2 } = await json2(url2, { signal, headers: { Cookie: cookie, Referer: musicPlatform(platform).home } });
+    return parseSearch(platform, data2).slice(0, limit);
+  }
+  async function resolve5(input, { cookie = "", signal } = {}) {
+    const track = musicTrack(input), values = cookieValues(cookie);
+    if (track.platform === "netease") {
+      const { data: data3 } = await netease("song/enhance/player/url/v1", { ids: JSON.stringify([track.id]), level: "higher", encodeType: "mp3" }, cookie, signal);
+      const item = data3.data?.[0];
+      return playResult(item?.url, item?.freeTrialInfo, item?.freeTrialInfo ? (item.freeTrialInfo.end - item.freeTrialInfo.start) / 1e3 : item?.time / 1e3);
+    }
+    if (track.platform === "qq") {
+      const uin = (values.uin || values.wxuin || "0").replace(/^o/, ""), key = values.qqmusic_key || values.qm_keyst || "";
+      let gtk = 5381;
+      for (const c of key) gtk = gtk + (gtk << 5) + c.charCodeAt(0) & 2147483647;
+      const payload = { comm: { uin, authst: key, g_tk: gtk, ct: 24, cv: 0, format: "json" }, req_1: { module: "vkey.GetVkeyServer", method: "CgiGetVkey", param: { guid: "10000", songmid: [track.id], songtype: [0], uin, loginflag: cookie ? 1 : 0, platform: "20", filename: [`M500${track.mediaId || track.id}.mp3`] } } };
+      const { data: data3 } = await json2("https://u.y.qq.com/cgi-bin/musicu.fcg", { signal, method: "POST", body: JSON.stringify(payload), headers: { Cookie: cookie, Referer: "https://y.qq.com/", "Content-Type": "application/json" } });
+      const result = data3.req_1?.data, item = result?.midurlinfo?.[0];
+      return playResult(item?.purl ? new URL(item.purl, result.sip?.[0] || "https://isure.stream.qqmusic.qq.com/").href : "");
+    }
+    const mid = values.mid || values.kg_mid || kugouMid, hash2 = track.id.toLowerCase(), userid = values.userid || 0;
+    const params = {
+      dfid: values.dfid || "-",
+      mid,
+      uuid: "-",
+      appid: 1005,
+      clientver: 11430,
+      clienttime: Math.floor(Date.now() / 1e3),
+      album_id: Number(track.albumId || 0),
+      area_code: 1,
+      hash: hash2,
+      version: 11430,
+      quality: 128,
+      album_audio_id: 0,
+      behavior: "play",
+      pid: 2,
+      cmd: 26,
+      pidversion: 3001,
+      IsFreePart: 0,
+      cdnBackup: 1,
+      module: "",
+      page_id: 151369488,
+      ppage_id: "463467626,350369493,788954147",
+      ...values.token ? { token: values.token, userid } : {},
+      key: md5(`${hash2}57ae12eb6890223e355ccfcb74edf70d1005${mid}${userid}`)
+    };
+    const salt = "OIlwieks28dk2k092lksi2UIkp";
+    params.signature = md5(salt + Object.keys(params).sort().map((key) => `${key}=${params[key]}`).join("") + salt);
+    const { data: data2 } = await json2(urlWith("https://gateway.kugou.com/v5/url", params), { signal, headers: { "x-router": "trackercdn.kugou.com", mid, dfid: params.dfid } });
+    if (data2["SSA-CODE"] || data2.data?.["SSA-CODE"] || data2.error_code === 30020) throw new Error("\u9177\u72D7\u8981\u6C42\u989D\u5916\u9A8C\u8BC1\uFF0C\u8BF7\u5148\u5728\u5B98\u65B9 App \u5B8C\u6210\u9A8C\u8BC1\u540E\u91CD\u8BD5");
+    return playResult(Array.isArray(data2.url) ? data2.url[0] : data2.url, data2.is_free_part, data2.timeLength);
+  }
+  async function beginLogin(platform, { signal } = {}) {
+    musicPlatform(platform);
+    if (platform === "qq") return qqLogin.begin({ signal });
+    if (platform === "netease") {
+      const { data: data3 } = await netease("login/qrcode/unikey", { type: 3 }, "", signal);
+      const key2 = data3.unikey ?? data3.data?.unikey;
+      if (!key2) throw new Error("\u7F51\u6613\u4E91\u672A\u8FD4\u56DE\u626B\u7801\u51ED\u636E\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+      return { platform, key: key2, url: urlWith("https://music.163.com/login", { codekey: key2 }) };
+    }
+    const session = { platform, mid: randomBytes5(16).toString("hex") };
+    const { data: data2 } = await kugou("/v2/qrcode", { appid: 1001, type: 1, plat: 4, srcappid: 2919, qrcode_txt: "https://h5.kugou.com/apps/loginQRCode/html/index.html?appid=1005&" }, session, signal);
+    const key = data2.data?.qrcode;
+    if (!key) throw new Error("\u9177\u72D7\u672A\u8FD4\u56DE\u626B\u7801\u51ED\u636E\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+    return { ...session, key, url: urlWith("https://h5.kugou.com/apps/loginQRCode/html/index.html", { qrcode: key }) };
+  }
+  async function checkLogin(session, { signal, onProgress = (_status) => {
+  } } = {}) {
+    if (session.platform === "qq") return qqLogin.check(session, { signal, onProgress });
+    if (session.platform === "netease") {
+      const { data: data3, cookies } = await netease("login/qrcode/client/login", { key: session.key, type: 3 }, "", signal);
+      if (data3.code === 803) {
+        const cookie = cookies.map((c) => c.split(";")[0]).join("; ");
+        if (!cookieValues(cookie).MUSIC_U) throw new Error("\u626B\u7801\u5B8C\u6210\u4F46\u5E73\u53F0\u672A\u8FD4\u56DE\u6709\u6548\u767B\u5F55\u6001");
+        return { status: "authorized", cookie };
+      }
+      return { status: data3.code === 800 ? "expired" : data3.code === 802 ? "scanned" : data3.code === 801 ? "waiting" : "failed" };
+    }
+    musicPlatform(session.platform);
+    const { data: data2 } = await kugou("/v2/get_userinfo_qrcode", { plat: 4, appid: 1005, srcappid: 2919, qrcode: session.key, dev: "Web" }, session, signal);
+    const info = data2.data;
+    if (Number(info?.status) === 4) {
+      if (!info.token || !info.userid) throw new Error("\u626B\u7801\u5B8C\u6210\u4F46\u5E73\u53F0\u672A\u8FD4\u56DE\u6709\u6548\u767B\u5F55\u6001");
+      return { status: "authorized", cookie: `token=${info.token}; userid=${info.userid}; mid=${session.mid}`, nickname: clean(info.nickname) };
+    }
+    return { status: Number(info?.status) === 0 ? "expired" : Number(info?.status) === 2 ? "scanned" : Number(info?.status) === 1 ? "waiting" : "failed" };
+  }
+  return { search, resolve: resolve5, beginLogin, checkLogin, ...createPlaylistProviders({ json: json2, netease, parseSongs: parseSearch, normalizeTrack: musicTrack, cookies: cookieValues, page: request }) };
+}
+
+// src/music/settings.mjs
+import { readFile as readFile5, mkdir as mkdir6, unlink as unlink3 } from "node:fs/promises";
+import { join as join6 } from "node:path";
+function normalizeMusicCookie(platform, input) {
+  musicPlatform(platform);
+  if (typeof input !== "string" || input.length > 16384 || /[\x00-\x1f\x7f]/.test(input)) throw new Error("\u767B\u5F55\u6001\u683C\u5F0F\u4E0D\u6B63\u786E\uFF0C\u8BF7\u7C98\u8D34\u5355\u884C Cookie");
+  const values = cookieValues(input.trim().replace(/^cookie:\s*/i, ""));
+  const required2 = platform === "netease" ? values.MUSIC_U : platform === "qq" ? (values.uin || values.wxuin) && (values.qqmusic_key || values.qm_keyst) : values.token && values.userid;
+  if (!required2) throw new Error(platform === "netease" ? "\u9700\u8981\u7F51\u6613\u4E91\u7F51\u9875\u767B\u5F55\u540E\u7684 MUSIC_U" : platform === "qq" ? "\u9700\u8981 QQ\u97F3\u4E50\u7684 uin\uFF08\u6216 wxuin\uFF09\u548C qqmusic_key\uFF08\u6216 qm_keyst\uFF09" : "\u9700\u8981\u9177\u72D7\u767B\u5F55\u540E\u7684 userid \u548C token");
+  const allowed = platform === "netease" ? ["MUSIC_U", "__csrf", "NMTID", "MUSIC_A"] : platform === "qq" ? ["uin", "wxuin", "qqmusic_key", "qm_keyst", "qqmusic_fromtag"] : ["userid", "token", "mid", "kg_mid", "dfid"];
+  return allowed.filter((key) => values[key]).map((key) => `${key}=${values[key]}`).join("; ");
+}
+var MusicSettings = class {
+  constructor(library) {
+    this.library = library;
+    this.directory = join6(library.internal, "settings");
+  }
+  path(name) {
+    return join6(this.directory, `music-${name}.enc`);
+  }
+  async read(name, fallback) {
+    try {
+      return await this.library.vault.unseal(await readFile5(this.path(name)));
+    } catch (error45) {
+      if (error45.code === "ENOENT") return fallback;
+      throw error45;
+    }
+  }
+  async write(name, value) {
+    await mkdir6(this.directory, { recursive: true, mode: 448 });
+    await atomicWrite(this.path(name), await this.library.vault.seal(value));
+  }
+  async cookie(platform) {
+    musicPlatform(platform);
+    return (await this.read(platform, {})).cookie || "";
+  }
+  async account(platform) {
+    musicPlatform(platform);
+    const value = await this.read(platform, {});
+    return { platform, configured: Boolean(value.cookie), method: value.method || "", nickname: value.nickname || "", savedAt: value.savedAt || "" };
+  }
+  async saveAccount(platform, input, { method = "cookie", nickname = "" } = {}) {
+    const cookie = normalizeMusicCookie(platform, input);
+    await this.write(platform, { cookie, method, nickname: String(nickname).replace(/[\x00-\x1f\x7f-\x9f]/g, "").slice(0, 80), savedAt: (/* @__PURE__ */ new Date()).toISOString() });
+    return this.account(platform);
+  }
+  async logout(platform) {
+    musicPlatform(platform);
+    await unlink3(this.path(platform)).catch((error45) => {
+      if (error45.code !== "ENOENT") throw error45;
+    });
+    return this.account(platform);
+  }
+  async player() {
+    const value = await this.read("player", {});
+    const queue = (Array.isArray(value.queue) ? value.queue : []).slice(0, 100).flatMap((track) => {
+      try {
+        return [musicTrack(track)];
+      } catch {
+        return [];
+      }
+    });
+    return { queue, currentKey: queue.some((track) => trackKey(track) === value.currentKey) ? value.currentKey : "", volume: Number.isFinite(value.volume) ? Math.max(0, Math.min(100, value.volume)) : 50, repeat: value.repeat === "one" ? "one" : "all" };
+  }
+  savePlayer(value) {
+    return this.write("player", { queue: value.queue.slice(0, 100).map(musicTrack), currentKey: value.currentKey, volume: value.volume, repeat: value.repeat });
+  }
+};
+
+// src/music/temp.mjs
+import { mkdtemp as mkdtemp2, readdir as readdir6, rm as rm4 } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join as join7, resolve as resolve3, dirname as dirname3, basename as basename3 } from "node:path";
+var pattern = /^moyu-music-(?:audio|login)-(\d+)-[\w-]+$/;
+function createMusicTemp(kind) {
+  if (!["audio", "login"].includes(kind)) throw new Error("\u65E0\u6548\u97F3\u4E50\u7F13\u5B58\u7C7B\u578B");
+  return mkdtemp2(join7(tmpdir(), `moyu-music-${kind}-${process.pid}-`));
+}
+async function removeMusicTemp(path) {
+  const absolute = resolve3(path);
+  if (dirname3(absolute) !== resolve3(tmpdir()) || !pattern.test(basename3(absolute))) throw new Error("\u97F3\u4E50\u7F13\u5B58\u8DEF\u5F84\u8D8A\u754C");
+  await rm4(absolute, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 });
+}
+
+// src/music/service.mjs
+var MusicService = class {
+  constructor(library, { providers = createMusicProviders(), download = createHttpClient({ maxBytes: 64 * 1024 * 1024, timeoutMs: 6e4 }), accountCoordinator = (
+    /** @type {any} */
+    void 0
+  ) } = {}) {
+    this.settings = new MusicSettings(library);
+    this.providers = providers;
+    this.download = download;
+    this.accountWrites = /* @__PURE__ */ new Map();
+    this.accountCoordinator = accountCoordinator;
+  }
+  /** @param {string} query @param {{platform?: string, limit?: number, signal?: AbortSignal}} options */
+  async search(query, { platform = "all", limit = 8, signal } = {}) {
+    const selected = platform === "all" ? MUSIC_PLATFORMS : [musicPlatform(platform)];
+    const results = await Promise.allSettled(selected.map(async (source) => this.providers.search(source.id, query.trim(), { limit, cookie: await this.settings.cookie(source.id), signal })));
+    signal?.throwIfAborted();
+    const tracks = [], errors = [], batches = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === "fulfilled") batches.push(result.value);
+      else errors.push({ platform: selected[i].id, message: result.reason instanceof Error ? result.reason.message : "\u5E73\u53F0\u6682\u4E0D\u53EF\u7528" });
+    }
+    for (let index2 = 0; index2 < Math.max(0, ...batches.map((batch) => batch.length)); index2++) for (const batch of batches) if (batch[index2]) tracks.push(batch[index2]);
+    return { tracks, errors };
+  }
+  async prepare(input, { signal } = {}) {
+    const track = musicTrack(input), cookie = await this.settings.cookie(track.platform);
+    const source = await this.providers.resolve(track, { cookie, signal });
+    signal?.throwIfAborted();
+    const result = await this.download(source.url, { signal, asBytes: true, headers: { Referer: musicPlatform(track.platform).home } });
+    signal?.throwIfAborted();
+    const directory = await createMusicTemp("audio");
+    try {
+      const path = join8(directory, "track.audio");
+      await writeFile4(path, result.bytes, { mode: 384, signal });
+      signal?.throwIfAborted();
+      return { path, track, preview: source.preview, release: () => removeMusicTemp(directory) };
+    } catch (error45) {
+      await removeMusicTemp(directory);
+      throw error45;
+    }
+  }
+  /** @param {{mode?: string, query?: string, platform?: string, collection?: string, page?: number, limit?: number, signal?: AbortSignal}} options */
+  async playlists({ mode = "search", query = "", platform = "all", collection = "created", page = 1, limit = 5, signal } = {}) {
+    let selected = platform === "all" ? MUSIC_PLATFORMS : [musicPlatform(platform)];
+    if (mode === "mine" && platform === "all") {
+      const configured = await Promise.all(selected.map((item) => this.settings.account(item.id)));
+      selected = selected.filter((item, index2) => configured[index2].configured);
+      if (!selected.length) throw new Error("\u8BF7\u5148\u5728 /music \u7684\u8D26\u53F7\u83DC\u5355\u767B\u5F55\u97F3\u4E50\u5E73\u53F0");
+    }
+    const results = await Promise.allSettled(selected.map(async (item) => this.providers.playlists(item.id, { mode, query, collection, page, limit, cookie: await this.settings.cookie(item.id), signal })));
+    signal?.throwIfAborted();
+    const playlists = [], errors = [], pages = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === "fulfilled") pages.push(result.value);
+      else errors.push({ platform: selected[i].id, message: result.reason instanceof Error ? result.reason.message : "\u5E73\u53F0\u6B4C\u5355\u6682\u4E0D\u53EF\u7528" });
+    }
+    for (let index2 = 0; index2 < Math.max(0, ...pages.map((batch) => batch.playlists.length)); index2++) for (const batch of pages) if (batch.playlists[index2]) playlists.push(batch.playlists[index2]);
+    return { playlists, errors, page, limit, hasMore: pages.some((item) => item.hasMore) };
+  }
+  /** @param {string} platform @param {string} id @param {{page?: number, limit?: number, signal?: AbortSignal}} options */
+  async playlist(platform, id, { page = 1, limit = 20, signal } = {}) {
+    musicPlaylist({ platform, id });
+    const result = await this.providers.playlist(platform, id, { page, limit, signal, cookie: await this.settings.cookie(platform) });
+    signal?.throwIfAborted();
+    return result;
+  }
+  /** @param {{limit?: number, exclude?: string[], signal?: AbortSignal}} options */
+  async radio({ limit = 5, exclude = [], signal } = {}) {
+    const result = await this.providers.radio({ limit, exclude, signal, cookie: await this.settings.cookie("qq") });
+    signal?.throwIfAborted();
+    return result;
+  }
+  accountWrite(platform, operation) {
+    const pending = (this.accountWrites.get(platform) || Promise.resolve()).catch(() => {
+    }).then(operation);
+    this.accountWrites.set(platform, pending);
+    void pending.finally(() => {
+      if (this.accountWrites.get(platform) === pending) this.accountWrites.delete(platform);
+    }).catch(() => {
+    });
+    return pending;
+  }
+  saveAccount(platform, cookie, options) {
+    return this.accountWrite(platform, () => this.accountCoordinator ? this.accountCoordinator.saveAccount(platform, cookie, options) : this.settings.saveAccount(platform, cookie, options));
+  }
+  logout(platform) {
+    return this.accountWrite(platform, () => this.accountCoordinator ? this.accountCoordinator.logout(platform) : this.settings.logout(platform));
+  }
+  /** Cancelling before a scan completes can never save a late login response. */
+  /** @param {string} platform @param {{signal?: AbortSignal, onSession?: (session: any) => Promise<void>, onStatus?: (status: string) => void, intervalMs?: number, expiresMs?: number}} options */
+  async login(platform, { signal, onSession = async (_session) => {
+  }, onStatus = (_status) => {
+  }, intervalMs = 2500, expiresMs = 18e4 } = {}) {
+    signal?.throwIfAborted();
+    const expectedVersion = await this.accountCoordinator?.accountVersion(platform);
+    const session = await this.providers.beginLogin(platform, { signal });
+    signal?.throwIfAborted();
+    await onSession(session);
+    const deadline = Date.now() + expiresMs;
+    while (Date.now() < deadline) {
+      signal?.throwIfAborted();
+      const state = await this.providers.checkLogin(session, { signal, onProgress: onStatus });
+      signal?.throwIfAborted();
+      if (state.status === "authorized") return this.accountWrite(platform, async () => {
+        signal?.throwIfAborted();
+        const options = { method: "qr", nickname: state.nickname };
+        return this.accountCoordinator ? this.accountCoordinator.saveAccount(platform, state.cookie, { ...options, expectedVersion, signal }) : this.settings.saveAccount(platform, state.cookie, options);
+      });
+      if (state.status === "expired" || state.status === "failed") throw new Error(state.status === "expired" ? "\u4E8C\u7EF4\u7801\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801" : "\u5E73\u53F0\u62D2\u7EDD\u4E86\u626B\u7801\u8BF7\u6C42\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+      onStatus(state.status);
+      await new Promise((resolve5, reject) => {
+        const abort = () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        };
+        const timer = setTimeout(() => {
+          signal?.removeEventListener("abort", abort);
+          resolve5();
+        }, intervalMs);
+        signal?.addEventListener("abort", abort, { once: true });
+        if (signal?.aborted) abort();
+      });
+    }
+    throw new Error("\u4E8C\u7EF4\u7801\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+  }
+};
+
 // src/server/index.ts
-var root2 = resolve3(dirname3(fileURLToPath(import.meta.url)), "..");
+var root2 = resolve4(dirname4(fileURLToPath(import.meta.url)), "..");
 var plugin = {
   id: "opencode-moyu-server",
   async server(_input, options) {
-    const directory = expandPath(typeof options?.booksDir === "string" ? options.booksDir : resolve3(root2, "books"));
+    const directory = expandPath(typeof options?.booksDir === "string" ? options.booksDir : resolve4(root2, "books"));
     const keyFile = typeof options?.keyFile === "string" ? expandPath(options.keyFile) : void 0;
     const service = createIngestion({ directory, keyFile });
     const videos = createVideoIngestion({ directory, keyFile });
+    const music = new MusicService(service.store);
     const sourceArgs = {
       url: tool.schema.string().url().describe("\u7528\u6237\u8981\u6C42\u91C7\u96C6\u7684\u5C0F\u8BF4\u76EE\u5F55\u6216\u6587\u5B57\u9875\u9762 URL\uFF0C\u53EF\u7531\u5F53\u524D\u6A21\u578B\u8054\u7F51\u68C0\u7D22\u83B7\u5F97"),
       sourceId: tool.schema.string().optional().describe("\u6765\u6E90\u9002\u914D\u5668 ID\uFF0C\u9ED8\u8BA4\u81EA\u52A8\u9009\u62E9"),
@@ -21045,10 +21818,57 @@ var plugin = {
     return {
       tool: {
         moyu_sources: tool({
-          description: "\u5217\u51FA\u6478\u9C7C\u8D44\u6599\u5E93\u7684\u5C0F\u8BF4\u53CA\u89C6\u9891\u6765\u6E90\u3002\u5C0F\u8BF4\u4F7F\u7528 moyu_catalog / moyu_import\uFF1BB \u7AD9\u548C YouTube \u4F7F\u7528 moyu_video_search / moyu_video_info / moyu_video_import\u3002\u5747\u4E0D\u4F7F\u7528\u6D4F\u89C8\u5668\u3002",
+          description: "\u5217\u51FA\u6478\u9C7C\u8D44\u6599\u5E93\u7684\u5C0F\u8BF4\u3001\u89C6\u9891\u548C\u97F3\u4E50\u6765\u6E90\u3002\u97F3\u4E50\u7528 moyu_music_search \u67E5\u6B4C\u66F2\u3001moyu_music_playlists \u67E5\u6B4C\u5355\u3001moyu_music_playlist \u67E5\u6B4C\u5355\u6B4C\u66F2\uFF0C\u7528 /music \u7BA1\u7406\u8D26\u53F7\u548C\u64AD\u653E\u3002\u67E5\u8BE2\u5747\u4F7F\u7528 HTTP\u3002",
           args: {},
           async execute() {
-            return JSON.stringify([...service.registry.list(), ...videos.platforms.list().map((item) => ({ ...item, kinds: ["video"], capabilities: ["search", "info", "import"] }))]);
+            return JSON.stringify([...service.registry.list(), ...videos.platforms.list().map((item) => ({ ...item, kinds: ["video"], capabilities: ["search", "info", "import", ...item.id === "bilibili" ? ["popular"] : []] })), ...MUSIC_PLATFORMS.map((item) => ({ id: item.id, name: item.name, kinds: ["audio"], capabilities: ["search", "play", "login", "playlists", "playlist", ...item.id === "qq" ? ["radio"] : []], qr: item.qr }))]);
+          }
+        }),
+        moyu_music_search: tool({
+          description: "\u805A\u5408\u641C\u7D22\u7F51\u6613\u4E91\u3001QQ\u97F3\u4E50\u548C\u9177\u72D7\uFF0C\u8FD4\u56DE\u6B4C\u66F2\u3001\u6B4C\u624B\u3001\u4E13\u8F91\u3001\u65F6\u957F\u548C\u5E73\u53F0\u6B4C\u66F2\u94FE\u63A5\uFF1B\u4FDD\u7559\u5E73\u53F0\u5DEE\u5F02\uFF0C\u5355\u4E2A\u5E73\u53F0\u5931\u8D25\u4ECD\u8FD4\u56DE\u5176\u4ED6\u5E73\u53F0\u7684\u7ED3\u679C\u3002\u53EA\u641C\u7D22\uFF0C\u4E0D\u81EA\u52A8\u64AD\u653E\u6216\u4E0B\u8F7D\uFF1B\u7528 /music \u6253\u5F00\u4FA7\u680F\u64AD\u653E\u5668\u3002\u8D26\u53F7\u4EC5\u5728\u97F3\u4E50\u754C\u9762\u7BA1\u7406\uFF0C\u4E0D\u80FD\u7D22\u8981\u6216\u63A5\u6536\u7528\u6237 Cookie\u3002",
+          args: { query: tool.schema.string().min(1).max(120), platform: tool.schema.enum(["all", "netease", "qq", "kugou"]).default("all"), limit: tool.schema.number().int().min(1).max(10).default(5) },
+          async execute(args, context) {
+            const origins = { netease: "https://music.163.com", qq: "https://c.y.qq.com", kugou: "https://songsearch.kugou.com" };
+            const patterns = args.platform === "all" ? Object.values(origins).map((url2) => url2 + "/*") : [origins[args.platform] + "/*"];
+            await context.ask({ permission: "webfetch", patterns, always: patterns, metadata: { music: true, platform: args.platform } });
+            return JSON.stringify(await music.search(args.query, { ...args, signal: context.abort }));
+          }
+        }),
+        moyu_music_playlists: tool({
+          description: "\u67E5\u8BE2\u97F3\u4E50\u6B4C\u5355\u3002mode=mine \u4F7F\u7528\u672C\u5730\u5DF2\u767B\u5F55\u8D26\u53F7\u8BFB\u53D6\u81EA\u5DF1\u7684\u6B4C\u5355\uFF0Ccollection=created \u8868\u793A\u521B\u5EFA\u7684\u6B4C\u5355\uFF0Cfavorite \u8868\u793A QQ/\u7F51\u6613\u4E91\u6536\u85CF\u6B4C\u5355\uFF1B\u9177\u72D7\u521B\u5EFA\u548C\u6536\u85CF\u4E3A\u5408\u5E76\u5217\u8868\u3002mode=search \u6309 query \u641C\u7D22\u516C\u5F00\u6B4C\u5355\u3002platform=all \u65F6\uFF0C\u4E2A\u4EBA\u6B4C\u5355\u53EA\u67E5\u8BE2\u5DF2\u767B\u5F55\u5E73\u53F0\uFF0C\u516C\u5F00\u641C\u7D22\u67E5\u8BE2\u4E09\u5E73\u53F0\u3002\u6BCF\u4E2A\u5E73\u53F0\u6BCF\u9875\u6700\u591A 10 \u4E2A\u3002\u7ED3\u679C\u53EA\u6709\u6B4C\u5355\u5143\u6570\u636E\u548C\u94FE\u63A5\uFF0C\u4E0D\u542B\u8D26\u53F7 Cookie\u3002\u4E0D\u4F1A\u4E0B\u8F7D\u3001\u64AD\u653E\u6216\u6539\u52A8\u5E73\u53F0\u6B4C\u5355\u3002",
+          args: { mode: tool.schema.enum(["mine", "search"]).default("mine"), platform: tool.schema.enum(["all", "netease", "qq", "kugou"]).default("all"), collection: tool.schema.enum(["created", "favorite"]).default("created"), query: tool.schema.string().min(1).max(120).optional(), page: tool.schema.number().int().min(1).max(500).default(1), limit: tool.schema.number().int().min(1).max(10).default(10) },
+          async execute(args, context) {
+            if (args.mode === "search" && !args.query?.trim()) throw new Error("\u641C\u7D22\u6B4C\u5355\u65F6\u8BF7\u63D0\u4F9B query");
+            const domains = { netease: ["https://music.163.com/*"], qq: ["https://c.y.qq.com/*", "https://u.y.qq.com/*"], kugou: ["https://gateway.kugou.com/*"] };
+            const patterns = args.platform === "all" ? Object.values(domains).flat() : domains[args.platform];
+            await context.ask({ permission: "webfetch", patterns, always: patterns, metadata: { music: true, playlists: true, mode: args.mode, platform: args.platform } });
+            return JSON.stringify(await music.playlists({ ...args, query: args.query || "", signal: context.abort }));
+          }
+        }),
+        moyu_music_playlist: tool({
+          description: "\u5206\u9875\u8BFB\u53D6\u6307\u5B9A\u97F3\u4E50\u6B4C\u5355\u7684\u6B4C\u66F2\u3002\u4F7F\u7528 moyu_music_playlists \u8FD4\u56DE\u7684 platform \u548C id\uFF1BQQ\u97F3\u4E50\u201C\u6211\u559C\u6B22\u201D\u7684\u7279\u6B8A ID \u4E3A liked\uFF0C\u4F7F\u7528\u672C\u5730\u5DF2\u767B\u5F55\u8D26\u53F7\u3002\u6BCF\u9875\u6700\u591A 30 \u9996\uFF0ChasMore \u8868\u793A\u8FD8\u6709\u4E0B\u4E00\u9875\uFF0Cunavailable \u8868\u793A\u672C\u9875\u7F3A\u5C11\u53EF\u7528\u5143\u6570\u636E\u7684\u6B4C\u66F2\u6570\u3002\u53EA\u8FD4\u56DE\u6807\u9898\u3001\u6B4C\u624B\u3001\u65F6\u957F\u7B49\uFF0C\u4E0D\u4EE3\u8868\u5DF2\u64AD\u653E\u6216\u62E5\u6709\u64AD\u653E\u6743\u9650\u3002\u7528 /music \u7684\u6B4C\u5355\u5165\u53E3\u67E5\u770B\u3001\u9010\u9996\u64AD\u653E\u6216\u5C06\u672C\u9875\u52A0\u5165\u672C\u5730\u961F\u5217\uFF0C\u6A21\u578B\u5DE5\u5177\u4E0D\u63A7\u5236\u58F0\u97F3\u3001\u4E0D\u6539\u52A8\u5E73\u53F0\u6B4C\u5355\u3002",
+          args: { platform: tool.schema.enum(["netease", "qq", "kugou"]), id: tool.schema.string().regex(/^[\w-]{1,120}$/), page: tool.schema.number().int().min(1).max(500).default(1), limit: tool.schema.number().int().min(1).max(30).default(20) },
+          async execute(args, context) {
+            const patterns = args.platform === "netease" ? ["https://music.163.com/*"] : args.platform === "qq" ? ["https://u.y.qq.com/*", ...args.id === "liked" ? ["https://c.y.qq.com/*"] : []] : ["https://gateway.kugou.com/*", .../^\d+$/.test(args.id) ? ["https://www.kugou.com/*"] : []];
+            await context.ask({ permission: "webfetch", patterns, always: patterns, metadata: { music: true, playlist: true, platform: args.platform } });
+            return JSON.stringify(await music.playlist(args.platform, args.id, { page: args.page, limit: args.limit, signal: context.abort }));
+          }
+        }),
+        moyu_music_radio: tool({
+          description: "\u4F7F\u7528\u672C\u5730\u5DF2\u767B\u5F55\u7684 QQ\u97F3\u4E50\u8D26\u53F7\u67E5\u8BE2\u4E00\u6279\u4E2A\u6027\u63A8\u8350 / \u79C1\u4EBA\u7535\u53F0\u6B4C\u66F2\uFF0C\u53EA\u8FD4\u56DE\u5143\u6570\u636E\uFF0C\u4E0D\u81EA\u52A8\u64AD\u653E\uFF0C\u4E0D\u4FEE\u6539\u559C\u6B22\u6216\u6536\u85CF\u3002\u7528 /music \u7684\u201CQQ\u7535\u53F0\u201D\u5F00\u59CB\u8FDE\u7EED\u542C\u6B4C\uFF0C\u4E0B\u4E00\u9996\u7EE7\u7EED\u5237\u63A8\u8350\u3002\u8D26\u53F7 Cookie \u4E0D\u8FD4\u56DE\u6A21\u578B\u3002",
+          args: { limit: tool.schema.number().int().min(1).max(10).default(5) },
+          async execute(args, context) {
+            const patterns = ["https://u.y.qq.com/*"];
+            await context.ask({ permission: "webfetch", patterns, always: patterns, metadata: { music: true, radio: true, platform: "qq" } });
+            return JSON.stringify(await music.radio({ ...args, signal: context.abort }));
+          }
+        }),
+        moyu_video_popular: tool({
+          description: "\u67E5\u8BE2 B \u7AD9\u5F53\u524D\u70ED\u95E8\u89C6\u9891\uFF0C\u6BCF\u9875\u6700\u591A 10 \u4E2A\uFF0C\u8FD4\u56DE\u6807\u9898\u3001\u4F5C\u8005\u3001\u65F6\u957F\u548C\u89C4\u8303\u5316\u89C6\u9891\u94FE\u63A5\uFF0ChasMore \u8868\u793A\u8FD8\u6709\u4E0B\u4E00\u9875\u3002\u65E0\u9700 API Key\uFF0C\u53EA\u7528 HTTP\u3002\u7528\u4E8E /moyu \u89C6\u9891 \u70ED\u95E8\u3001\u6362\u4E00\u6279\u7B49\u8BF7\u6C42\uFF1B\u67E5\u8BE2\u4E0D\u4F1A\u4E0B\u8F7D\u89C6\u9891\uFF0C\u7528\u6237\u9009\u5B9A\u540E\u53EF\u7528 moyu_video_info / moyu_video_import \u91C7\u96C6\u3002",
+          args: { page: tool.schema.number().int().min(1).max(100).default(1) },
+          async execute(args, context) {
+            await context.ask({ permission: "webfetch", patterns: ["https://api.bilibili.com/x/web-interface/popular*"], always: ["https://api.bilibili.com/*"], metadata: { platform: "bilibili", popular: true, page: args.page } });
+            return JSON.stringify(await videos.platforms.popular({ page: args.page, signal: context.abort }));
           }
         }),
         moyu_video_search: tool({
@@ -21070,13 +21890,13 @@ var plugin = {
           }
         }),
         moyu_video_import: tool({
-          description: "\u4E0B\u8F7D\u7528\u6237\u6307\u5B9A\u7684\u4E00\u4E2A B \u7AD9 / YouTube \u516C\u5F00\u89C6\u9891\u5E76\u52A0\u5BC6\u653E\u5165\u89C6\u9891\u5E93\uFF0C\u7528 /video \u5728\u4FA7\u680F\u50CF\u7D20\u64AD\u653E\u3002\u4F7F\u7528 HTTP \u4E0B\u8F7D\u5668 yt-dlp\uFF0C\u4E0D\u7528\u6D4F\u89C8\u5668\u6216\u7528\u6237\u767B\u5F55\u3002\u6309\u77ED\u8FB9\u4F18\u5148 480p\uFF08\u517C\u5BB9\u7AD6\u5C4F\uFF09\uFF0C\u65E0\u4F4E\u6E05\u65F6\u9009\u6700\u5C0F\u53EF\u7528\u6E05\u6670\u5EA6\uFF1B\u5355\u89C6\u9891\u6700\u591A 256 MiB / 60 \u5206\u949F\uFF0C\u9047\u5230\u8BBF\u95EE\u62D2\u7EDD\u505C\u6B62\u3002API Key \u4E0D\u80FD\u4EE3\u66FF\u89C6\u9891\u8BBF\u95EE\u6743\u9650\u3002\u76F8\u540C URL \u5DF2\u6709\u7F13\u5B58\u65F6\u76F4\u63A5\u590D\u7528\uFF0C\u4E0D\u8FD4\u56DE\u539F\u59CB\u5A92\u4F53\u6216\u4E34\u65F6\u6D41\u94FE\u63A5\u3002",
-          args: { url: tool.schema.string().min(1).max(500) },
+          description: "\u4E0B\u8F7D\u7528\u6237\u6307\u5B9A\u7684\u4E00\u4E2A B \u7AD9 / YouTube \u516C\u5F00\u89C6\u9891\u5E76\u52A0\u5BC6\u653E\u5165\u89C6\u9891\u5E93\uFF0C\u7528 /video \u5728\u4FA7\u680F\u64AD\u653E\u3002\u4F7F\u7528 HTTP \u4E0B\u8F7D\u5668 yt-dlp\uFF0C\u4E0D\u7528\u6D4F\u89C8\u5668\u6216\u7528\u6237\u767B\u5F55\u3002\u9ED8\u8BA4\u6309\u672C\u5730\u4E0B\u8F7D\u8BBE\u7F6E\u4F18\u5148 1080p\uFF0C\u4E5F\u53EF\u6307\u5B9A 720p / 480p\uFF0C\u517C\u5BB9\u7AD6\u5C4F\uFF0C\u6765\u6E90\u4E0D\u63D0\u4F9B\u65F6\u56DE\u9000\u53EF\u7528\u6E05\u6670\u5EA6\uFF1B\u5355\u89C6\u9891\u6700\u591A 256 MiB / 60 \u5206\u949F\uFF0C\u9047\u5230\u8BBF\u95EE\u62D2\u7EDD\u505C\u6B62\u3002\u5DF2\u6709\u540C\u7B49\u6216\u66F4\u9AD8\u6E05\u6670\u5EA6\u7F13\u5B58\u65F6\u590D\u7528\uFF0C\u63D0\u9AD8\u76EE\u6807\u6E05\u6670\u5EA6\u65F6\u4E0B\u8F7D\u72EC\u7ACB\u526F\u672C\u5E76\u4FDD\u7559\u65E7\u89C6\u9891\u3002API Key \u4E0D\u80FD\u4EE3\u66FF\u89C6\u9891\u8BBF\u95EE\u6743\u9650\u3002",
+          args: { url: tool.schema.string().min(1).max(500), quality: tool.schema.enum(["480p", "720p", "1080p"]).optional().describe("\u53EF\u9009\u4E0B\u8F7D\u6E05\u6670\u5EA6\uFF1B\u7701\u7565\u65F6\u4F7F\u7528\u89C6\u9891\u754C\u9762\u4FDD\u5B58\u7684\u8BBE\u7F6E\uFF0C\u9ED8\u8BA4 1080p") },
           async execute(args, context) {
             const target = videoUrl(args.url);
             await context.ask({ permission: "webfetch", patterns: [target.url], always: [new URL(target.url).origin + "/*"], metadata: { platform: target.platform, download: true } });
-            const result = await videos.importVideo({ url: target.url, signal: context.abort, onProgress: (progress) => context.metadata({ title: `\u89C6\u9891\u91C7\u96C6 \xB7 ${progress.phase} ${progress.percent.toFixed(0)}%`, metadata: progress }) });
-            return JSON.stringify({ id: result.resource.id, title: result.resource.title, source: target.url, duration: result.resource.metadata.duration, cached: result.cached, status: "ready", encrypted: true });
+            const result = await videos.importVideo({ url: target.url, quality: args.quality ? Number(args.quality.slice(0, -1)) : void 0, signal: context.abort, onProgress: (progress) => context.metadata({ title: `\u89C6\u9891\u91C7\u96C6 \xB7 ${progress.phase} ${progress.percent.toFixed(0)}%`, metadata: progress }) });
+            return JSON.stringify({ id: result.resource.id, title: result.resource.title, source: target.url, duration: result.resource.metadata.duration, width: result.resource.metadata.width, height: result.resource.metadata.height, downloadQuality: result.resource.metadata.downloadQuality, cached: result.cached, status: "ready", encrypted: true });
           }
         }),
         moyu_catalog: tool({

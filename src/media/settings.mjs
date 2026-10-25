@@ -1,6 +1,7 @@
 import { readFile, unlink, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { atomicWrite } from "../library/store.mjs"
+import { DEFAULT_VIDEO_QUALITY, videoQuality } from "./video-quality.mjs"
 
 export class MediaSettings {
   constructor(library) { this.library = library; this.path = join(library.internal, "settings", "youtube.enc") }
@@ -22,5 +23,18 @@ export class MediaSettings {
   async removeKey() {
     await unlink(this.path).catch((error) => { if (error.code !== "ENOENT") throw error })
     return this.status()
+  }
+  async downloadQuality() {
+    try {
+      const settings = await this.library.vault.unseal(await readFile(join(this.library.internal, "settings", "video.enc")))
+      return videoQuality(settings.downloadQuality)
+    } catch (error) { if (error.code !== "ENOENT") throw error }
+    return DEFAULT_VIDEO_QUALITY
+  }
+  async saveDownloadQuality(input) {
+    const downloadQuality = videoQuality(input)
+    await mkdir(join(this.library.internal, "settings"), { recursive: true, mode: 0o700 })
+    await atomicWrite(join(this.library.internal, "settings", "video.enc"), await this.library.vault.seal({ downloadQuality }))
+    return downloadQuality
   }
 }

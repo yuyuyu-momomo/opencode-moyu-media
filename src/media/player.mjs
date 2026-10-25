@@ -4,12 +4,13 @@ import { FrameQueue } from "./frame-queue.mjs"
 
 /** Decoder owns no UI or files. One bounded frame queue, no full-video conversion. */
 export class PixelPlayer {
-  constructor({ onFrame = (_frame, _size) => {}, onState = (_state) => {}, onError = (_error) => {}, binary = mediaBinary, launch = launchMedia, frameSize = pixelSize } = {}) {
+  constructor({ onFrame = (_frame, _size) => {}, onState = (_state) => {}, onError = (_error) => {}, binary = mediaBinary, launch = launchMedia, frameSize = pixelSize, beforePlay = async (_signal) => {} } = {}) {
     this.onFrame = onFrame; this.onState = onState; this.onError = onError
     this.binary = binary; this.launch = launch; this.generation = 0
     this.position = 0; this.playing = false; this.muted = true; this.fps = 10
     this.columns = 36; this.rows = 16; this.disposed = false
     this.frameSize = frameSize; this.scaleFilter = "neighbor"
+    this.beforePlay = beforePlay; this.stopping = Promise.resolve()
   }
   emit() { this.onState({ position: this.position, playing: this.playing, muted: this.muted, loading: this.loading || false }) }
   load(video, position = 0) {
@@ -31,11 +32,14 @@ export class PixelPlayer {
     }
   }
   stop() {
+    this.playAbort?.abort()
     ++this.generation; clearTimeout(this.timer)
-    stopMedia(this.decoder); stopMedia(this.audio)
+    const stopping = [this.decoder, this.audio].filter((child) => child && child.exitCode === null && !child.signalCode).map((child) => new Promise((resolve) => { child.once("close", resolve); stopMedia(child) }))
+    this.stopping = Promise.all([this.stopping, ...stopping]).then(() => {})
     this.decoder = undefined; this.audio = undefined; this.loading = false
   }
   pause() { this.stop(); this.playing = false; this.emit() }
+  async pauseAndWait() { this.pause(); await this.stopping }
   play() { if (this.position >= (this.video?.duration || Infinity) - .05) this.position = 0; return this.start(true) }
   seek(seconds) {
     if (!this.video) return
@@ -55,9 +59,13 @@ export class PixelPlayer {
   async start(playing) {
     this.stop()
     if (!this.video || this.disposed) return
-    const token = this.generation, video = this.video, start = this.position
+    const token = this.generation, video = this.video, start = this.position, abort = this.playAbort = new AbortController()
     this.playing = playing; this.loading = true; this.emit()
     try {
+      await this.stopping
+      if (token !== this.generation || this.disposed) return
+      if (playing) await this.beforePlay(abort.signal)
+      if (token !== this.generation || this.disposed) return
       const binary = await this.binary("ffmpeg"), path = await nativeMediaPath(binary, video.path)
       if (token !== this.generation || this.disposed) return
       const size = this.frameSize(video.width, video.height, this.columns, this.rows), frameBytes = size.width * size.height * 3

@@ -22,7 +22,7 @@ export function sidebarLayout(scrollbox) {
       // A resize callback may still see the previous layout snapshot. The
       // session frame fills the space from its left edge to the terminal edge.
       const total = docked ? Math.max(1, terminalWidth - (frame.screenX ?? frame.x ?? 0)) : terminalWidth
-      const max = Math.max(36, Math.min(Math.floor(total * .6), total - 44))
+      const max = Math.max(36, Math.min(Math.floor(total * .75), total - 44))
       const width = Math.max(36, Math.min(max, Math.round(total * percent / 100)))
       for (const item of targets) {
         if (item.node.isDestroyed) continue
@@ -36,7 +36,7 @@ export function sidebarLayout(scrollbox) {
 
 /** Fill the sidebar viewport so the reader's auto margin pushes native cards
  * to its bottom. Keep their own renderers, reactive data and click handlers. */
-export function sidebarDock(reader, viewport, changed = () => {}) {
+export function sidebarDock(reader, viewport, changed = () => {}, scrollbox) {
   const container = reader.parent
   if (!container?.getChildren().includes(reader)) return
   const original = container.minHeight ?? null
@@ -44,15 +44,35 @@ export function sidebarDock(reader, viewport, changed = () => {}) {
   const resized = function() { previous?.call(this); queueMicrotask(changed) }
   container.onSizeChange = resized
   let minimum
+  const hiddenCards = new Map()
+  function cardsToCollapse() {
+    const inside = container.getChildren().filter((node) => node !== reader)
+    const siblings = scrollbox?.parent?.getChildren() ?? []
+    const position = siblings.indexOf(scrollbox)
+    // Some hosts put onboarding and context below the scrollbox rather than
+    // inside its content. Keep the title before the scrollbox visible.
+    return [...new Set([...inside, ...(position >= 0 ? siblings.slice(position + 1) : [])])]
+  }
+  function restoreCards() {
+    for (const [node, visible] of hiddenCards) if (!node.isDestroyed && node.visible === false) node.visible = visible
+    hiddenCards.clear()
+  }
   function restore() {
+    restoreCards()
     if (minimum !== undefined && !container.isDestroyed) container.minHeight = original
     if (!container.isDestroyed && container.onSizeChange === resized) container.onSizeChange = previous
     minimum = undefined
   }
   return {
-    measure(active) {
+    measure(active, expanded = false) {
       if (!active || reader.isDestroyed || viewport.isDestroyed || container.isDestroyed) { restore(); return 0 }
       if (minimum !== viewport.height) { minimum = viewport.height; container.minHeight = minimum }
+      if (!expanded) restoreCards()
+      else for (const node of cardsToCollapse()) {
+        if (node.isDestroyed || node.visible === false) continue
+        if (!hiddenCards.has(node)) hiddenCards.set(node, node.visible !== false)
+        node.visible = false
+      }
       const cards = container.getChildren().filter((node) => node !== reader && !node.isDestroyed && node.visible !== false && node.height > 0)
       return cards.reduce((rows, node) => rows + node.height + 1, 0)
     },

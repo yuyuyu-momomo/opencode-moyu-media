@@ -10,11 +10,10 @@ import { MediaCache, MAX_VIDEO_BYTES } from "../media/cache.mjs"
 import { inspectVideo, mediaBinary } from "../media/runtime.mjs"
 import { createVideoPlatforms, videoUrl } from "../sources/video-platforms.mjs"
 import { cleanText } from "../library/text-reader.mjs"
+import { videoFormatArgs, videoQuality } from "../media/video-quality.mjs"
 
 const execute = promisify(execFile)
-// Sort by the shorter edge so portrait 480x852 and landscape 852x480 are equivalent.
-// If no format is <=480p, yt-dlp picks the smallest available resolution instead.
-export const VIDEO_FORMAT_ARGS = Object.freeze(["--format", "bv*+ba/bv*", "--format-sort", "res:480,vcodec:h264,acodec:m4a"])
+export const VIDEO_FORMAT_ARGS = Object.freeze(videoFormatArgs())
 export async function downloaderBinary() {
   const paths = process.env.MOYU_YTDLP ? [process.env.MOYU_YTDLP] : [
     join(homedir(), ".local/share/opencode-moyu/media/bin", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp"),
@@ -36,12 +35,12 @@ export function downloadFailure(message, platform) {
   if (/requested format is not available/i.test(message)) return "来源未提供当前可下载的视频格式，未入库"
   return "视频来源获取失败：" + safeError(message)
 }
-export async function downloadVideo(url, directory, { signal, onProgress = (_value) => {}, binary = downloaderBinary, launch = spawn } = {}) {
+export async function downloadVideo(url, directory, { signal, quality, onProgress = (_value) => {}, binary = downloaderBinary, launch = spawn } = {}) {
   const target = videoUrl(url)
   signal?.throwIfAborted()
   const executable = await binary(), ffmpeg = await mediaBinary("ffmpeg")
   signal?.throwIfAborted()
-  const args = ["--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-playlist", "--playlist-items", "1", "--no-remote-components", "--js-runtimes", "node", "--socket-timeout", "15", "--retries", "0", "--extractor-retries", "0", "--fragment-retries", "0", "--abort-on-unavailable-fragments", "--concurrent-fragments", "1", "--match-filters", "!is_live & duration <= 3600", "--max-filesize", String(MAX_VIDEO_BYTES), ...VIDEO_FORMAT_ARGS, "--merge-output-format", "mp4/mkv", "--ffmpeg-location", dirname(ffmpeg), "--no-mtime", "--newline", "--progress", "--progress-template", "download:MOYU_PROGRESS:%(progress._percent_str)s", "--print", "before_dl:MOYU_META:%(title)j", "--no-simulate", "--paths", directory, "--output", "video.%(ext)s", "--", target.url]
+  const args = ["--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-playlist", "--playlist-items", "1", "--no-remote-components", "--js-runtimes", "node", "--socket-timeout", "15", "--retries", "0", "--extractor-retries", "0", "--fragment-retries", "0", "--abort-on-unavailable-fragments", "--concurrent-fragments", "1", "--match-filters", "!is_live & duration <= 3600", "--max-filesize", String(MAX_VIDEO_BYTES), ...videoFormatArgs(quality), "--merge-output-format", "mp4/mkv", "--ffmpeg-location", dirname(ffmpeg), "--no-mtime", "--newline", "--progress", "--progress-template", "download:MOYU_PROGRESS:%(progress._percent_str)s", "--print", "before_dl:MOYU_META:%(title)j", "--no-simulate", "--paths", directory, "--output", "video.%(ext)s", "--", target.url]
   return new Promise((resolve, reject) => {
     const child = launch(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" })
     let stderr = "", partial = "", title = "", failure, finished = false
@@ -111,12 +110,19 @@ export function createVideoIngestion({ directory, keyFile, read, download = down
       try { process.kill(Number(entry.name.split("-")[0]), 0) } catch (error) { if (error.code === "ESRCH") await rm(join(workRoot, entry.name), { recursive: true, force: true }) }
     }
   }
-  async function importVideo({ url, signal, onProgress = (_value) => {} }) {
-    const target = videoUrl(url), id = stableId("video:" + target.url)
-    return store.withJobLock(id, async () => {
+  /** @param {{url: string, signal?: AbortSignal, quality?: number, onProgress?: (value: {phase: string, percent: number}) => void}} options */
+  async function importVideo({ url, signal, quality = undefined, onProgress = (_value) => {} }) {
+    const target = videoUrl(url)
+    quality = videoQuality(quality ?? await settings.downloadQuality())
+    const lockId = stableId("video:" + target.url), id = stableId("video:" + target.url + ":" + quality)
+    return store.withJobLock(lockId, async () => {
       signal?.throwIfAborted()
-      const existing = (await store.resources()).find((item) => item.id === id)
-      if (existing) { try { await access(cache.path(id)); return { resource: existing, cached: true } } catch (error) { if (error.code !== "ENOENT") throw error } }
+      const existing = (await store.resources()).filter((item) => item.kind === "video" && item.source.url === target.url && item.metadata.managedMedia && Math.max(item.metadata.downloadQuality ?? 480, Math.min(item.metadata.width || 0, item.metadata.height || 0)) >= quality)
+        .sort((a, b) => Math.min(b.metadata.width, b.metadata.height) - Math.min(a.metadata.width, a.metadata.height))
+      for (const resource of existing) {
+        try { await access(cache.path(resource.id)); return { resource, cached: true } }
+        catch (error) { if (error.code !== "ENOENT") throw error }
+      }
       const workRoot = join(store.internal, "downloads")
       await mkdir(workRoot, { recursive: true, mode: 0o700 })
       const work = await mkdtemp(join(workRoot, process.pid + "-" + id + "-"))
@@ -126,14 +132,14 @@ export function createVideoIngestion({ directory, keyFile, read, download = down
         if (target.platform === "bilibili" || await settings.key()) {
           try { details = await platforms.info(target.url, { signal }) } catch { signal?.throwIfAborted() }
         }
-        const media = await download(target.url, work, { signal, onProgress })
+        const media = await download(target.url, work, { signal, quality, onProgress })
         signal?.throwIfAborted()
         const info = await inspectVideo(media.path)
         signal?.throwIfAborted()
         onProgress({ phase: "encrypting", percent: 99 })
         const path = await cache.seal(id, media.path)
         signal?.throwIfAborted()
-        const resource = { schemaVersion: 1, id, kind: "video", title: media.title || details?.title || info.title, source: { adapter: target.platform, url: target.url }, assets: [{ role: "media", mime: "application/x-moyu-video", path }], metadata: { author: details?.author, description: details?.description, views: details?.views, metadataFetched: Boolean(details), width: info.width, height: info.height, duration: info.duration, hasAudio: info.hasAudio, managedMedia: true, extension: extname(media.path) }, updatedAt: new Date().toISOString() }
+        const resource = { schemaVersion: 1, id, kind: "video", title: media.title || details?.title || info.title, source: { adapter: target.platform, url: target.url }, assets: [{ role: "media", mime: "application/x-moyu-video", path }], metadata: { author: details?.author, description: details?.description, views: details?.views, metadataFetched: Boolean(details), width: info.width, height: info.height, duration: info.duration, hasAudio: info.hasAudio, managedMedia: true, downloadQuality: quality, extension: extname(media.path) }, updatedAt: new Date().toISOString() }
         await store.putResource(resource)
         return { resource, cached: false }
       } catch (error) {

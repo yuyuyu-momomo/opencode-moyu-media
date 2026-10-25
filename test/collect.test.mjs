@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { collectionQuery, requestCollection } from "../src/ui/collect.mjs"
+import { collectionKind } from "../src/domain/collection-task.mjs"
 
 function fixture(route = { type: "session", sessionID: "current-session" }) {
   const calls = []
@@ -52,4 +53,16 @@ test("空命令只用于书架入口，不创建模型请求；缺少选中模�
   host.ui.model.current = () => undefined
   await assert.rejects(requestCollection(host, "凡人修仙传"), /选择可用模型/)
   assert.deepEqual(calls, [])
+})
+
+test("/moyu 视频、搜索和 B 站热门任务带视频标记，小说任务继续走原入口", async () => {
+  for(const query of ['视频 热门','视频 搜索 猫咪','video search cats','B站热门','搜索热门','热门','BV1xx411c7mD','https://www.bilibili.com/video/BV1xx411c7mD/','爬取这个视频，1080p']) {
+    const {host,calls}=fixture()
+    await requestCollection(host,'/moyu '+query)
+    const prompt=calls.at(-1)[1]
+    assert.equal(prompt.metadata.kind,'video',query)
+    assert.equal(prompt.text,'视频任务：'+query)
+    assert.equal(prompt.metadata.query,query)
+  }
+  for(const query of ['凡人修仙传','热门小说，先采集20章','小说 视频时代','https://novel.test/catalog']) assert.equal(collectionKind(query),'novel',query)
 })
