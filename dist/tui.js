@@ -3555,7 +3555,7 @@ import { ScrollBoxRenderable } from "@opentui/core";
 import { dirname as dirname5, resolve as resolve4, basename as basename5 } from "node:path";
 import { watch as watch2 } from "node:fs";
 import { access as access5 } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 import { createHash as createHash8 } from "node:crypto";
 
 // node_modules/ansi-regex/index.js
@@ -4773,7 +4773,7 @@ var MediaCache = class {
     await mkdir4(temporary, { mode: 448 });
     const extension = /^\.(mp4|mkv|webm|mov|avi|m4v|mpeg|mpg|gif)$/.test(resource.metadata.extension || "") ? resource.metadata.extension : ".mp4";
     const decoded = join4(temporary, "video" + extension);
-    const release = () => rm2(temporary, { recursive: true, force: true, maxRetries: 4, retryDelay: 200 });
+    const release2 = () => rm2(temporary, { recursive: true, force: true, maxRetries: 4, retryDelay: 200 });
     try {
       const decipher = createDecipheriv2("aes-256-gcm", await this.library.vault.key(false), header.subarray(8, 20));
       decipher.setAAD(aad2);
@@ -4781,9 +4781,9 @@ var MediaCache = class {
       await pipeline(createReadStream(path, { start: 36 }), decipher, createWriteStream(decoded, { flags: "wx", mode: 384 }), { signal });
       const video = await inspectVideo(decoded, void 0, { signal });
       signal?.throwIfAborted();
-      return { ...video, id: resource.id, title: resource.title, release };
+      return { ...video, id: resource.id, title: resource.title, release: release2 };
     } catch {
-      await release();
+      await release2();
       signal?.throwIfAborted();
       throw new Error("\u89C6\u9891\u7F13\u5B58\u65E0\u6CD5\u89E3\u5BC6\u6216\u64AD\u653E\uFF0C\u8BF7\u68C0\u67E5\u5BC6\u94A5\u53CA\u6587\u4EF6\u5B8C\u6574\u6027\u540E\u91CD\u65B0\u4E0B\u8F7D");
     }
@@ -6831,26 +6831,105 @@ var MusicService = class {
 var import_qrcode = __toESM(require_qrcode(), 1);
 import { writeFile as writeFile5 } from "node:fs/promises";
 import { join as join10 } from "node:path";
-import { spawn as spawn3 } from "node:child_process";
 import { pathToFileURL } from "node:url";
+
+// src/core/external-links.mjs
+import { spawn as spawn3 } from "node:child_process";
+import { release } from "node:os";
+import { fileURLToPath } from "node:url";
+var windowsPowerShell = "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe";
+var payloadScript = "$ErrorActionPreference='Stop';try{$payload=([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd().Trim()))|ConvertFrom-Json);";
+var openScript = payloadScript + "Start-Process -FilePath ([string]$payload.target) -ErrorAction Stop;exit 0}catch{exit 1}";
+var copyScript = payloadScript + "Set-Clipboard -Value ([string]$payload.target) -ErrorAction Stop;exit 0}catch{exit 1}";
+function runLinkCommand(command, args, { input = "", timeout = 8e3 } = {}) {
+  return new Promise((resolve5, reject) => {
+    const child = spawn3(command, args, { stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
+    let output = "", finished = false;
+    const finish = (error) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      if (error) {
+        child.kill();
+        reject(error);
+      } else resolve5(output);
+    };
+    const timer = setTimeout(() => finish(new Error("\u547D\u4EE4\u672A\u5728\u9650\u5B9A\u65F6\u95F4\u5185\u5B8C\u6210")), timeout);
+    child.stdout.on("data", (chunk) => {
+      output += chunk.toString();
+      if (output.length > 65536) finish(new Error("\u547D\u4EE4\u8F93\u51FA\u8FC7\u957F"));
+    });
+    child.once("error", () => finish(new Error("\u547D\u4EE4\u4E0D\u53EF\u7528")));
+    child.once("close", (code) => finish(code === 0 ? void 0 : new Error("\u547D\u4EE4\u6267\u884C\u5931\u8D25")));
+    child.stdin.on("error", () => {
+    });
+    child.stdin.end(input);
+  });
+}
+function environment(options) {
+  const platform = options.platform ?? process.platform;
+  return { platform, wsl: platform === "linux" && (options.wsl ?? Boolean(process.env.WSL_DISTRO_NAME || process.env.WSL_INTEROP || /microsoft/i.test(release()))), run: options.run ?? runLinkCommand };
+}
+function targetUrl(target) {
+  if (typeof target !== "string" || target.length > 16384 || /[\x00-\x20\x7f]/.test(target)) throw new Error("\u65E0\u6548\u7684\u9875\u9762\u94FE\u63A5");
+  let url;
+  try {
+    url = new URL(target);
+  } catch {
+    throw new Error("\u65E0\u6548\u7684\u9875\u9762\u94FE\u63A5");
+  }
+  if (!["https:", "http:", "file:"].includes(url.protocol) || url.username || url.password) throw new Error("\u65E0\u6548\u7684\u9875\u9762\u94FE\u63A5");
+  return url;
+}
+async function powershell(run, wsl, script, target) {
+  const input = Buffer.from(JSON.stringify({ target })).toString("base64");
+  const args = ["-NoProfile", "-NonInteractive", "-STA", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")];
+  const commands = wsl ? [windowsPowerShell, "powershell.exe"] : ["powershell.exe"];
+  for (const command of commands) {
+    try {
+      await run(command, args, { input });
+      return;
+    } catch {
+    }
+  }
+  throw new Error("Windows \u9875\u9762\u6216\u526A\u8D34\u677F\u547D\u4EE4\u4E0D\u53EF\u7528");
+}
+async function openExternalPage(target, options = {}) {
+  const url = targetUrl(target), { platform, wsl, run } = environment(options);
+  try {
+    if (platform === "win32" || wsl) {
+      const page = url.protocol === "file:" ? wsl ? String(await run("wslpath", ["-w", fileURLToPath(url)])).trim() : fileURLToPath(url) : url.href;
+      if (!page) throw new Error("\u672C\u5730\u9875\u9762\u8DEF\u5F84\u8F6C\u6362\u5931\u8D25");
+      await powershell(run, wsl, openScript, page);
+    } else await run(platform === "darwin" ? "open" : "xdg-open", [url.href]);
+  } catch {
+    throw new Error("\u6D4F\u89C8\u5668\u672A\u80FD\u786E\u8BA4\u6253\u5F00\uFF0C\u8BF7\u590D\u5236\u94FE\u63A5\u5230\u6D4F\u89C8\u5668\u8BBF\u95EE");
+  }
+}
+async function copyExternalLink(target, options = {}) {
+  const url = targetUrl(target), { platform, wsl, run } = environment(options);
+  try {
+    if (platform === "win32" || wsl) return await powershell(run, wsl, copyScript, url.href);
+    const commands = platform === "darwin" ? [["pbcopy", []]] : [["wl-copy", []], ["xclip", ["-selection", "clipboard"]], ["xsel", ["--clipboard", "--input"]]];
+    for (const [command, args] of commands) {
+      try {
+        await run(command, args, { input: url.href });
+        return;
+      } catch {
+      }
+    }
+  } catch {
+  }
+  throw new Error("\u81EA\u52A8\u590D\u5236\u4E0D\u53EF\u7528\uFF0C\u8BF7\u5728\u5B8C\u6574\u94FE\u63A5\u6846\u4E2D\u624B\u52A8\u590D\u5236");
+}
+
+// src/music/login.mjs
 function musicQRCode(url) {
   const { modules } = import_qrcode.default.create(url, { errorCorrectionLevel: "M" });
   const size = modules.size, commands = [];
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (modules.data[y * size + x]) commands.push(`M${x + 4} ${y + 4}h1v1h-1z`);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size + 8} ${size + 8}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="white"/><path fill="black" d="${commands.join("")}"/></svg>`;
   return "data:image/svg+xml;base64," + Buffer.from(svg).toString("base64");
-}
-function openMusicPage(target) {
-  const command = process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open";
-  const args = process.platform === "win32" ? ["url.dll,FileProtocolHandler", target] : [target];
-  return new Promise((resolve5, reject) => {
-    const child = spawn3(command, args, { stdio: "ignore", windowsHide: true });
-    child.once("error", () => reject(new Error("\u65E0\u6CD5\u6253\u5F00\u9ED8\u8BA4\u6D4F\u89C8\u5668\uFF0C\u8BF7\u68C0\u67E5\u7CFB\u7EDF\u7684\u6D4F\u89C8\u5668\u8BBE\u7F6E")));
-    child.once("spawn", () => {
-      child.unref();
-      resolve5();
-    });
-  });
 }
 async function musicLoginPage(session) {
   const name = musicPlatform(session.platform).name;
@@ -6966,7 +7045,7 @@ function createMusicReader(api, library, controller, settings) {
         settings.close();
         try {
           if (item.value === "source") {
-            void openMusicPage(track.sourceUrl).catch(failed);
+            void openExternalPage(track.sourceUrl).catch(failed);
             return;
           }
           void controller.add(track).then(() => item.value === "play" ? controller.play(trackKey(track)) : toast("\u5DF2\u52A0\u5165\u64AD\u653E\u961F\u5217")).catch(failed);
@@ -7380,7 +7459,7 @@ function createMusicReader(api, library, controller, settings) {
           onSession: async (session) => {
             page = await musicLoginPage(session);
             abort.signal.throwIfAborted();
-            await openMusicPage(page.url);
+            await openExternalPage(page.url);
           },
           onStatus: (status) => {
             if (abort.signal.aborted) return;
@@ -7460,7 +7539,7 @@ function createMusicReader(api, library, controller, settings) {
         settings.close();
         if (item.value === "qr") startLogin(source);
         else if (item.value === "cookie") importCookie(source);
-        else if (item.value === "home") void openMusicPage(musicPlatform(source).home).catch(failed);
+        else if (item.value === "home") void openExternalPage(musicPlatform(source).home).catch(failed);
         else if (item.value === "cancel") cancelLogin();
         else settings.dialog(() => _$createComponent2(api.ui.DialogConfirm, {
           get title() {
@@ -14641,6 +14720,7 @@ var ShoppingService = class {
 };
 
 // src/ui/shopping.tsx
+var linkModeKey = "opencode-moyu:shopping:linkMode";
 function createShoppingReader(api, library, settings) {
   const service = new ShoppingService(library);
   const [results, setResults] = createSignal3([]);
@@ -14654,6 +14734,8 @@ function createShoppingReader(api, library, settings) {
   const [page, setPage] = createSignal3(1);
   const [loginStatus, setLoginStatus] = createSignal3("");
   const [loginBusy, setLoginBusy] = createSignal3(false);
+  const [lastLink, setLastLink] = createSignal3();
+  let linkRequest = 0;
   let pending, loginAbort, disposed = false;
   const loginTasks = /* @__PURE__ */ new Set();
   function toast(message, error = false) {
@@ -14694,6 +14776,13 @@ function createShoppingReader(api, library, settings) {
         if (!abort.signal.aborted && !disposed) {
           setLoginStatus(error instanceof Error ? error.message : "\u626B\u7801\u767B\u5F55\u5931\u8D25");
           fail(error);
+          const link = {
+            url: account.loginUrl,
+            title: `${account.name}\u5B98\u65B9\u767B\u5F55\u9875`,
+            hint: "\u666E\u901A\u6D4F\u89C8\u5668\u767B\u5F55\u4E0D\u4F1A\u4FDD\u5B58\u5230\u63D2\u4EF6\uFF1B\u4FDD\u5B58\u8D26\u53F7\u8BF7\u8FD4\u56DE\u8D26\u53F7\u83DC\u5355\u91CD\u65B0\u626B\u7801"
+          };
+          setLastLink(link);
+          if (settings.active() && settings.canDialog()) linkMenu(link);
         }
       } finally {
         if (loginAbort === abort) {
@@ -14727,6 +14816,10 @@ function createShoppingReader(api, library, settings) {
           title: "\u53EA\u6253\u5F00\u5B98\u65B9\u767B\u5F55\u9875",
           value: "page",
           description: "\u4F7F\u7528\u9ED8\u8BA4\u6D4F\u89C8\u5668\uFF1B\u6B64\u65B9\u5F0F\u4E0D\u628A\u767B\u5F55\u6001\u4FDD\u5B58\u5230\u63D2\u4EF6"
+        }, {
+          title: "\u67E5\u770B / \u590D\u5236\u5B98\u65B9\u767B\u5F55\u94FE\u63A5",
+          value: "link",
+          description: "\u6D4F\u89C8\u5668\u4E0D\u53EF\u7528\u65F6\u624B\u52A8\u8BBF\u95EE\uFF1B\u666E\u901A\u6D4F\u89C8\u5668\u767B\u5F55\u4E0D\u4F1A\u4FDD\u5B58\u5230\u63D2\u4EF6"
         }, ...state.configured ? [{
           title: "\u9000\u51FA\u672C\u5730\u8D26\u53F7",
           value: "logout",
@@ -14737,7 +14830,16 @@ function createShoppingReader(api, library, settings) {
         settings.close();
         if (item.value === "qr") return startLogin(id);
         if (item.value === "cancel") return cancelLogin();
-        if (item.value === "page") return void open3(account.loginUrl).catch(fail);
+        if (item.value === "page") return void open3(account.loginUrl, `${account.name}\u5B98\u65B9\u767B\u5F55\u9875`, false, "\u666E\u901A\u6D4F\u89C8\u5668\u767B\u5F55\u4E0D\u4F1A\u4FDD\u5B58\u5230\u63D2\u4EF6").catch(fail);
+        if (item.value === "link") {
+          const link = {
+            url: account.loginUrl,
+            title: `${account.name}\u5B98\u65B9\u767B\u5F55\u9875`,
+            hint: "\u666E\u901A\u6D4F\u89C8\u5668\u767B\u5F55\u4E0D\u4F1A\u4FDD\u5B58\u5230\u63D2\u4EF6"
+          };
+          setLastLink(link);
+          return fullLink(link);
+        }
         settings.dialog(() => _$createComponent3(api.ui.DialogConfirm, {
           get title() {
             return `\u9000\u51FA${account.name}\u672C\u5730\u8D26\u53F7`;
@@ -14778,10 +14880,112 @@ function createShoppingReader(api, library, settings) {
       fail(error);
     }
   }
-  async function open3(url) {
+  const linkOnly = () => api.kv.get(linkModeKey, "auto") === "link";
+  function linkMode() {
+    settings.dialog(() => _$createComponent3(api.ui.DialogSelect, {
+      title: "\u8D2D\u7269\u94FE\u63A5\u6253\u5F00\u65B9\u5F0F",
+      get current() {
+        return linkOnly() ? "link" : "auto";
+      },
+      options: [{
+        title: "\u81EA\u52A8\u6253\u5F00\u6D4F\u89C8\u5668\uFF0C\u5931\u8D25\u65F6\u663E\u793A\u94FE\u63A5",
+        value: "auto",
+        description: "WSL \u8C03\u7528 Windows \u9ED8\u8BA4\u6D4F\u89C8\u5668\uFF1B\u94FE\u63A5\u53EF\u968F\u65F6\u590D\u5236"
+      }, {
+        title: "\u4EC5\u663E\u793A\u94FE\u63A5",
+        value: "link",
+        description: "\u7559\u5728 OpenCode \u4E2D\u67E5\u770B\u3001\u590D\u5236\uFF0C\u9700\u8981\u65F6\u518D\u70B9\u51FB\u6253\u5F00"
+      }],
+      onSelect: (item) => {
+        api.kv.set(linkModeKey, item.value);
+        settings.close();
+        toast("\u5DF2\u4FDD\u5B58\u94FE\u63A5\u6253\u5F00\u65B9\u5F0F");
+      }
+    }));
+  }
+  function linkMenu(link = lastLink(), message = "") {
+    if (!link) return toast("\u8FD8\u6CA1\u6709\u94FE\u63A5\uFF0C\u8BF7\u5148\u9009\u62E9\u5546\u54C1\u6216\u8D26\u53F7\u767B\u5F55\u9875");
+    settings.dialog(() => _$createComponent3(api.ui.DialogSelect, {
+      get title() {
+        return message || link.title;
+      },
+      get placeholder() {
+        return link.hint || new URL(link.url).hostname;
+      },
+      get options() {
+        return [{
+          title: "\u67E5\u770B\u5B8C\u6574\u94FE\u63A5 / \u624B\u52A8\u590D\u5236",
+          value: "view",
+          description: link.url
+        }, {
+          title: "\u590D\u5236\u5B8C\u6574\u94FE\u63A5",
+          value: "copy"
+        }, {
+          title: "\u91CD\u8BD5\u6253\u5F00\u6D4F\u89C8\u5668",
+          value: "retry",
+          description: "\u4F7F\u7528\u7CFB\u7EDF\u9ED8\u8BA4\u6D4F\u89C8\u5668"
+        }, {
+          title: "\u94FE\u63A5\u6253\u5F00\u65B9\u5F0F\u2026",
+          value: "mode",
+          description: linkOnly() ? "\u5F53\u524D\uFF1A\u4EC5\u663E\u793A\u94FE\u63A5" : "\u5F53\u524D\uFF1A\u81EA\u52A8\u6253\u5F00\uFF0C\u5931\u8D25\u65F6\u663E\u793A\u94FE\u63A5"
+        }];
+      },
+      onSelect: (item) => {
+        settings.close();
+        if (item.value === "view") return fullLink(link);
+        if (item.value === "copy") return void copyLink(link);
+        if (item.value === "retry") return void open3(link.url, link.title, true, link.hint).catch(fail);
+        linkMode();
+      }
+    }));
+  }
+  async function copyLink(link) {
+    try {
+      await copyExternalLink(link.url);
+      toast("\u5B8C\u6574\u94FE\u63A5\u5DF2\u590D\u5236");
+      if (settings.active() && settings.canDialog()) linkMenu(link, "\u5B8C\u6574\u94FE\u63A5\u5DF2\u590D\u5236");
+    } catch {
+      if (settings.active() && settings.canDialog()) fullLink(link, "\u81EA\u52A8\u590D\u5236\u4E0D\u53EF\u7528 \xB7 \u8BF7\u624B\u52A8\u590D\u5236\u94FE\u63A5");
+      else toast("\u81EA\u52A8\u590D\u5236\u4E0D\u53EF\u7528\uFF0C\u70B9\u51FB\u300C\u94FE\u63A5\u300D\u624B\u52A8\u590D\u5236", true);
+    }
+  }
+  function fullLink(link, title = "\u5B8C\u6574\u94FE\u63A5 \xB7 \u56DE\u8F66\u590D\u5236") {
+    settings.dialog(() => _$createComponent3(api.ui.DialogPrompt, {
+      title,
+      get value() {
+        return link.url;
+      },
+      get placeholder() {
+        return link.hint || "\u56DE\u8F66\u590D\u5236\u539F\u59CB\u5B8C\u6574\u94FE\u63A5\uFF1BEsc \u8FD4\u56DE\u94FE\u63A5\u64CD\u4F5C";
+      },
+      onCancel: () => {
+        settings.close();
+        linkMenu(link);
+      },
+      onConfirm: () => {
+        settings.close();
+        void copyLink(link);
+      }
+    }));
+  }
+  async function open3(url, title = "\u8D2D\u7269\u9875\u9762\u94FE\u63A5", retry = false, hint) {
     const target = shoppingUrl(url);
     if (!target) throw new Error("\u65E0\u6548\u7684\u8D2D\u7269\u5E73\u53F0\u94FE\u63A5");
-    await openMusicPage(target);
+    const link = {
+      url: target,
+      title,
+      hint
+    }, request = ++linkRequest;
+    setLastLink(link);
+    if (linkOnly() && !retry) return fullLink(link);
+    try {
+      await openExternalPage(target);
+    } catch {
+      if (disposed || api.lifecycle.signal.aborted || request !== linkRequest) return;
+      setNotice("\u6D4F\u89C8\u5668\u672A\u80FD\u6253\u5F00\uFF1B\u70B9\u51FB\u300C\u94FE\u63A5\u300D\u67E5\u770B\u3001\u590D\u5236\u6216\u91CD\u8BD5");
+      if (settings.active() && settings.canDialog()) fullLink(link, "\u6D4F\u89C8\u5668\u6253\u5F00\u5931\u8D25 \xB7 \u5B8C\u6574\u94FE\u63A5\uFF08\u56DE\u8F66\u590D\u5236\uFF09");
+      else toast("\u6D4F\u89C8\u5668\u672A\u80FD\u6253\u5F00\uFF0C\u70B9\u51FB\u8D2D\u7269\u9762\u677F\u300C\u94FE\u63A5\u300D\u590D\u5236", true);
+    }
   }
   function notes(offer, saved) {
     const lines = [`${offer.priceLabel} ${money(offer.priceCents)}`, `\u8FD0\u8D39\uFF1A${offer.shippingCents === null ? "\u5F85\u786E\u8BA4" : money(offer.shippingCents)}`, `\u6765\u6E90\uFF1A${shoppingSource(offer.source).name}`, `\u5E97\u94FA\uFF1A${offer.shop || offer.platform}`, `\u53D1\u5E03\uFF1A${offer.publishedAt || "\u6765\u6E90\u672A\u6CE8\u660E"}`, `\u67E5\u8BE2\uFF1A${offer.observedAt}`, "\u4F18\u60E0\u6761\u4EF6\uFF1A", offer.conditions || "\u6765\u6E90\u672A\u6CE8\u660E\uFF0C\u8BF7\u5230\u5E73\u53F0\u9875\u9762\u6838\u5BF9"];
@@ -14833,6 +15037,10 @@ function createShoppingReader(api, library, settings) {
           title: "\u6253\u5F00\u5546\u54C1 / \u597D\u4EF7\u6765\u6E90\u9875",
           value: "source",
           description: shoppingSource(offer.source).name + " \xB7 \u5728\u5E73\u53F0\u9875\u9762\u767B\u5F55\u3001\u9886\u5238\u6216\u8D2D\u4E70"
+        }, {
+          title: "\u67E5\u770B / \u590D\u5236\u5546\u54C1\u94FE\u63A5",
+          value: "link",
+          description: "\u5728 OpenCode \u4E2D\u67E5\u770B\u5B8C\u6574\u6765\u6E90\u94FE\u63A5"
         }, ...offer.coupons.filter((coupon) => couponAvailable(coupon)).map((coupon, i) => ({
           title: `\u6253\u5F00\u4F18\u60E0\u5238\uFF1A${coupon.title}`,
           value: `coupon:${i}`,
@@ -14851,6 +15059,14 @@ function createShoppingReader(api, library, settings) {
         settings.close();
         if (item.value === "info" || item.value === "conditions") return notes(offer, saved);
         if (item.value === "source") return void open3(offer.sourceUrl).catch(fail);
+        if (item.value === "link") {
+          const link = {
+            url: offer.sourceUrl,
+            title: "\u5546\u54C1 / \u597D\u4EF7\u6765\u6E90\u94FE\u63A5"
+          };
+          setLastLink(link);
+          return fullLink(link);
+        }
         if (item.value.startsWith("coupon:")) {
           const coupon = offer.coupons.filter((coupon2) => couponAvailable(coupon2))[Number(item.value.slice(7))];
           if (coupon) void open3(coupon.url).catch(fail);
@@ -15051,11 +15267,16 @@ function createShoppingReader(api, library, settings) {
             title: "\u8D2D\u7269\u8D26\u53F7 \xB7 \u626B\u7801\u767B\u5F55\u2026",
             value: "accounts",
             description: "\u7BA1\u7406\u4EAC\u4E1C\u3001\u6DD8\u5B9D / \u5929\u732B\u3001\u62FC\u591A\u591A\u7684\u672C\u5730\u8D26\u53F7"
+          }, {
+            title: "\u94FE\u63A5\u6253\u5F00\u65B9\u5F0F\u2026",
+            value: "links",
+            description: linkOnly() ? "\u4EC5\u663E\u793A\u94FE\u63A5" : "\u81EA\u52A8\u6253\u5F00\uFF0C\u5931\u8D25\u65F6\u663E\u793A\u94FE\u63A5"
           }];
         },
         onSelect: (item) => {
           settings.close();
           if (item.value === "accounts") return void accounts();
+          if (item.value === "links") return linkMode();
           if (item.value === "manmanbuy") {
             setSource("manmanbuy");
             return promptSearch();
@@ -15131,6 +15352,17 @@ function createShoppingReader(api, library, settings) {
       _$insert3(_el$2, _$createComponent3(Button, {
         label: "[\u8D26\u53F7]",
         action: accounts
+      }), null);
+      _$insert3(_el$2, _$createComponent3(Show3, {
+        get when() {
+          return lastLink();
+        },
+        get children() {
+          return _$createComponent3(Button, {
+            label: "[\u94FE\u63A5]",
+            action: () => linkMenu()
+          });
+        }
       }), null);
       _$insert3(_el$3, () => loginStatus() || (busy() ? "\u6B63\u5728\u67E5\u8BE2\uFF0C\u53EF\u70B9\u51FB\u53D6\u6D88" : notice()));
       _$insert3(_el$, _$createComponent3(For2, {
@@ -16169,7 +16401,7 @@ var SharedMediaClient = class {
 
 // src/ui/index.tsx
 var prefix2 = "opencode-moyu:";
-var pluginRoot = resolve4(dirname5(fileURLToPath(import.meta.url)), "..");
+var pluginRoot = resolve4(dirname5(fileURLToPath2(import.meta.url)), "..");
 var tui = async (host, options) => {
   const configuredRows = Number(options?.rows);
   const fixedRows = Number.isInteger(configuredRows) && configuredRows >= 4 ? Math.min(configuredRows, 40) : void 0;

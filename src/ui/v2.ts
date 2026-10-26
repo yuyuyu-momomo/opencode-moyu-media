@@ -33,7 +33,7 @@ export default Plugin.define({
     }
     function prompt(props: TuiDialogPromptProps) {
       const generation = dialogGeneration
-      void context.ui.dialog.prompt({ title: props.title, placeholder: props.placeholder }).then((value) => {
+      void context.ui.dialog.prompt({ title: props.title, placeholder: props.placeholder, value: props.value }).then((value) => {
         if (generation !== dialogGeneration || abort.signal.aborted) return
         finish()
         if (value === undefined) props.onCancel?.()

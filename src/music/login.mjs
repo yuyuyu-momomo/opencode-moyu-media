@@ -1,10 +1,10 @@
 import QRCode from "qrcode/lib/core/qrcode.js"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { spawn } from "node:child_process"
 import { pathToFileURL } from "node:url"
 import { musicPlatform } from "./providers.mjs"
 import { createMusicTemp, removeMusicTemp } from "./temp.mjs"
+export { openExternalPage as openMusicPage } from "../core/external-links.mjs"
 
 export function musicQRCode(url) {
   const { modules } = QRCode.create(url, { errorCorrectionLevel: "M" })
@@ -14,15 +14,6 @@ export function musicQRCode(url) {
   return "data:image/svg+xml;base64," + Buffer.from(svg).toString("base64")
 }
 
-export function openMusicPage(target) {
-  const command = process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open"
-  const args = process.platform === "win32" ? ["url.dll,FileProtocolHandler", target] : [target]
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: "ignore", windowsHide: true })
-    child.once("error", () => reject(new Error("无法打开默认浏览器，请检查系统的浏览器设置")))
-    child.once("spawn", () => { child.unref(); resolve() })
-  })
-}
 /** A local, static page. No network QR service, cookie form or web listener. */
 export async function musicLoginPage(session) {
   const name = musicPlatform(session.platform).name

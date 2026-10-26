@@ -6,12 +6,14 @@ import stringWidth from "string-width"
 import { LibraryStore } from "../library/store.mjs"
 import { ShoppingService } from "../shopping/service.mjs"
 import { SHOPPING_SOURCES, shoppingOffer, shoppingSource, shoppingUrl, offerKey, money, cents, couponAvailable } from "../shopping/contracts.mjs"
-import { openMusicPage as openPage } from "../music/login.mjs"
+import { openExternalPage, copyExternalLink } from "../core/external-links.mjs"
 import { SHOPPING_ACCOUNTS, shoppingAccount } from "../shopping/accounts.mjs"
 
 type API = Parameters<TuiPlugin>[0]
 type Offer = ReturnType<typeof shoppingOffer>
 type Button = (props: { label: string; action: () => unknown; muted?: boolean }) => JSX.Element
+type PageLink = { url: string; title: string; hint?: string }
+const linkModeKey = "opencode-moyu:shopping:linkMode"
 
 export function createShoppingReader(api: API, library: LibraryStore, settings: {
   rows: () => number; active: () => boolean; canDialog: () => boolean; dialog: (render: () => JSX.Element) => void; close: () => void
@@ -28,6 +30,8 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
   const [page, setPage] = createSignal(1)
   const [loginStatus, setLoginStatus] = createSignal("")
   const [loginBusy, setLoginBusy] = createSignal(false)
+  const [lastLink, setLastLink] = createSignal<PageLink>()
+  let linkRequest = 0
   let pending: AbortController | undefined, loginAbort: AbortController | undefined, disposed = false
   const loginTasks = new Set<Promise<void>>()
   function toast(message: string, error = false) { if (!disposed && !api.lifecycle.signal.aborted) api.ui.toast({ title: "墨鱼购物", message, variant: error ? "error" : "info" }) }
@@ -45,7 +49,12 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
         } })
         if (!abort.signal.aborted && !disposed) { setLoginStatus(`${account.name}登录态已加密保存`); toast(`${account.name}登录态已加密保存`) }
       } catch (error) {
-        if (!abort.signal.aborted && !disposed) { setLoginStatus(error instanceof Error ? error.message : "扫码登录失败"); fail(error) }
+        if (!abort.signal.aborted && !disposed) {
+          setLoginStatus(error instanceof Error ? error.message : "扫码登录失败"); fail(error)
+          const link = { url: account.loginUrl, title: `${account.name}官方登录页`, hint: "普通浏览器登录不会保存到插件；保存账号请返回账号菜单重新扫码" }
+          setLastLink(link)
+          if (settings.active() && settings.canDialog()) linkMenu(link)
+        }
       } finally { if (loginAbort === abort) { loginAbort = undefined; setLoginBusy(false) } }
     })()
     loginTasks.add(task); void task.finally(() => loginTasks.delete(task)).catch(() => {})
@@ -58,12 +67,14 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
         { title: "扫码登录", value: "qr", description: `打开官方页面，用${account.scanner}扫码；需要验证时在该页面完成` },
         ...(loginBusy() ? [{ title: "取消正在等待的扫码", value: "cancel", description: "关闭本次独立登录窗口，停止接收结果" }] : []),
         { title: "只打开官方登录页", value: "page", description: "使用默认浏览器；此方式不把登录态保存到插件" },
+        { title: "查看 / 复制官方登录链接", value: "link", description: "浏览器不可用时手动访问；普通浏览器登录不会保存到插件" },
         ...(state.configured ? [{ title: "退出本地账号", value: "logout", description: "删除该平台保存的登录态，保留其他账号和收藏" }] : []),
       ]} onSelect={(item) => {
         settings.close()
         if (item.value === "qr") return startLogin(id)
         if (item.value === "cancel") return cancelLogin()
-        if (item.value === "page") return void open(account.loginUrl).catch(fail)
+        if (item.value === "page") return void open(account.loginUrl, `${account.name}官方登录页`, false, "普通浏览器登录不会保存到插件").catch(fail)
+        if (item.value === "link") { const link = { url: account.loginUrl, title: `${account.name}官方登录页`, hint: "普通浏览器登录不会保存到插件" }; setLastLink(link); return fullLink(link) }
         settings.dialog(() => <api.ui.DialogConfirm title={`退出${account.name}本地账号`} message="删除插件里保存的该平台登录态？其他平台、收藏和联盟应用凭据保留。" onCancel={settings.close}
           onConfirm={() => { settings.close(); cancelLogin(); void service.settings.logout(id).then(() => toast("已删除本地登录态")).catch(fail) }} />)
       }} />)
@@ -77,10 +88,49 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
         onSelect={(item) => { settings.close(); void accountMenu(item.value).catch(fail) }} />)
     } catch (error) { fail(error) }
   }
-  async function open(url: string) {
+  const linkOnly = () => api.kv.get<string>(linkModeKey, "auto") === "link"
+  function linkMode() {
+    settings.dialog(() => <api.ui.DialogSelect title="购物链接打开方式" current={linkOnly() ? "link" : "auto"} options={[
+      { title: "自动打开浏览器，失败时显示链接", value: "auto", description: "WSL 调用 Windows 默认浏览器；链接可随时复制" },
+      { title: "仅显示链接", value: "link", description: "留在 OpenCode 中查看、复制，需要时再点击打开" },
+    ]} onSelect={(item) => { api.kv.set(linkModeKey, item.value); settings.close(); toast("已保存链接打开方式") }} />)
+  }
+  function linkMenu(link = lastLink(), message = "") {
+    if (!link) return toast("还没有链接，请先选择商品或账号登录页")
+    settings.dialog(() => <api.ui.DialogSelect title={message || link.title} placeholder={link.hint || new URL(link.url).hostname} options={[
+      { title: "查看完整链接 / 手动复制", value: "view", description: link.url },
+      { title: "复制完整链接", value: "copy" },
+      { title: "重试打开浏览器", value: "retry", description: "使用系统默认浏览器" },
+      { title: "链接打开方式…", value: "mode", description: linkOnly() ? "当前：仅显示链接" : "当前：自动打开，失败时显示链接" },
+    ]} onSelect={(item) => {
+      settings.close()
+      if (item.value === "view") return fullLink(link)
+      if (item.value === "copy") return void copyLink(link)
+      if (item.value === "retry") return void open(link.url, link.title, true, link.hint).catch(fail)
+      linkMode()
+    }} />)
+  }
+  async function copyLink(link: PageLink) {
+    try { await copyExternalLink(link.url); toast("完整链接已复制"); if (settings.active() && settings.canDialog()) linkMenu(link, "完整链接已复制") }
+    catch { if (settings.active() && settings.canDialog()) fullLink(link, "自动复制不可用 · 请手动复制链接"); else toast("自动复制不可用，点击「链接」手动复制", true) }
+  }
+  function fullLink(link: PageLink, title = "完整链接 · 回车复制") {
+    settings.dialog(() => <api.ui.DialogPrompt title={title} value={link.url} placeholder={link.hint || "回车复制原始完整链接；Esc 返回链接操作"}
+      onCancel={() => { settings.close(); linkMenu(link) }} onConfirm={() => { settings.close(); void copyLink(link) }} />)
+  }
+  async function open(url: string, title = "购物页面链接", retry = false, hint?: string) {
     const target = shoppingUrl(url)
     if (!target) throw new Error("无效的购物平台链接")
-    await openPage(target)
+    const link = { url: target, title, hint }, request = ++linkRequest
+    setLastLink(link)
+    if (linkOnly() && !retry) return fullLink(link)
+    try { await openExternalPage(target) }
+    catch {
+      if (disposed || api.lifecycle.signal.aborted || request !== linkRequest) return
+      setNotice("浏览器未能打开；点击「链接」查看、复制或重试")
+      if (settings.active() && settings.canDialog()) fullLink(link, "浏览器打开失败 · 完整链接（回车复制）")
+      else toast("浏览器未能打开，点击购物面板「链接」复制", true)
+    }
   }
   function notes(offer: Offer, saved: boolean) {
     const lines = [`${offer.priceLabel} ${money(offer.priceCents)}`, `运费：${offer.shippingCents === null ? "待确认" : money(offer.shippingCents)}`, `来源：${shoppingSource(offer.source).name}`, `店铺：${offer.shop || offer.platform}`, `发布：${offer.publishedAt || "来源未注明"}`, `查询：${offer.observedAt}`, "优惠条件：", offer.conditions || "来源未注明，请到平台页面核对"]
@@ -103,6 +153,7 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
         { title: `${offer.priceLabel} ${money(offer.priceCents)}`, value: "info", description: `${offer.shop || offer.platform} · 运费${offer.shippingCents === null ? "待确认" : money(offer.shippingCents)}` },
         { title: offer.conditions || "优惠条件请到来源页核对", value: "conditions", description: `发布 ${offer.publishedAt || "来源未注明"} · 查询 ${offer.observedAt}` },
         { title: "打开商品 / 好价来源页", value: "source", description: shoppingSource(offer.source).name + " · 在平台页面登录、领券或购买" },
+        { title: "查看 / 复制商品链接", value: "link", description: "在 OpenCode 中查看完整来源链接" },
         ...offer.coupons.filter((coupon) => couponAvailable(coupon)).map((coupon, i) => ({ title: `打开优惠券：${coupon.title}`, value: `coupon:${i}`, description: coupon.endsAt ? `到期 ${coupon.endsAt}，领取资格由平台确认` : "优惠资格与叠加条件由平台确认" })),
         { title: saved ? "删除这条收藏" : "收藏此报价", value: saved ? "remove" : "save", description: "仅在本地加密保存，收藏价格不会自动更新" },
         { title: "搜索同款关键词…", value: "search", description: "输入品牌、型号、容量 / 数量，核对相同规格" },
@@ -110,6 +161,7 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
         settings.close()
         if (item.value === "info" || item.value === "conditions") return notes(offer, saved)
         if (item.value === "source") return void open(offer.sourceUrl).catch(fail)
+        if (item.value === "link") { const link = { url: offer.sourceUrl, title: "商品 / 好价来源链接" }; setLastLink(link); return fullLink(link) }
         if (item.value.startsWith("coupon:")) { const coupon = offer.coupons.filter((coupon) => couponAvailable(coupon))[Number(item.value.slice(7))]; if (coupon) void open(coupon.url).catch(fail); return }
         if (item.value === "search") return promptSearch()
         void (item.value === "remove" ? service.settings.removeFavorite(offer) : service.settings.saveFavorite(offer)).then(() => toast(item.value === "remove" ? "已删除收藏" : "报价已加密收藏")).catch(fail)
@@ -174,9 +226,11 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
         options={[
           ...states.map((item) => ({ title: `${item.name} · ${!item.credential ? "公开网页" : item.configured ? "应用已配置" : "应用未配置"}`, value: item.id, description: item.credential ? "配置 / 删除联盟应用凭据" : "直接搜索公开折扣爆料；遇到验证时停止" })),
           { title: "购物账号 · 扫码登录…", value: "accounts", description: "管理京东、淘宝 / 天猫、拼多多的本地账号" },
+          { title: "链接打开方式…", value: "links", description: linkOnly() ? "仅显示链接" : "自动打开，失败时显示链接" },
         ]} onSelect={(item) => {
           settings.close()
           if (item.value === "accounts") return void accounts()
+          if (item.value === "links") return linkMode()
           if (item.value === "manmanbuy") { setSource("manmanbuy"); return promptSearch() }
           configure(item.value)
         }} />)
@@ -200,7 +254,7 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
     const textRows = () => settings.rows() < 8 ? 1 : 2
     const count = () => Math.max(0, Math.floor((settings.rows() - 2 - textRows() * 2) / 3))
     return <box flexDirection="column" height={settings.rows()} flexShrink={0}>
-      <box height={1} flexShrink={0} flexDirection="row" gap={1}><Button label="[筛选]" action={filters} /><Button label="[来源]" action={sources} /><Button label="[账号]" action={accounts} /></box>
+      <box height={1} flexShrink={0} flexDirection="row" gap={1}><Button label="[筛选]" action={filters} /><Button label="[来源]" action={sources} /><Button label="[账号]" action={accounts} /><Show when={lastLink()}><Button label="[链接]" action={() => linkMenu()} /></Show></box>
       <text fg={theme().textMuted} height={textRows()}>{loginStatus() || (busy() ? "正在查询，可点击取消" : notice())}</text>
       <For each={results().slice(0, count())}>{(offer) => <box height={3} flexShrink={0}>
         <Button label={`${money(offer.priceCents)} ${offer.title}`} action={() => detail(offer)} />

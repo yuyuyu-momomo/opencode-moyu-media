@@ -34,6 +34,17 @@ await new ShoppingSettings(library).saveFavorite({source:'manmanbuy',id:'123',ti
 seed += """await new ShoppingSettings(library).saveAccount('pdd',[{name:'PDDAccessToken',value:'synthetic-test-only',domain:'.yangkeduo.com',path:'/',expires:-1},{name:'pdd_user_id',value:'123',domain:'.yangkeduo.com',path:'/',expires:-1}]);"""
 installed = CONFIG / "extensions/opencode-moyu"
 subprocess.run(["node", "--input-type=module", "-e", seed, str(installed / "books"), str(installed / "keys/library.key")], cwd=ROOT, check=True, capture_output=True)
+# Simulate opener failure and clipboard success only inside this temporary install.
+# No real browser or user clipboard is used by the terminal integration test.
+bundle = installed / "dist/tui-v2.js"
+code = bundle.read_text()
+for signature, injected in [
+    ("async function openExternalPage(target, options = {}) {", "throw new Error('synthetic opener failure');"),
+    ("async function copyExternalLink(target, options = {}) {", "await (await import('node:fs/promises')).writeFile(" + json.dumps(str(WORK / "copied-url.txt")) + ",target); return;"),
+]:
+    assert code.count(signature) == 1, signature
+    code = code.replace(signature, signature + injected)
+bundle.write_text(code)
 with socket.socket() as sock:
     sock.bind(("127.0.0.1", 0))
     PORT = sock.getsockname()[1]
@@ -139,6 +150,34 @@ try:
     wait_for(lambda text: "完整报价与优惠说明" in text and "2026-10-26T00:00:00Z" in text, "full-offer-notes-visible")
     click("运费：待确认", "favorite-notes-back")
     wait_for(lambda text: "删除这条收藏" in text, "favorite-notes-returned")
+    click("打开商品 / 好价来源页", "source-open-failure")
+    wait_for(lambda text: "浏览器打开失败" in text and "https://item.jd.com/123.html" in text, "browser-failure-keeps-full-url")
+    escape()
+    wait_for(lambda text: "复制完整链接" in text and "重试打开浏览器" in text, "fallback-actions-visible")
+    click("重试打开浏览器", "browser-retry")
+    wait_for(lambda text: "浏览器打开失败" in text and "https://item.jd.com/123.html" in text, "browser-retry-keeps-url")
+    tmux("send-keys", "-t", "reader:0.0", "Enter")
+    wait_for(lambda text: "完整链接已复制" in text, "copy-from-full-url-prompt")
+    assert (WORK / "copied-url.txt").read_text() == "https://item.jd.com/123.html"
+    escape()
+    click("[链接]", "recent-link-open")
+    wait_for(lambda text: "查看完整链接 / 手动复制" in text, "recent-link-retained")
+    click("链接打开方式", "link-mode-open")
+    wait_for(lambda text: "购物链接打开方式" in text, "link-mode-options-visible")
+    click("仅显示链接", "link-mode-select")
+    wait_for(lambda text: "已保存链接打开方式" in text, "link-mode-saved")
+    click("[账号]", "link-only-account-open")
+    wait_for(lambda text: "购物账号 · 扫码登录" in text, "link-only-accounts-visible")
+    click("京东 未保存", "link-only-jd-open")
+    wait_for(lambda text: "查看 / 复制官方登录链接" in text, "account-direct-link-visible")
+    click("只打开官方登录页", "link-only-page-open")
+    wait_for(lambda text: "完整链接 · 回车复制" in text and "https://passport.jd.com/new/login.aspx" in text and "浏览器打开失败" not in text, "link-only-mode-skips-opener")
+    escape()
+    escape()
+    click("[收藏]", "favorite-reopen-after-link")
+    wait_for(lambda text: "购物界面测试耳机" in text, "favorite-preserved-after-link")
+    click("购物界面测试耳机", "favorite-detail-after-link")
+    wait_for(lambda text: "删除这条收藏" in text, "favorite-actions-restored")
     click("删除这条收藏", "favorite-delete")
     wait_for(lambda text: "已删除收藏" in text, "favorite-deleted")
     assert not list((installed / "books/.moyu/shopping").glob("favorite-*.enc"))

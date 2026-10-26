@@ -16,7 +16,7 @@
 
 ## 快速安装
 
-[下载安装包 ZIP](https://github.com/yuyuyu-momomo/opencode-moyu-media/raw/refs/heads/main/releases/opencode-moyu-media-v0.8.0.zip)，解压后阅读 `TERMS.md` 和 `LICENSE`，再运行 `bash install.sh`；Windows 原生 OpenCode 可双击 `install.cmd`。
+[下载安装包 ZIP](https://github.com/yuyuyu-momomo/opencode-moyu-media/raw/refs/heads/main/releases/opencode-moyu-media-v0.8.1.zip)，解压后阅读 `TERMS.md` 和 `LICENSE`，再运行 `bash install.sh`；Windows 原生 OpenCode 可双击 `install.cmd`。
 
 也可直接安装仓库中的预编译版本：
 
