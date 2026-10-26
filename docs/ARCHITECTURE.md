@@ -4,18 +4,18 @@
 
 ```mermaid
 flowchart LR
-  Input[/moyu 书名或目录链接] --> Host[ui/collect 独立轻量会话]
-  Host --> Model[当前 OpenCode 模型]
-  Model --> Tools[server 模型工具]
-  Tools --> Service[services 采集编排]
-  Service --> Registry[core 来源注册表]
-  Registry --> HTML[sources HTML 小说]
-  Registry -.扩展.-> Other[视频 / API / RSS 来源]
-  HTML --> HTTP[core HTTP 请求]
-  Service --> Store[library 资料库]
-  Store --> Vault[AES-256-GCM 加密]
-  Vault --> Disk[正文 / 任务 / 缓存 / 索引]
-  Store --> UI[ui 侧栏阅读]
+  Input["/moyu 书名或目录链接"] --> Host["ui/collect 独立轻量会话"]
+  Host --> Model["当前 OpenCode 模型"]
+  Model --> Tools["server 模型工具"]
+  Tools --> Service["services 采集编排"]
+  Service --> Registry["core 来源注册表"]
+  Registry --> HTML["sources HTML 小说"]
+  Registry -. 扩展 .-> Other["视频 / API / RSS 来源"]
+  HTML --> HTTP["core HTTP 请求"]
+  Service --> Store["library 资料库"]
+  Store --> Vault["AES-256-GCM 加密"]
+  Vault --> Disk["正文 / 任务 / 缓存 / 索引"]
+  Store --> UI["ui 侧栏阅读"]
 ```
 
 ## 目录职责
@@ -24,13 +24,13 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  A[OpenCode A 本地界面] --> IPC[加密本机 IPC]
-  B[OpenCode B 本地界面] --> IPC
-  IPC --> R[runtime 共享协调]
-  R --> M[单 MusicController]
-  R --> S[加密队列与逐项设置]
-  R --> V[本地视频暂停确认]
-  A --> N[独立小说界面]
+  A["OpenCode A 本地界面"] --> IPC["加密本机 IPC"]
+  B["OpenCode B 本地界面"] --> IPC
+  IPC --> R["runtime 共享协调"]
+  R --> M["单 MusicController"]
+  R --> S["加密队列与逐项设置"]
+  R --> V["本地视频暂停确认"]
+  A --> N["独立小说界面"]
   B --> N
 ```
 

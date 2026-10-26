@@ -1,0 +1,11 @@
+Generated with the built-in image_gen tool.
+
+Use case: logo-brand.
+Asset type: square standalone application logo for 墨鱼多媒体 (Moyu Media), an OpenCode sidebar app for reading novels, watching video and listening to music.
+Primary request: design one original, polished, instantly recognizable cuttlefish logo.
+Subject: a compact friendly cuttlefish silhouette. Integrate a small right-facing play triangle as a clean negative-space cutout in its rounded mantle; the two lower arms subtly form the two pages of an open book. Keep the remaining arms simple flowing curves so the overall mark remains one unified cuttlefish, with a gentle rhythm suggesting audio.
+Style: minimalist flat graphic with precise vector-like contours, confident thick shapes and restrained personality. Ink-dark body with clean negative space. Strong silhouette, readable as a tiny 32px icon.
+Composition: one centered mark on a square canvas with generous equal clear space; the mark occupies about 72 percent of the canvas.
+Background: genuinely transparent alpha, including clear cutouts. No background panel.
+Text: none.
+Avoid: multiple options, presentation boards, tiny decorative details, extra floating symbols, gradients, shadows, 3D, photorealism, watermark, borrowed brand marks.
