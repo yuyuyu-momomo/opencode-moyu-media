@@ -7,6 +7,7 @@ import { videoUrl } from "../sources/video-platforms.mjs"
 import { expandPath, listBooks } from "../library/text-reader.mjs"
 import { MusicService } from "../music/service.mjs"
 import { MUSIC_PLATFORMS } from "../music/providers.mjs"
+import { ShoppingService } from "../shopping/service.mjs"
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const plugin: PluginModule = {
@@ -17,6 +18,7 @@ const plugin: PluginModule = {
     const service = createIngestion({ directory, keyFile })
     const videos = createVideoIngestion({ directory, keyFile })
     const music = new MusicService(service.store)
+    const shopping = new ShoppingService(service.store)
     const sourceArgs = {
       url: tool.schema.string().url().describe("用户要求采集的小说目录或文字页面 URL，可由当前模型联网检索获得"),
       sourceId: tool.schema.string().optional().describe("来源适配器 ID，默认自动选择"),
@@ -25,10 +27,31 @@ const plugin: PluginModule = {
     }
     return {
       tool: {
-        moyu_sources: tool({
-          description: "列出摸鱼资料库的小说、视频和音乐来源。音乐用 moyu_music_search 查歌曲、moyu_music_playlists 查歌单、moyu_music_playlist 查歌单歌曲，用 /music 管理账号和播放。查询均使用 HTTP。",
+        moyu_shopping_sources: tool({
+          description: "查看购物比价来源和联盟应用配置状态，不返回密钥。慢慢买公开好价无需账号；京东联盟、淘宝/天猫联盟需要在 /moyu 购物 来源设置中配置应用凭据。买家登录与应用授权分开。",
           args: {},
-          async execute() { return JSON.stringify([...service.registry.list(), ...videos.platforms.list().map((item) => ({ ...item, kinds: ["video"], capabilities: ["search", "info", "import", ...(item.id === "bilibili" ? ["popular"] : [])] })), ...MUSIC_PLATFORMS.map((item) => ({ id: item.id, name: item.name, kinds: ["audio"], capabilities: ["search", "play", "login", "playlists", "playlist", ...(item.id === "qq" ? ["radio"] : [])], qr: item.qr }))]) },
+          async execute() { return JSON.stringify(await shopping.sources()) },
+        }),
+        moyu_shopping_search: tool({
+          description: "搜索商品低价与优惠券。source=all 只查询公开好价和已配置联盟接口；慢慢买是爆料报价，联盟价格可能是预估券后价，必须展示优惠条件、规格、来源和查询时间。不是结算价或全网最低保证，不自行叠券或扣返现。每次最多10条，不自动登录、领券、下单或支付；/moyu 购物 可筛选、收藏、打开官方来源。不得索要账号密码、Cookie或应用密钥进入聊天。",
+          args: { query: tool.schema.string().min(1).max(200), source: tool.schema.enum(["all", "manmanbuy", "jd", "taobao"]).default("all"), platform: tool.schema.enum(["all", "jd", "taobao", "tmall"]).default("all"), onlyCoupons: tool.schema.boolean().default(false), maxPriceCents: tool.schema.number().int().min(0).optional().describe("可选单件预算上限，单位为分，不包含未知运费"), page: tool.schema.number().int().min(1).max(100).default(1), limit: tool.schema.number().int().min(1).max(10).default(5) },
+          async execute(args, context) {
+            const states = await shopping.sources()
+            const selected = args.source === "all" ? states.filter((item) => !item.credential || item.configured) : states.filter((item) => item.id === args.source)
+            const patterns = selected.map((item) => item.origin + "/*")
+            await context.ask({ permission: "webfetch", patterns, always: patterns, metadata: { shopping: true, source: args.source } })
+            return JSON.stringify(await shopping.search(args.query, { ...args, signal: context.abort }))
+          },
+        }),
+        moyu_sources: tool({
+          description: "列出小说、视频、音乐和购物来源。音乐在 /music 管理账号与播放；购物用 moyu_shopping_search 查好价与优惠券，在 /moyu 购物 筛选和收藏。查询均使用 HTTP。",
+          args: {},
+          async execute() { return JSON.stringify([
+            ...service.registry.list(),
+            ...videos.platforms.list().map((item) => ({ ...item, kinds: ["video"], capabilities: ["search", "info", "import", ...(item.id === "bilibili" ? ["popular"] : [])] })),
+            ...MUSIC_PLATFORMS.map((item) => ({ id: item.id, name: item.name, kinds: ["audio"], capabilities: ["search", "play", "login", "playlists", "playlist", ...(item.id === "qq" ? ["radio"] : [])], qr: item.qr })),
+            ...(await shopping.sources()).map((item) => ({ ...item, kinds: ["product"] })),
+          ]) },
         }),
         moyu_music_search: tool({
           description: "聚合搜索网易云、QQ音乐和酷狗，返回歌曲、歌手、专辑、时长和平台歌曲链接；保留平台差异，单个平台失败仍返回其他平台的结果。只搜索，不自动播放或下载；用 /music 打开侧栏播放器。账号仅在音乐界面管理，不能索要或接收用户 Cookie。",

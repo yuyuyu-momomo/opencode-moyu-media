@@ -21989,6 +21989,366 @@ var MusicService = class {
   }
 };
 
+// src/shopping/settings.mjs
+import { mkdir as mkdir7, readFile as readFile6, readdir as readdir7, unlink as unlink4 } from "node:fs/promises";
+import { join as join9 } from "node:path";
+
+// src/shopping/contracts.mjs
+import { createHash as createHash5 } from "node:crypto";
+var SHOPPING_SOURCES = [
+  { id: "manmanbuy", name: "\u6162\u6162\u4E70\u597D\u4EF7", origin: "https://s.manmanbuy.com", credential: false },
+  { id: "jd", name: "\u4EAC\u4E1C\u8054\u76DF", origin: "https://api.jd.com", credential: true },
+  { id: "taobao", name: "\u6DD8\u5B9D / \u5929\u732B\u8054\u76DF", origin: "https://eco.taobao.com", credential: true }
+];
+function shoppingSource(id) {
+  const source = SHOPPING_SOURCES.find((item) => item.id === id);
+  if (!source) throw new Error("\u4E0D\u652F\u6301\u7684\u8D2D\u7269\u6765\u6E90");
+  return source;
+}
+function cleanText2(input, max = 300) {
+  return String(input ?? "").replace(/<[^>]*>/g, "").replace(/[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "").replace(/\s+/gu, " ").trim().slice(0, max);
+}
+function cents(input) {
+  const text4 = String(input ?? "").trim();
+  if (!/^\d{1,9}(?:\.\d{1,2})?$/.test(text4)) return null;
+  const [whole, fraction = ""] = text4.split(".");
+  return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+}
+var domains = ["jd.com", "3.cn", "taobao.com", "tmall.com", "tb.cn", "alimama.com", "manmanbuy.com"];
+function shoppingUrl(input, base) {
+  try {
+    if (typeof input !== "string" || !input || input.length > 4e3) return "";
+    const url2 = new URL(input.startsWith("//") ? "https:" + input : input, base);
+    if (!["http:", "https:"].includes(url2.protocol) || url2.username || url2.password || url2.port) return "";
+    if (!domains.some((domain2) => url2.hostname === domain2 || url2.hostname.endsWith("." + domain2))) return "";
+    url2.protocol = "https:";
+    return url2.href;
+  } catch {
+    return "";
+  }
+}
+function offerKey(offer) {
+  shoppingSource(offer.source);
+  return createHash5("sha256").update(offer.source + ":" + offer.id).digest("hex").slice(0, 32);
+}
+function shoppingOffer(value) {
+  shoppingSource(value.source);
+  const id = cleanText2(value.id, 120), title = cleanText2(value.title, 180), sourceUrl = shoppingUrl(value.sourceUrl);
+  if (!id || !title || !sourceUrl) throw new Error("\u5546\u54C1\u8D44\u6599\u7F3A\u5C11\u6709\u6548\u6765\u6E90\u6216\u6807\u9898");
+  const amount = (v) => Number.isSafeInteger(v) && v >= 0 && v <= 99999999999 ? v : null;
+  const coupons = (Array.isArray(value.coupons) ? value.coupons : []).slice(0, 8).map((coupon) => ({
+    title: cleanText2(coupon.title, 120),
+    amountCents: amount(coupon.amountCents),
+    thresholdCents: amount(coupon.thresholdCents),
+    url: shoppingUrl(coupon.url),
+    startsAt: cleanText2(coupon.startsAt, 40),
+    endsAt: cleanText2(coupon.endsAt, 40)
+  }));
+  return {
+    source: value.source,
+    id,
+    title,
+    platform: cleanText2(value.platform, 24),
+    shop: cleanText2(value.shop, 80),
+    sourceUrl,
+    priceCents: amount(value.priceCents),
+    priceLabel: cleanText2(value.priceLabel, 30),
+    shippingCents: amount(value.shippingCents),
+    conditions: cleanText2(value.conditions, 500),
+    publishedAt: cleanText2(value.publishedAt, 40),
+    observedAt: cleanText2(value.observedAt, 40),
+    couponMentioned: value.couponMentioned === true,
+    coupons
+  };
+}
+function couponAvailable(coupon, now = Date.now()) {
+  const start = Date.parse(coupon.startsAt), end2 = Date.parse(coupon.endsAt);
+  return Boolean(coupon.url) && (!Number.isFinite(start) || start <= now) && (!Number.isFinite(end2) || end2 >= now);
+}
+
+// src/shopping/settings.mjs
+var ShoppingSettings = class {
+  constructor(library) {
+    this.library = library;
+    this.directory = join9(library.internal, "shopping");
+  }
+  async read(name, fallback) {
+    try {
+      return await this.library.vault.unseal(await readFile6(join9(this.directory, name + ".enc")));
+    } catch (error45) {
+      if (error45.code === "ENOENT") return fallback;
+      throw error45;
+    }
+  }
+  async write(name, value) {
+    await mkdir7(this.directory, { recursive: true, mode: 448 });
+    await atomicWrite(join9(this.directory, name + ".enc"), await this.library.vault.seal(value));
+  }
+  async credentials(source) {
+    shoppingSource(source);
+    return this.read("config-" + source, null);
+  }
+  async status(source) {
+    return { source, configured: Boolean(await this.credentials(source)) };
+  }
+  async saveCredentials(source, input) {
+    if (!shoppingSource(source).credential) throw new Error("\u8FD9\u4E2A\u6765\u6E90\u4E0D\u9700\u8981\u5BC6\u94A5");
+    if (typeof input === "string" && input.length > 4096) throw new Error("\u5E94\u7528\u914D\u7F6E\u8FC7\u957F");
+    let value;
+    try {
+      value = typeof input === "string" ? JSON.parse(input) : input;
+    } catch {
+      throw new Error("\u914D\u7F6E\u9700\u8981\u5B8C\u6574 JSON\uFF0C\u5305\u542B appKey\u3001appSecret\uFF1B\u6DD8\u5B9D\u8FD8\u9700\u8981 adzoneId");
+    }
+    const keys = source === "taobao" ? ["appKey", "appSecret", "adzoneId"] : ["appKey", "appSecret"];
+    const config2 = {};
+    for (const key of keys) {
+      const field = typeof value?.[key] === "string" ? value[key].trim() : "";
+      if (!/^[A-Za-z0-9_-]{1,200}$/.test(field) || key === "adzoneId" && !/^\d{1,20}$/.test(field)) throw new Error(`\u8BF7\u586B\u5199\u6709\u6548\u7684 ${key}`);
+      config2[key] = field;
+    }
+    await this.write("config-" + source, config2);
+    return this.status(source);
+  }
+  async removeCredentials(source) {
+    shoppingSource(source);
+    await this.remove("config-" + source);
+    return this.status(source);
+  }
+  async remove(name) {
+    await unlink4(join9(this.directory, name + ".enc")).catch((error45) => {
+      if (error45.code !== "ENOENT") throw error45;
+    });
+  }
+  async favorites() {
+    let names;
+    try {
+      names = await readdir7(this.directory);
+    } catch (error45) {
+      if (error45.code === "ENOENT") return [];
+      throw error45;
+    }
+    const offers = [];
+    for (const name of names.filter((name2) => /^favorite-[a-f0-9]{32}\.enc$/.test(name2))) {
+      const item = await this.read(name.slice(0, -4), null);
+      if (item) offers.push(shoppingOffer(item));
+    }
+    return offers.sort((a, b) => b.observedAt.localeCompare(a.observedAt));
+  }
+  saveFavorite(offer) {
+    const value = shoppingOffer(offer);
+    return this.write("favorite-" + offerKey(value), value);
+  }
+  removeFavorite(offer) {
+    return this.remove("favorite-" + offerKey(offer));
+  }
+};
+
+// src/shopping/providers.mjs
+import { createHash as createHash6 } from "node:crypto";
+var shoppingTimestamp = (date5 = /* @__PURE__ */ new Date()) => new Date(date5.getTime() + 8 * 36e5).toISOString().slice(0, 19).replace("T", " ");
+function signShopping(params, secret) {
+  const text4 = Object.keys(params).filter((key) => key !== "sign").sort().map((key) => key + params[key]).join("");
+  return createHash6("md5").update(secret + text4 + secret, "utf8").digest("hex").toUpperCase();
+}
+var isoTime = (value) => {
+  const number4 = Number(value);
+  if (!number4 || !Number.isFinite(number4)) return "";
+  const date5 = new Date(number4 < 1e11 ? number4 * 1e3 : number4);
+  return Number.isNaN(date5.getTime()) ? "" : date5.toISOString();
+};
+function parseManmanbuy(html3, { url: url2 = "https://s.manmanbuy.com/", now = (/* @__PURE__ */ new Date()).toISOString() } = {}) {
+  const $ = load(html3);
+  if (new URL(url2).hostname !== "s.manmanbuy.com" || /验证码|访问验证|安全验证/.test($("title").text()) || $("#captcha-element, [id*=captcha]").length) throw new Error("\u6162\u6162\u4E70\u9700\u8981\u4EBA\u673A\u9A8C\u8BC1\uFF0C\u5DF2\u505C\u6B62\u8BE5\u6765\u6E90");
+  $("script, style, noscript").remove();
+  const offers = [], seen = /* @__PURE__ */ new Set();
+  $('[class*="DiscountItemPC_discountItem__"]').each((_, element) => {
+    const card = $(element), titleLink = card.find('[class*="itemTitle__"] a').first();
+    const sourceUrl = shoppingUrl(titleLink.attr("href"), url2), id = /discuxiao_(\d+)\.aspx/.exec(sourceUrl)?.[1];
+    if (!id || seen.has(id)) return;
+    const conditions = cleanText2(card.find('[class*="itemSubTitle__"]').text(), 500);
+    const price = /^(\d+(?:\.\d{1,2})?)\s*元(?:[^\d]|$)/u.exec(conditions)?.[1];
+    const title = titleLink.text(), mall = cleanText2(card.find('[class*="itemMall__"]').text());
+    const platform = /京东/.test(mall) ? "jd" : /天猫/.test(mall) ? "tmall" : /淘宝/.test(mall) ? "taobao" : mall;
+    offers.push(shoppingOffer({
+      source: "manmanbuy",
+      id,
+      title,
+      sourceUrl,
+      priceCents: cents(price),
+      priceLabel: "\u7206\u6599\u4EF7",
+      platform,
+      shop: mall,
+      conditions,
+      couponMentioned: /券/.test(title + conditions),
+      publishedAt: card.find('[class*="itemTime__"]').text(),
+      observedAt: now
+    }));
+    seen.add(id);
+  });
+  if (!offers.length && !/暂无|没有找到|无相关|未找到/.test($.root().text())) throw new Error("\u6162\u6162\u4E70\u672A\u89E3\u6790\u51FA\u5546\u54C1\uFF0C\u53EF\u80FD\u9875\u9762\u7ED3\u6784\u5DF2\u53D8\u5316\uFF1B\u8BF7\u6253\u5F00\u6765\u6E90\u9875\u6838\u5BF9");
+  return offers;
+}
+function parseJD(data2, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  return (Array.isArray(data2) ? data2 : []).slice(0, 50).flatMap((item) => {
+    try {
+      if (!/^\d{1,25}$/.test(String(item.skuId))) return [];
+      const coupons = (item.couponInfo?.couponList || []).slice(0, 8).map((coupon) => ({
+        title: `\u6EE1${coupon.quota ?? "?"}\u51CF${coupon.discount ?? "?"}`,
+        amountCents: cents(coupon.discount),
+        thresholdCents: cents(coupon.quota),
+        url: coupon.link,
+        startsAt: isoTime(coupon.useStartTime),
+        endsAt: isoTime(coupon.useEndTime)
+      }));
+      const estimate = cents(item.priceInfo?.lowestCouponPrice), listed = cents(item.priceInfo?.price);
+      const final = estimate !== null && estimate > 0 ? estimate : null;
+      return [shoppingOffer({
+        source: "jd",
+        id: item.skuId,
+        title: item.skuName,
+        sourceUrl: `https://item.jd.com/${item.skuId}.html`,
+        platform: "jd",
+        shop: item.shopInfo?.shopName,
+        priceCents: final ?? listed,
+        priceLabel: final !== null ? "\u9884\u4F30\u5238\u540E\u4EF7" : "\u9500\u552E\u4EF7",
+        conditions: "\u8054\u76DF\u62A5\u4EF7\uFF1B\u6838\u5BF9\u89C4\u683C\u3001\u914D\u9001\u3001\u4F1A\u5458\u4E0E\u4F18\u60E0\u5238\u4F7F\u7528\u6761\u4EF6\uFF0C\u4EE5\u5E73\u53F0\u7ED3\u7B97\u4E3A\u51C6",
+        observedAt: now,
+        coupons
+      })];
+    } catch {
+      return [];
+    }
+  });
+}
+function parseTaobao(data2, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  return (Array.isArray(data2) ? data2 : []).slice(0, 50).flatMap((item) => {
+    try {
+      const basic = item.item_basic_info || {}, price = item.price_promotion_info || {}, publish = item.publish_info || {};
+      const promotion = price.final_promotion_path_list?.final_promotion_path_map_data || [];
+      const coupons = (price.more_promotion_list?.more_promotion_map_data || []).filter((p) => /券/.test(p.promotion_title || "")).map((p) => ({ title: cleanText2(p.promotion_title + " " + p.promotion_desc), url: p.promotion_url, startsAt: isoTime(p.promotion_start_time), endsAt: isoTime(p.promotion_end_time) }));
+      const estimate = cents(price.final_promotion_price);
+      const final = estimate !== null && estimate > 0 ? estimate : null;
+      return [shoppingOffer({
+        source: "taobao",
+        id: item.item_id,
+        title: basic.title,
+        sourceUrl: publish.click_url || publish.coupon_share_url || basic.item_url,
+        platform: Number(basic.user_type) === 1 ? "tmall" : "taobao",
+        shop: basic.shop_title,
+        priceCents: final ?? cents(price.zk_final_price),
+        priceLabel: final !== null ? "\u9884\u4F30\u4FC3\u9500\u4EF7" : "\u9500\u552E\u4EF7",
+        shippingCents: cents(basic.real_post_fee),
+        conditions: ["\u6838\u5BF9\u89C4\u683C\u3001\u8FD0\u8D39\u548C\u8D26\u53F7\u6743\u76CA\uFF0C\u4EE5\u5E73\u53F0\u7ED3\u7B97\u4E3A\u51C6", ...promotion.map((p) => cleanText2(p.promotion_title + " " + p.promotion_desc))].join("\uFF1B"),
+        couponMentioned: promotion.some((p) => /券/.test(p.promotion_title || "")),
+        coupons,
+        observedAt: now
+      })];
+    } catch {
+      return [];
+    }
+  });
+}
+function createShoppingProviders({ http: http2 = createHttpClient({ timeoutMs: 15e3, maxBytes: 2 * 1024 * 1024 }), now = () => /* @__PURE__ */ new Date() } = {}) {
+  async function api(url2, params, signal) {
+    const response = await http2(url2, { method: "POST", body: new URLSearchParams(params).toString(), headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" }, signal, redirect: "manual" });
+    let data2;
+    try {
+      data2 = JSON.parse(response.text);
+    } catch {
+      throw new Error("\u8D2D\u7269\u63A5\u53E3\u6CA1\u6709\u8FD4\u56DE\u6709\u6548 JSON");
+    }
+    if (data2.error_response) throw new Error("\u5E73\u53F0\u63A5\u53E3\u62D2\u7EDD\u8BF7\u6C42\uFF0C\u8BF7\u5728\u6765\u6E90\u8BBE\u7F6E\u68C0\u67E5\u5E94\u7528\u51ED\u636E\u4E0E\u63A5\u53E3\u6743\u9650");
+    return data2;
+  }
+  return {
+    async search(source, query, { credentials, signal, page = 1, limit = 20, onlyCoupons = false, tmallOnly = false } = {}) {
+      if (source === "manmanbuy") {
+        const url2 = new URL("https://s.manmanbuy.com/pc/search/result");
+        url2.search = new URLSearchParams({ c: "discount", keyword: query, pageId: String(page) }).toString();
+        const response2 = await http2(url2.href, { signal, redirect: "manual" });
+        if (response2.redirect) throw new Error("\u6162\u6162\u4E70\u8981\u6C42\u8DF3\u8F6C\u6216\u8BBF\u95EE\u9A8C\u8BC1\uFF0C\u5DF2\u505C\u6B62\u8BE5\u6765\u6E90\uFF1B\u53EF\u6253\u5F00\u5B98\u65B9\u6765\u6E90\u9875\u67E5\u770B");
+        return parseManmanbuy(response2.text, { url: response2.url, now: now().toISOString() });
+      }
+      if (!credentials) throw new Error("\u8BF7\u5728\u8D2D\u7269\u300C\u6765\u6E90\u300D\u4E2D\u914D\u7F6E\u8054\u76DF\u5E94\u7528\u51ED\u636E\uFF1B\u4E70\u5BB6\u7F51\u9875\u767B\u5F55\u4E0D\u80FD\u66FF\u4EE3\u63A5\u53E3\u6388\u6743");
+      const params = { app_key: credentials.appKey, format: "json", sign_method: "md5", timestamp: shoppingTimestamp(now()) };
+      if (source === "jd") {
+        Object.assign(params, { method: "jd.union.open.goods.query", v: "1.0", param_json: JSON.stringify({ goodsReqDTO: { keyword: query, pageIndex: page, pageSize: limit, ...onlyCoupons ? { isCoupon: 1 } : {} } }) });
+        params.sign = signShopping(params, credentials.appSecret);
+        const data3 = await api("https://api.jd.com/routerjson", params, signal);
+        let result;
+        try {
+          const outer = data3.jd_union_open_goods_query_responce || data3.jd_union_open_goods_query_response;
+          result = typeof outer?.queryResult === "string" ? JSON.parse(outer.queryResult) : outer?.queryResult;
+        } catch {
+        }
+        if (!result || Number(result.code) !== 200) throw new Error("\u4EAC\u4E1C\u8054\u76DF\u67E5\u8BE2\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u5546\u54C1\u67E5\u8BE2\u63A5\u53E3\u6743\u9650\u4E0E\u989D\u5EA6");
+        return parseJD(result.data, now().toISOString());
+      }
+      if (source !== "taobao") throw new Error("\u4E0D\u652F\u6301\u7684\u8D2D\u7269\u6765\u6E90");
+      Object.assign(params, { method: "taobao.tbk.dg.material.optional.upgrade", v: "2.0", q: query, adzone_id: credentials.adzoneId, page_no: String(page), page_size: String(limit), has_coupon: String(onlyCoupons), is_tmall: String(tmallOnly) });
+      params.sign = signShopping(params, credentials.appSecret);
+      const data2 = await api("https://eco.taobao.com/router/rest", params, signal);
+      const response = data2.tbk_dg_material_optional_upgrade_response;
+      if (!response) throw new Error("\u6DD8\u5B9D\u8054\u76DF\u67E5\u8BE2\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u5E94\u7528\u51ED\u636E\u3001\u63A8\u5E7F\u4F4D\u548C\u63A5\u53E3\u6743\u9650");
+      return parseTaobao(response.result_list?.map_data || [], now().toISOString());
+    }
+  };
+}
+
+// src/shopping/service.mjs
+var ShoppingService = class {
+  constructor(library, { providers = createShoppingProviders() } = {}) {
+    this.settings = new ShoppingSettings(library);
+    this.providers = providers;
+  }
+  async sources() {
+    return Promise.all(SHOPPING_SOURCES.map(async (source) => ({ ...source, ...await this.settings.status(source.id), capabilities: ["search", "offers", "favorites"], login: "platform-page" })));
+  }
+  /** @param {string} query @param {{source?: string, platform?: string, onlyCoupons?: boolean, maxPriceCents?: number|null, limit?: number, page?: number, signal?: AbortSignal}} options */
+  async search(query, { source = "all", platform = "all", onlyCoupons = false, maxPriceCents = null, limit = 10, page = 1, signal } = {}) {
+    if (typeof query !== "string" || !query.trim() || query.length > 200) throw new Error("\u8BF7\u8F93\u5165 1\u2013200 \u5B57\u7684\u5546\u54C1\u5173\u952E\u8BCD\u3001\u54C1\u724C\u578B\u53F7\u4E0E\u89C4\u683C");
+    if (!["all", "jd", "taobao", "tmall"].includes(platform)) throw new Error("\u4E0D\u652F\u6301\u7684\u5E73\u53F0\u7B5B\u9009");
+    if (!Number.isInteger(limit) || limit < 1 || limit > 20 || !Number.isInteger(page) || page < 1 || page > 100) throw new Error("\u6BCF\u6B21\u67E5\u8BE2 1\u201320 \u6761\uFF0C\u9875\u7801 1\u2013100");
+    if (maxPriceCents !== null && (!Number.isSafeInteger(maxPriceCents) || maxPriceCents < 0)) throw new Error("\u9884\u7B97\u683C\u5F0F\u4E0D\u6B63\u786E");
+    const states = await this.sources(), selected = source === "all" ? states.filter((s) => !s.credential || s.configured) : [states.find((s) => s.id === shoppingSource(source).id)];
+    signal?.throwIfAborted();
+    const completed = await Promise.allSettled(selected.map(async (item) => {
+      const credentials = item.credential ? await this.settings.credentials(item.id) : null;
+      const offers2 = await this.providers.search(item.id, query.trim(), { credentials, signal, page, limit: 20, onlyCoupons, tmallOnly: platform === "tmall" });
+      return offers2.map(shoppingOffer);
+    }));
+    signal?.throwIfAborted();
+    const offers = [], errors = [], keys = /* @__PURE__ */ new Set();
+    completed.forEach((result, index2) => {
+      if (result.status === "rejected") {
+        errors.push({ source: selected[index2].id, message: result.reason instanceof Error ? result.reason.message : "\u6765\u6E90\u67E5\u8BE2\u5931\u8D25" });
+        return;
+      }
+      for (const offer of result.value) {
+        const matchPlatform = platform === "all" || offer.platform === platform || platform === "taobao" && offer.platform === "tmall";
+        if (!matchPlatform || onlyCoupons && !offer.coupons.some((coupon) => couponAvailable(coupon)) && !offer.couponMentioned) continue;
+        if (maxPriceCents !== null && (offer.priceCents === null || offer.priceCents > maxPriceCents)) continue;
+        const key = offerKey(offer);
+        if (!keys.has(key)) {
+          offers.push(offer);
+          keys.add(key);
+        }
+      }
+    });
+    offers.sort((a, b) => (a.priceCents ?? Infinity) - (b.priceCents ?? Infinity));
+    return {
+      query: query.trim(),
+      page,
+      offers: offers.slice(0, limit),
+      matched: offers.length,
+      errors,
+      skipped: source === "all" ? states.filter((s) => s.credential && !s.configured).map((s) => ({ source: s.id, reason: "\u672A\u914D\u7F6E\u8054\u76DF\u5E94\u7528\u51ED\u636E" })) : [],
+      notice: "\u6309\u672C\u6B21\u67E5\u5230\u7684\u62A5\u4EF7\u6392\u5E8F\uFF1B\u5546\u54C1\u89C4\u683C\u53EF\u80FD\u4E0D\u540C\uFF0C\u7206\u6599\u53CA\u9884\u4F30\u4EF7\u9700\u6838\u5BF9\u4F18\u60E0\u6761\u4EF6\u3002\u4E0D\u662F\u5168\u7F51\u6700\u4F4E\u4EF7\u6216\u7ED3\u7B97\u4EF7\u4FDD\u8BC1\u3002"
+    };
+  }
+};
+
 // src/server/index.ts
 var root2 = resolve4(dirname4(fileURLToPath(import.meta.url)), "..");
 var plugin = {
@@ -21999,6 +22359,7 @@ var plugin = {
     const service = createIngestion({ directory, keyFile });
     const videos = createVideoIngestion({ directory, keyFile });
     const music = new MusicService(service.store);
+    const shopping = new ShoppingService(service.store);
     const sourceArgs = {
       url: tool.schema.string().url().describe("\u7528\u6237\u8981\u6C42\u91C7\u96C6\u7684\u5C0F\u8BF4\u76EE\u5F55\u6216\u6587\u5B57\u9875\u9762 URL\uFF0C\u53EF\u7531\u5F53\u524D\u6A21\u578B\u8054\u7F51\u68C0\u7D22\u83B7\u5F97"),
       sourceId: tool.schema.string().optional().describe("\u6765\u6E90\u9002\u914D\u5668 ID\uFF0C\u9ED8\u8BA4\u81EA\u52A8\u9009\u62E9"),
@@ -22007,11 +22368,34 @@ var plugin = {
     };
     return {
       tool: {
-        moyu_sources: tool({
-          description: "\u5217\u51FA\u6478\u9C7C\u8D44\u6599\u5E93\u7684\u5C0F\u8BF4\u3001\u89C6\u9891\u548C\u97F3\u4E50\u6765\u6E90\u3002\u97F3\u4E50\u7528 moyu_music_search \u67E5\u6B4C\u66F2\u3001moyu_music_playlists \u67E5\u6B4C\u5355\u3001moyu_music_playlist \u67E5\u6B4C\u5355\u6B4C\u66F2\uFF0C\u7528 /music \u7BA1\u7406\u8D26\u53F7\u548C\u64AD\u653E\u3002\u67E5\u8BE2\u5747\u4F7F\u7528 HTTP\u3002",
+        moyu_shopping_sources: tool({
+          description: "\u67E5\u770B\u8D2D\u7269\u6BD4\u4EF7\u6765\u6E90\u548C\u8054\u76DF\u5E94\u7528\u914D\u7F6E\u72B6\u6001\uFF0C\u4E0D\u8FD4\u56DE\u5BC6\u94A5\u3002\u6162\u6162\u4E70\u516C\u5F00\u597D\u4EF7\u65E0\u9700\u8D26\u53F7\uFF1B\u4EAC\u4E1C\u8054\u76DF\u3001\u6DD8\u5B9D/\u5929\u732B\u8054\u76DF\u9700\u8981\u5728 /moyu \u8D2D\u7269 \u6765\u6E90\u8BBE\u7F6E\u4E2D\u914D\u7F6E\u5E94\u7528\u51ED\u636E\u3002\u4E70\u5BB6\u767B\u5F55\u4E0E\u5E94\u7528\u6388\u6743\u5206\u5F00\u3002",
           args: {},
           async execute() {
-            return JSON.stringify([...service.registry.list(), ...videos.platforms.list().map((item) => ({ ...item, kinds: ["video"], capabilities: ["search", "info", "import", ...item.id === "bilibili" ? ["popular"] : []] })), ...MUSIC_PLATFORMS.map((item) => ({ id: item.id, name: item.name, kinds: ["audio"], capabilities: ["search", "play", "login", "playlists", "playlist", ...item.id === "qq" ? ["radio"] : []], qr: item.qr }))]);
+            return JSON.stringify(await shopping.sources());
+          }
+        }),
+        moyu_shopping_search: tool({
+          description: "\u641C\u7D22\u5546\u54C1\u4F4E\u4EF7\u4E0E\u4F18\u60E0\u5238\u3002source=all \u53EA\u67E5\u8BE2\u516C\u5F00\u597D\u4EF7\u548C\u5DF2\u914D\u7F6E\u8054\u76DF\u63A5\u53E3\uFF1B\u6162\u6162\u4E70\u662F\u7206\u6599\u62A5\u4EF7\uFF0C\u8054\u76DF\u4EF7\u683C\u53EF\u80FD\u662F\u9884\u4F30\u5238\u540E\u4EF7\uFF0C\u5FC5\u987B\u5C55\u793A\u4F18\u60E0\u6761\u4EF6\u3001\u89C4\u683C\u3001\u6765\u6E90\u548C\u67E5\u8BE2\u65F6\u95F4\u3002\u4E0D\u662F\u7ED3\u7B97\u4EF7\u6216\u5168\u7F51\u6700\u4F4E\u4FDD\u8BC1\uFF0C\u4E0D\u81EA\u884C\u53E0\u5238\u6216\u6263\u8FD4\u73B0\u3002\u6BCF\u6B21\u6700\u591A10\u6761\uFF0C\u4E0D\u81EA\u52A8\u767B\u5F55\u3001\u9886\u5238\u3001\u4E0B\u5355\u6216\u652F\u4ED8\uFF1B/moyu \u8D2D\u7269 \u53EF\u7B5B\u9009\u3001\u6536\u85CF\u3001\u6253\u5F00\u5B98\u65B9\u6765\u6E90\u3002\u4E0D\u5F97\u7D22\u8981\u8D26\u53F7\u5BC6\u7801\u3001Cookie\u6216\u5E94\u7528\u5BC6\u94A5\u8FDB\u5165\u804A\u5929\u3002",
+          args: { query: tool.schema.string().min(1).max(200), source: tool.schema.enum(["all", "manmanbuy", "jd", "taobao"]).default("all"), platform: tool.schema.enum(["all", "jd", "taobao", "tmall"]).default("all"), onlyCoupons: tool.schema.boolean().default(false), maxPriceCents: tool.schema.number().int().min(0).optional().describe("\u53EF\u9009\u5355\u4EF6\u9884\u7B97\u4E0A\u9650\uFF0C\u5355\u4F4D\u4E3A\u5206\uFF0C\u4E0D\u5305\u542B\u672A\u77E5\u8FD0\u8D39"), page: tool.schema.number().int().min(1).max(100).default(1), limit: tool.schema.number().int().min(1).max(10).default(5) },
+          async execute(args, context) {
+            const states = await shopping.sources();
+            const selected = args.source === "all" ? states.filter((item) => !item.credential || item.configured) : states.filter((item) => item.id === args.source);
+            const patterns = selected.map((item) => item.origin + "/*");
+            await context.ask({ permission: "webfetch", patterns, always: patterns, metadata: { shopping: true, source: args.source } });
+            return JSON.stringify(await shopping.search(args.query, { ...args, signal: context.abort }));
+          }
+        }),
+        moyu_sources: tool({
+          description: "\u5217\u51FA\u5C0F\u8BF4\u3001\u89C6\u9891\u3001\u97F3\u4E50\u548C\u8D2D\u7269\u6765\u6E90\u3002\u97F3\u4E50\u5728 /music \u7BA1\u7406\u8D26\u53F7\u4E0E\u64AD\u653E\uFF1B\u8D2D\u7269\u7528 moyu_shopping_search \u67E5\u597D\u4EF7\u4E0E\u4F18\u60E0\u5238\uFF0C\u5728 /moyu \u8D2D\u7269 \u7B5B\u9009\u548C\u6536\u85CF\u3002\u67E5\u8BE2\u5747\u4F7F\u7528 HTTP\u3002",
+          args: {},
+          async execute() {
+            return JSON.stringify([
+              ...service.registry.list(),
+              ...videos.platforms.list().map((item) => ({ ...item, kinds: ["video"], capabilities: ["search", "info", "import", ...item.id === "bilibili" ? ["popular"] : []] })),
+              ...MUSIC_PLATFORMS.map((item) => ({ id: item.id, name: item.name, kinds: ["audio"], capabilities: ["search", "play", "login", "playlists", "playlist", ...item.id === "qq" ? ["radio"] : []], qr: item.qr })),
+              ...(await shopping.sources()).map((item) => ({ ...item, kinds: ["product"] }))
+            ]);
           }
         }),
         moyu_music_search: tool({
@@ -22029,8 +22413,8 @@ var plugin = {
           args: { mode: tool.schema.enum(["mine", "search"]).default("mine"), platform: tool.schema.enum(["all", "netease", "qq", "kugou"]).default("all"), collection: tool.schema.enum(["created", "favorite"]).default("created"), query: tool.schema.string().min(1).max(120).optional(), page: tool.schema.number().int().min(1).max(500).default(1), limit: tool.schema.number().int().min(1).max(10).default(10) },
           async execute(args, context) {
             if (args.mode === "search" && !args.query?.trim()) throw new Error("\u641C\u7D22\u6B4C\u5355\u65F6\u8BF7\u63D0\u4F9B query");
-            const domains = { netease: ["https://music.163.com/*"], qq: ["https://c.y.qq.com/*", "https://u.y.qq.com/*"], kugou: ["https://gateway.kugou.com/*"] };
-            const patterns = args.platform === "all" ? Object.values(domains).flat() : domains[args.platform];
+            const domains2 = { netease: ["https://music.163.com/*"], qq: ["https://c.y.qq.com/*", "https://u.y.qq.com/*"], kugou: ["https://gateway.kugou.com/*"] };
+            const patterns = args.platform === "all" ? Object.values(domains2).flat() : domains2[args.platform];
             await context.ask({ permission: "webfetch", patterns, always: patterns, metadata: { music: true, playlists: true, mode: args.mode, platform: args.platform } });
             return JSON.stringify(await music.playlists({ ...args, query: args.query || "", signal: context.abort }));
           }

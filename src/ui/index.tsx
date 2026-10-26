@@ -14,9 +14,11 @@ import { sidebarDock, sidebarLayout } from "./sidebar-layout.mjs"
 import { scaledVideoSize, VIDEO_SCALE_PRESETS } from "./video-size.mjs"
 import { createVideoReader } from "./video"
 import { createMusicReader } from "./music"
+import { createShoppingReader } from "./shopping"
 import { SharedMediaClient } from "../runtime/media-client.mjs"
 
 type Book = Awaited<ReturnType<typeof loadBook>>
+type Mode = "novel" | "video" | "music" | "shopping"
 const prefix = "opencode-moyu:"
 const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -34,10 +36,10 @@ const tui: TuiPlugin = async (host, options) => {
     get<T = unknown>(key: string, fallback?: T): T { return Object.hasOwn(playback.preferences || {}, key) ? playback.preferences[key] : host.kv.get<T>(key, fallback) },
     set(key: string, value: unknown) { void playback.setPreference(key, value).catch((error: unknown) => { if (!host.lifecycle.signal.aborted) host.ui.toast({ message: String(error), variant: "error" }) }) },
   } }
-  const moyu = (api as typeof api & { moyu?: { collect: (query: string) => Promise<unknown>; registerMusicLogin?: (handler: (platform: string) => void) => void } }).moyu
+  const moyu = (api as typeof api & { moyu?: { collect: (query: string) => Promise<unknown>; registerNavigation?: (handler: (mode: string) => void | Promise<void>) => void; registerMusicLogin?: (handler: (platform: string) => void) => void } }).moyu
   const collect = moyu?.collect
   const [visible, setVisible] = createSignal(true)
-  const [mode, setMode] = createSignal<"novel" | "video" | "music">("novel")
+  const [mode, setMode] = createSignal<Mode>("novel")
   const [book, setBook] = createSignal<Book>()
   const [offset, setOffset] = createSignal(0)
   const [height, setHeight] = createSignal(api.renderer.height)
@@ -57,7 +59,8 @@ const tui: TuiPlugin = async (host, options) => {
   const onboarding = createMemo(() => options?.hostMajor === 2 || (!api.kv.get("dismissed_getting_started", false) && !api.state.provider.some(
     (provider) => provider.id !== "opencode" || Object.values(provider.models).some((model) => model.cost?.input !== 0),
   )))
-  const chromeRows = () => mode() === "music" ? 2 : (height() < 40 ? 9 : 12) + (mode() === "video" && options?.hostMajor === 2 ? 1 : 0)
+  const compactMode = () => mode() === "music" || mode() === "shopping"
+  const chromeRows = () => compactMode() ? 3 : (height() < 40 ? 10 : 13) + (mode() === "video" && options?.hostMajor === 2 ? 1 : 0)
   const minimumRows = () => options?.hostMajor !== 2 && height() < 40 ? 2 : 4
   const availableRows = createMemo(() => Math.max(minimumRows(), viewportHeight() === undefined
     ? height() - (onboarding() ? 31 : 20)
@@ -68,8 +71,8 @@ const tui: TuiPlugin = async (host, options) => {
     videoScalePercent(),
   ))
   const videoSize = createMemo(() => videoExpanded() ? scaledVideoSize(75, 100, expandedScalePercent()) : normalVideoSize())
-  const heightPercent = createMemo(() => mode() === "music" ? 100 : mode() === "video" ? !videoExpanded() && videoHeightPercent() === undefined && videoScalePercent() === 100 ? undefined : videoSize().height : novelHeightPercent())
-  const widthPercent = createMemo(() => mode() === "music" ? 33 : mode() === "video" ? !videoExpanded() && videoWidthPercent() === undefined && videoScalePercent() === 100 ? undefined : videoSize().width : novelWidthPercent())
+  const heightPercent = createMemo(() => compactMode() ? 100 : mode() === "video" ? !videoExpanded() && videoHeightPercent() === undefined && videoScalePercent() === 100 ? undefined : videoSize().height : novelHeightPercent())
+  const widthPercent = createMemo(() => compactMode() ? 33 : mode() === "video" ? !videoExpanded() && videoWidthPercent() === undefined && videoScalePercent() === 100 ? undefined : videoSize().width : novelWidthPercent())
   const rows = createMemo(() => heightPercent() === undefined
     ? Math.min(fixedRows ?? 24, availableRows())
     : Math.max(minimumRows(), Math.floor(availableRows() * heightPercent()! / 100)))
@@ -109,13 +112,17 @@ const tui: TuiPlugin = async (host, options) => {
   })
   playback.onPauseVideo = () => video.pauseAndWait()
   const music = createMusicReader(api, library, playback, { rows, active: () => mode() === "music" && visible() && api.route.current.name === "session", canDialog: () => !ownsDialog, dialog, close: closeDialog })
+  const shopping = createShoppingReader(api, library, { rows, active: () => mode() === "shopping" && visible() && api.route.current.name === "session", canDialog: () => !ownsDialog, dialog, close: closeDialog })
   await music.ready
+  moyu?.registerNavigation?.((next) => {
+    if (["novel", "video", "music", "shopping"].includes(next) && !api.lifecycle.signal.aborted) return navigateMoyu(next as Mode)
+  })
   moyu?.registerMusicLogin?.((platform) => {
     if (api.lifecycle.signal.aborted) return
     selectMode("music"); setVisible(true); api.kv.set(prefix + "visible", true)
     music.login(platform)
   })
-  function selectMode(next: "novel" | "video" | "music") {
+  function selectMode(next: Mode) {
     save()
     setMode(next)
     api.kv.set(prefix + "mode", next)
@@ -146,6 +153,7 @@ const tui: TuiPlugin = async (host, options) => {
     }
   }
   function turn(direction: number) {
+    if (mode() === "shopping") return
     if (mode() === "video") { video.seek(direction * 10); return }
     if (mode() === "music") { void music.seek(direction * 10); return }
     if (!book() || busy()) return
@@ -212,7 +220,17 @@ const tui: TuiPlugin = async (host, options) => {
   function openMoyu() {
     setVisible(true)
     api.kv.set(prefix + "visible", true)
-    return mode() === "music" ? music.queue() : mode() === "video" ? video.shelf() : shelf()
+    dialog(() => <api.ui.DialogSelect title="墨鱼 · 选择功能" placeholder="点击进入；购物比价和本地阅读不需要选择模型" options={[
+      { title: "小说", value: "novel", description: "书架、章节目录与采集阅读" },
+      { title: "视频", value: "video", description: "本地、B 站和 YouTube 视频" },
+      { title: "音乐", value: "music", description: "聚合搜索、歌单与播放器" },
+      { title: "购物", value: "shopping", description: "低价搜索、优惠券和加密收藏" },
+    ]} onSelect={(item) => { closeDialog(); navigateMoyu(item.value as Mode) }} />)
+  }
+  function navigateMoyu(next: Mode) {
+    selectMode(next); setVisible(true); api.kv.set(prefix + "visible", true)
+    if (next === "novel") return shelf()
+    if (next === "video") return video.shelf()
   }
   function chapters() {
     if (mode() !== "novel") selectMode("novel")
@@ -250,6 +268,7 @@ const tui: TuiPlugin = async (host, options) => {
     />)
   }
   function jump() {
+    if (mode() === "shopping") return shopping.results()
     if (mode() === "music") return music.jump()
     if (mode() === "video") return video.jump()
     if (!book()) return promptFile()
@@ -433,6 +452,7 @@ const tui: TuiPlugin = async (host, options) => {
     }, 100)
   })
   function removeBook() {
+    if (mode() === "shopping") return shopping.favorites()
     if (mode() === "music") return music.remove()
     if (mode() === "video") return video.remove()
     const current = book()
@@ -463,6 +483,7 @@ const tui: TuiPlugin = async (host, options) => {
     watcher.close()
     clearTimeout(refresh)
     save()
+    shopping.dispose()
     const disposing = Promise.all([video.dispose(), music.dispose()]).then(() => playback.dispose())
     api.renderer.off("resize", resize)
     if (ownsDialog) closeDialog()
@@ -490,6 +511,7 @@ const tui: TuiPlugin = async (host, options) => {
     setVisible(api.kv.get<boolean>(prefix + "visible", true))
     if (api.kv.get<string>(prefix + "mode", "novel") === "video" && !playback.state?.playing && !playback.state?.videoOwner) setMode("video")
     else if (api.kv.get<string>(prefix + "mode", "novel") === "music") selectMode("music")
+    else if (api.kv.get<string>(prefix + "mode", "novel") === "shopping") selectMode("shopping")
     const initial = typeof options?.file === "string" ? options.file : api.kv.get<string>(prefix + "last", "")
     void open(initial || resolve(pluginRoot, "books/夜班便利店.txt"), true)
   })
@@ -509,9 +531,10 @@ const tui: TuiPlugin = async (host, options) => {
   api.keymap.registerLayer({
     mode: "base",
     commands: [
-      { name: "moyu.open", title: "墨鱼阅读：打开书架", slashName: "moyu", run: openMoyu },
+      { name: "moyu.open", title: "墨鱼：选择小说、视频、音乐或购物", slashName: "moyu", run: openMoyu },
       { name: "moyu.video", title: "摸鱼视频：打开视频库", slashName: "video", run: () => { selectMode("video"); setVisible(true); return video.shelf() } },
       { name: "moyu.music", title: "墨鱼音乐：打开聚合播放器", slashName: "music", run: () => { selectMode("music"); setVisible(true); api.kv.set(prefix + "visible", true) } },
+      { name: "moyu.shopping", title: "墨鱼购物：搜索低价与优惠券", run: () => navigateMoyu("shopping") },
       { name: "moyu.shelf", title: "墨鱼阅读：书架 / 打开文件", slashName: "read", run: shelf },
       { name: "moyu.chapters", title: "墨鱼阅读：章节目录", slashName: "chapters", run: chapters },
       { name: "moyu.jump", title: "墨鱼阅读：跳转进度", run: jump },
@@ -609,13 +632,15 @@ const tui: TuiPlugin = async (host, options) => {
       <box ref={(node: BoxRenderable) => { readerNode = node }} flexShrink={0} width="100%" marginBottom={options?.hostMajor === 2 ? "auto" : 0} height={book() || mode() !== "novel" ? rows() + chromeRows() : undefined} onSizeChange={function(this: BoxRenderable) { readerNode = this; setBodyWidth(Math.max(2, Math.floor(this.width))); observe(this); dock() }}>
         <box flexShrink={0} height={1} flexDirection="row" justifyContent="space-between">
           <text fg={theme().text}><b>{bodyWidth() >= 43 ? "墨鱼多媒体" : "墨鱼"}</b></text>
-          <box flexDirection="row" gap={1}>
+          <Button label="[隐藏]" action={toggle} muted />
+        </box>
+        <box flexShrink={0} height={1} flexDirection="row" gap={1}>
             <Button label="[小说]" action={() => selectMode("novel")} muted={mode() !== "novel"} />
             <Button label="[视频]" action={() => selectMode("video")} muted={mode() !== "video"} />
             <Button label="[音乐]" action={() => selectMode("music")} muted={mode() !== "music"} />
-            <Button label="[隐藏]" action={toggle} muted />
-          </box>
+            <Button label="[购物]" action={() => selectMode("shopping")} muted={mode() !== "shopping"} />
         </box>
+        <Show when={mode() === "shopping"} fallback={<>
         <Show when={mode() === "music"} fallback={<box flexShrink={0} height={1} flexDirection="row" gap={2}>
           <Button label={mode() === "video" ? "[视频库]" : "[书架]"} action={() => mode() === "video" ? video.shelf() : shelf()} />
           <Button label={mode() === "video" ? "[搜索]" : "[目录]"} action={() => mode() === "video" ? video.search() : chapters()} />
@@ -630,7 +655,14 @@ const tui: TuiPlugin = async (host, options) => {
             <Button label="[账号]" action={music.accounts} />
           </box>
         </Show>
-        <Show when={mode() !== "music"}>
+        </>}>
+          <box flexShrink={0} height={1} flexDirection="row" gap={1}>
+            <Button label="[搜索]" action={shopping.search} />
+            <Button label="[结果]" action={shopping.results} />
+            <Button label="[收藏]" action={shopping.favorites} />
+          </box>
+        </Show>
+        <Show when={!compactMode()}>
         <box flexShrink={0} height={1 + gap()} flexDirection="row" gap={mode() === "video" ? 1 : 2}>
           <Show when={options?.hostMajor === 2}><Button label={`[宽度 ${widthPercent() === undefined ? "自动" : Math.round(widthPercent()! * 10) / 10 + "%"}]`} action={widthSize} /></Show>
           <Button label={`[高度 ${heightPercent() === undefined ? "自动" : Math.round(heightPercent()! * 10) / 10 + "%"}]`} action={heightSize} />
@@ -646,6 +678,7 @@ const tui: TuiPlugin = async (host, options) => {
         </Show>
         </Show>
         <Show when={mode() === "music"} fallback={<Show when={mode() === "video"}><video.View Button={Button} gap={gap()} /></Show>}><music.View Button={Button} /></Show>
+        <Show when={mode() === "shopping"}><shopping.View Button={Button} /></Show>
         <Show when={mode() === "novel"}>
         <Show when={book()} fallback={<Button label={busy() ? "正在打开…" : "[点击打开本地小说]"} action={shelf} />}>
           <box flexShrink={0} height={2 + gap()}>

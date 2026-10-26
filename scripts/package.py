@@ -9,6 +9,7 @@ destination = root / "releases" / f"opencode-moyu-media-v{version}.zip"
 destination.parent.mkdir(exist_ok=True)
 files = ["dist/tui.js", "dist/tui-v2.js", "dist/server.js", "dist/server-v2.js", "dist/install.mjs", "books/夜班便利店.txt", "install.sh", "install.cmd", "README.md", "TERMS.md", "LICENSE", "THIRD_PARTY_NOTICES.txt", "QUICKSTART.txt", "docs/ARCHITECTURE.md", "docs/MUSIC.md"]
 files += ["assets/brand/moyu-mark.png"]
+files += ["docs/SHOPPING.md"]
 with ZipFile(destination, "w", ZIP_DEFLATED) as archive:
     for name in files:
         archive.write(root / name, "opencode-moyu-media/" + name)

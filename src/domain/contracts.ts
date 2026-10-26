@@ -1,5 +1,5 @@
 /** Shared contracts for source adapters, persisted resources, and future viewers. */
-export type ContentKind = "novel" | "article" | "video" | "audio" | "image" | "dataset"
+export type ContentKind = "novel" | "article" | "video" | "audio" | "image" | "dataset" | "product"
 export type Capability = "catalog" | "fetch"
 export type SourceItem = { id: string; title: string; url: string; kind: ContentKind; metadata?: Record<string, unknown> }
 export type SourceCatalog = { title: string; url: string; kind: ContentKind; items: SourceItem[]; catalogComplete?: boolean; catalogError?: string }

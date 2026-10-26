@@ -131,6 +131,8 @@ try:
     tmux("send-keys", "-t", "reader:0.0", "Enter")
     time.sleep(0.4)  # Arguments-capable commands first complete to '/moyu '.
     tmux("send-keys", "-t", "reader:0.0", "Enter")
+    wait_for(lambda text: "墨鱼 · 选择功能" in text and "购物" in text, "slash-moyu-menu")
+    click("小说", "slash-moyu-novel")
     wait_for(lambda text: "书架 · 墨鱼阅读" in text and "让当前模型采集小说" in text, "slash-moyu-shelf")
     tmux("send-keys", "-t", "reader:0.0", "-l", "让当前模型")
     tmux("send-keys", "-t", "reader:0.0", "Enter")

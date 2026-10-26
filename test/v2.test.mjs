@@ -28,7 +28,16 @@ test("2.x 模型工具保留参数校验、服务执行及权限拒绝", async (
   try {
     assert.ok(hooks.has("context"))
     assert.ok(hooks.has("compaction"))
-    assert.deepEqual([...tools.keys()].sort(), ["moyu_catalog", "moyu_delete", "moyu_import", "moyu_library", "moyu_music_playlist", "moyu_music_playlists", "moyu_music_radio", "moyu_music_search", "moyu_search", "moyu_sources", "moyu_video_import", "moyu_video_info", "moyu_video_popular", "moyu_video_search"])
+    assert.deepEqual([...tools.keys()].sort(), ["moyu_catalog", "moyu_delete", "moyu_import", "moyu_library", "moyu_music_playlist", "moyu_music_playlists", "moyu_music_radio", "moyu_music_search", "moyu_search", "moyu_shopping_search", "moyu_shopping_sources", "moyu_sources", "moyu_video_import", "moyu_video_info", "moyu_video_popular", "moyu_video_search"])
+    const shopping = JSON.parse((await tools.get("moyu_shopping_sources").execute({}, context)).content)
+    assert.equal(shopping.find((item) => item.id === "jd").configured, false)
+    assert.doesNotMatch(JSON.stringify(shopping), /appSecret|cookie/i)
+    const shoppingSchema = tools.get("moyu_shopping_search").input["~standard"]
+    assert.equal((await shoppingSchema.validate({ query: "耳机" })).value.source, "all")
+    assert.ok((await shoppingSchema.validate({ query: "耳机", source: "unknown" })).issues.length)
+    await assert.rejects(tools.get("moyu_shopping_search").execute({query:"耳机",source:"all",platform:"all",limit:5,page:1,onlyCoupons:false},context),/test-permission-denied/)
+    assert.deepEqual(requests.at(-1).resources,["https://s.manmanbuy.com/*"])
+    requests.length = 0
     const sources = JSON.parse((await tools.get("moyu_sources").execute({}, context)).content)
     assert.equal(sources[0].id, "html-novel")
     assert.ok(sources.some((item) => item.id === "youtube"))

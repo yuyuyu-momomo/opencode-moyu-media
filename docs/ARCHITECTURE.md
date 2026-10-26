@@ -1,6 +1,6 @@
 # 框架与接入约定
 
-当前版本实现本地小说、HTML 小说采集、加密资料库、本地及 B 站 / YouTube 侧栏视频，以及三平台聚合音乐、歌单和 QQ 私人电台。视频支持原生图片协议和字符回退；多个 OpenCode 通过资料库共享运行层协调播放与设置。
+当前版本实现本地小说、HTML 小说采集、加密资料库、本地及 B 站 / YouTube 侧栏视频，以及三平台聚合音乐、歌单和 QQ 私人电台。视频支持原生图片协议和字符回退；多个 OpenCode 通过资料库共享运行层协调播放与设置。购物面板独立查询慢慢买公开好价与可选联盟接口，保留优惠条件并加密收藏报价，不进入正文采集或媒体播放流程。
 
 ```mermaid
 flowchart LR
@@ -44,6 +44,11 @@ flowchart LR
 | `src/library/store.mjs` | 资源索引、章节分片、锁、原子写入、入库与删除 |
 | `src/library/vault.mjs` | 随机密钥、随机 nonce、AES-GCM 认证加密 |
 | `src/library/text-reader.mjs` | TXT 解码、中文分页、章节识别、加密书籍读取 |
+| `src/shopping/contracts.mjs` | 购物来源、报价类型、以分存储的金额、条件、时间与券链接校验 |
+| `src/shopping/providers.mjs` | 慢慢买公开搜索与京东 / 淘宝联盟签名 HTTP 请求，验证或拒绝时停止 |
+| `src/shopping/service.mjs` | 可用来源选择、并发查询、失败隔离、预算与券筛选、报价排序 |
+| `src/shopping/settings.mjs` | 独立加密保存联盟凭据与逐项收藏，不接收买家密码 |
+| `src/ui/shopping.tsx` | 购物面板、搜索结果、优惠条件、来源设置及收藏删除 |
 | `src/runtime/channel.mjs` | 按资料库真实路径和密钥确定本机管道 / Socket，认证加密及有界消息帧 |
 | `src/runtime/media-server.mjs` | 单音乐引擎、视频优先及播放资格、全局设置逐项更新、账号版本 |
 | `src/runtime/media-client.mjs` | 跨窗口命令、状态订阅、取消、断线重连、视频资格版本与设置写入收尾 |
