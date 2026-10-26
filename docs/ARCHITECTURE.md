@@ -48,6 +48,9 @@ flowchart LR
 | `src/shopping/providers.mjs` | 慢慢买公开搜索与京东 / 淘宝联盟签名 HTTP 请求，验证或拒绝时停止 |
 | `src/shopping/service.mjs` | 可用来源选择、并发查询、失败隔离、预算与券筛选、报价排序 |
 | `src/shopping/settings.mjs` | 独立加密保存联盟凭据与逐项收藏，不接收买家密码 |
+| `src/shopping/accounts.mjs` | 京东、淘宝 / 天猫、拼多多的账号契约、域名过滤及登录标记校验 |
+| `src/shopping/browser.mjs` | 独立临时 Chrome / Edge 登录窗口、有限本机控制、取消与清理 |
+| `src/shopping/windows-login.mjs` | Windows / WSL 本机 PowerShell 桥接，仅对本次临时窗口读取 Cookie 或关闭 |
 | `src/ui/shopping.tsx` | 购物面板、搜索结果、优惠条件、来源设置及收藏删除 |
 | `src/runtime/channel.mjs` | 按资料库真实路径和密钥确定本机管道 / Socket，认证加密及有界消息帧 |
 | `src/runtime/media-server.mjs` | 单音乐引擎、视频优先及播放资格、全局设置逐项更新、账号版本 |

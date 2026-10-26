@@ -1,11 +1,37 @@
 import { ShoppingSettings } from "./settings.mjs"
 import { createShoppingProviders } from "./providers.mjs"
 import { SHOPPING_SOURCES, shoppingSource, shoppingOffer, offerKey, couponAvailable } from "./contracts.mjs"
+import { openShoppingLogin } from "./browser.mjs"
+import { shoppingAccount, accountAuthorized } from "./accounts.mjs"
+import { setTimeout as sleep } from "node:timers/promises"
 
 export class ShoppingService {
-  constructor(library, { providers = createShoppingProviders() } = {}) { this.settings = new ShoppingSettings(library); this.providers = providers }
+  constructor(library, { providers = createShoppingProviders(), loginWindow = openShoppingLogin } = {}) { this.settings = new ShoppingSettings(library); this.providers = providers; this.loginWindow = loginWindow }
+  /** @param {string} platform @param {{signal?: AbortSignal, onStatus?: (status: string) => void, timeoutMs?: number, intervalMs?: number}} options */
+  async login(platform, { signal, onStatus = () => {}, timeoutMs = 180000, intervalMs = 2000 } = {}) {
+    shoppingAccount(platform)
+    const expectedVersion = await this.settings.accountVersion(platform)
+    signal?.throwIfAborted(); onStatus("opening")
+    let session
+    try {
+      session = await this.loginWindow(platform, { signal })
+      const until = Date.now() + Math.min(300000, Math.max(100, timeoutMs))
+      onStatus("waiting")
+      while (Date.now() < until) {
+        signal?.throwIfAborted()
+        const cookies = await session.cookies()
+        signal?.throwIfAborted()
+        if (accountAuthorized(platform, cookies)) {
+          onStatus("saving")
+          return await this.settings.saveAccount(platform, cookies, { expectedVersion })
+        }
+        await sleep(Math.max(10, intervalMs), undefined, { signal })
+      }
+      throw new Error("等待扫码超时，请重新打开官方登录窗口")
+    } finally { await session?.close() }
+  }
   async sources() {
-    return Promise.all(SHOPPING_SOURCES.map(async (source) => ({ ...source, ...await this.settings.status(source.id), capabilities: ["search", "offers", "favorites"], login: "platform-page" })))
+    return Promise.all(SHOPPING_SOURCES.map(async (source) => ({ ...source, ...await this.settings.status(source.id), capabilities: ["search", "offers", "favorites"], login: "isolated-platform-window" })))
   }
   /** @param {string} query @param {{source?: string, platform?: string, onlyCoupons?: boolean, maxPriceCents?: number|null, limit?: number, page?: number, signal?: AbortSignal}} options */
   async search(query, { source = "all", platform = "all", onlyCoupons = false, maxPriceCents = null, limit = 10, page = 1, signal } = {}) {

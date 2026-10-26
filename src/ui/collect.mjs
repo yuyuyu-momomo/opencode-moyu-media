@@ -11,6 +11,13 @@ export function moyuNavigation(input) {
   const sections = { "小说": "novel", "阅读": "novel", novel: "novel", "视频": "video", video: "video", "音乐": "music", music: "music", "购物": "shopping", "比价": "shopping", shopping: "shopping", shop: "shopping" }
   return Object.hasOwn(sections, query) ? sections[query] : undefined
 }
+export function shoppingLoginRequest(input) {
+  const query = collectionQuery(input).replace(/\s+/gu, "").replace(/[。！!]+$/u, "")
+  const name = "(京东|jd|淘宝|天猫|tb|taobao|tmall|拼多多|pdd|pinduoduo)"
+  const match = new RegExp(`^(?:请)?(?:帮我)?(?:扫码)?登录${name}(?:账号)?$`, "iu").exec(query) || new RegExp(`^${name}(?:扫码)?登录$`, "iu").exec(query)
+  if (!match) return
+  return /京东|^jd$/i.test(match[1]) ? "jd" : /拼多多|pdd|pinduoduo/i.test(match[1]) ? "pdd" : "taobao"
+}
 
 /** Account commands stay local and do not require a selected language model. */
 export function musicLoginRequest(input) {
@@ -23,13 +30,19 @@ export function musicLoginRequest(input) {
   return /^(?:qq)/i.test(match[1]) ? "qq" : /网易|netease/i.test(match[1]) ? "netease" : "kugou"
 }
 
-/** @param {any} host @param {string} input @param {{login?: (platform: string) => void | Promise<void>, navigate?: (mode: string) => void | Promise<void>}} handlers */
-export async function dispatchMoyu(host, input, { login, navigate } = {}) {
+/** @param {any} host @param {string} input @param {{login?: (platform: string) => void | Promise<void>, shoppingLogin?: (platform: string) => void | Promise<void>, navigate?: (mode: string) => void | Promise<void>}} handlers */
+export async function dispatchMoyu(host, input, { login, shoppingLogin, navigate } = {}) {
   const mode = moyuNavigation(input)
   if (mode) {
     if (!navigate) throw new Error("墨鱼功能入口尚未准备好，请稍后重试")
     await navigate(mode)
     return { kind: "navigation", mode }
+  }
+  const shopping = shoppingLoginRequest(input)
+  if (shopping) {
+    if (!shoppingLogin) throw new Error("购物登录入口尚未准备好，请稍后重试或打开 /moyu 购物 的账号菜单")
+    await shoppingLogin(shopping)
+    return { kind: "shopping-login", platform: shopping }
   }
   const platform = musicLoginRequest(input)
   if (platform) {

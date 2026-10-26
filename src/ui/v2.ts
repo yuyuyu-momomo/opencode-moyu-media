@@ -24,6 +24,7 @@ export default Plugin.define({
     let onClose: (() => void) | undefined
     let musicLogin: ((platform: string) => void) | undefined
     let navigation: ((mode: string) => void | Promise<void>) | undefined
+    let shoppingLogin: ((platform: string) => void) | undefined
     const finish = () => { const callback = onClose; onClose = undefined; callback?.() }
     function clear() {
       ++dialogGeneration
@@ -63,7 +64,10 @@ export default Plugin.define({
     }
     async function collect(query: string) {
       try {
-        const result = await dispatchMoyu(context, query, { navigate(mode) {
+        const result = await dispatchMoyu(context, query, { shoppingLogin(platform) {
+          if (!shoppingLogin) throw new Error("购物登录入口尚未准备好，请稍后重试")
+          shoppingLogin(platform)
+        }, navigate(mode) {
           if (!navigation) throw new Error("墨鱼功能入口尚未准备好，请稍后重试")
           return navigation(mode)
         }, login(platform) {
@@ -78,6 +82,7 @@ export default Plugin.define({
     }
     const bridge = {
       moyu: { collect,
+        registerShoppingLogin(handler: (platform: string) => void) { shoppingLogin = handler; cleanup.push(() => { shoppingLogin = undefined }) },
         registerNavigation(handler: (mode: string) => void | Promise<void>) { navigation = handler; cleanup.push(() => { navigation = undefined }) },
         registerMusicLogin(handler: (platform: string) => void) { musicLogin = handler; cleanup.push(() => { musicLogin = undefined }) },
       },

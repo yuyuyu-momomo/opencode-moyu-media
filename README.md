@@ -16,7 +16,7 @@
 
 ## 快速安装
 
-[下载安装包 ZIP](https://github.com/yuyuyu-momomo/opencode-moyu-media/raw/refs/heads/main/releases/opencode-moyu-media-v0.7.0.zip)，解压后阅读 `TERMS.md` 和 `LICENSE`，再运行 `bash install.sh`；Windows 原生 OpenCode 可双击 `install.cmd`。
+[下载安装包 ZIP](https://github.com/yuyuyu-momomo/opencode-moyu-media/raw/refs/heads/main/releases/opencode-moyu-media-v0.8.0.zip)，解压后阅读 `TERMS.md` 和 `LICENSE`，再运行 `bash install.sh`；Windows 原生 OpenCode 可双击 `install.cmd`。
 
 也可直接安装仓库中的预编译版本：
 
@@ -84,7 +84,9 @@ QQ「我喜欢」可从歌单菜单直接打开，也会显示在「我的歌单
 
 选择商品可打开好价来源页、打开接口返回且仍在有效期内的领券链接，或加密收藏报价。爆料中的返现、淘金币、会员和凑单条件会保留，不从价格中再扣一次。收藏保存的是查询时的报价，可在「收藏」中查看和删除。
 
-「来源/登录」可以打开京东和淘宝官方登录页，登录态留在浏览器，供用户在平台领券和购买。京东联盟与淘宝 / 天猫联盟查询是可选来源，需要在该菜单本地配置有接口权限的 AppKey、AppSecret，淘宝还需推广位 adzoneId；买家网页登录不等于联盟应用授权。凭据加密保存，不发送给模型。
+「账号」支持京东、淘宝 / 天猫、拼多多扫码登录，也可直接输入 `/moyu 登录京东`、`/moyu 登录淘宝`、`/moyu 登录拼多多`。使用已安装的 Chrome / Edge 打开独立临时窗口，在官方页面选择扫码并用手机确认；WSL 可使用 Windows 浏览器。插件只接收这个新窗口中相应平台的登录 Cookie，确认后加密保存到本地资料库，关闭窗口并清理临时配置。可以取消扫码或退出单个平台，其他账号和收藏保留。平台要求的验证码或额外验证由用户在官方窗口完成。
+
+京东联盟与淘宝 / 天猫联盟查询仍是可选来源，需要在「来源」中配置有接口权限的 AppKey、AppSecret，淘宝还需推广位 adzoneId。买家扫码不能代替联盟应用授权；当前扫码功能管理本地买家登录态，不会自动获得个人专属券查询接口、领券或下单。账号凭据不发送给模型或上传仓库。
 
 也可输入 `/moyu 购物 搜索蓝牙耳机，预算200元，找优惠券`，当前模型通过 `moyu_shopping_sources` 和 `moyu_shopping_search` 返回少量报价。详见 [购物接入说明](docs/SHOPPING.md)。
 

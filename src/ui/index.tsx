@@ -36,7 +36,7 @@ const tui: TuiPlugin = async (host, options) => {
     get<T = unknown>(key: string, fallback?: T): T { return Object.hasOwn(playback.preferences || {}, key) ? playback.preferences[key] : host.kv.get<T>(key, fallback) },
     set(key: string, value: unknown) { void playback.setPreference(key, value).catch((error: unknown) => { if (!host.lifecycle.signal.aborted) host.ui.toast({ message: String(error), variant: "error" }) }) },
   } }
-  const moyu = (api as typeof api & { moyu?: { collect: (query: string) => Promise<unknown>; registerNavigation?: (handler: (mode: string) => void | Promise<void>) => void; registerMusicLogin?: (handler: (platform: string) => void) => void } }).moyu
+  const moyu = (api as typeof api & { moyu?: { collect: (query: string) => Promise<unknown>; registerNavigation?: (handler: (mode: string) => void | Promise<void>) => void; registerShoppingLogin?: (handler: (platform: string) => void) => void; registerMusicLogin?: (handler: (platform: string) => void) => void } }).moyu
   const collect = moyu?.collect
   const [visible, setVisible] = createSignal(true)
   const [mode, setMode] = createSignal<Mode>("novel")
@@ -117,6 +117,7 @@ const tui: TuiPlugin = async (host, options) => {
   moyu?.registerNavigation?.((next) => {
     if (["novel", "video", "music", "shopping"].includes(next) && !api.lifecycle.signal.aborted) return navigateMoyu(next as Mode)
   })
+  moyu?.registerShoppingLogin?.((platform) => { navigateMoyu("shopping"); shopping.login(platform) })
   moyu?.registerMusicLogin?.((platform) => {
     if (api.lifecycle.signal.aborted) return
     selectMode("music"); setVisible(true); api.kv.set(prefix + "visible", true)
@@ -483,8 +484,7 @@ const tui: TuiPlugin = async (host, options) => {
     watcher.close()
     clearTimeout(refresh)
     save()
-    shopping.dispose()
-    const disposing = Promise.all([video.dispose(), music.dispose()]).then(() => playback.dispose())
+    const disposing = Promise.all([video.dispose(), music.dispose(), shopping.dispose()]).then(() => playback.dispose())
     api.renderer.off("resize", resize)
     if (ownsDialog) closeDialog()
     return disposing

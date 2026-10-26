@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise shopping sidebar clicks in an isolated OpenCode 2 terminal.
 
-Uses one synthetic encrypted favorite. Does not query stores, open login pages,
+Uses synthetic encrypted favorites and one synthetic account. Does not query stores, open login pages,
 use account credentials, call a model or touch the user's OpenCode configuration.
 Requires an installed OpenCode 2 and tmux.
 """
@@ -31,6 +31,7 @@ subprocess.run(["node", str(ROOT / "dist/install.mjs"), "--config-dir", str(CONF
 seed = """import {LibraryStore} from './src/library/store.mjs';import{ShoppingSettings}from'./src/shopping/settings.mjs';
 const library=new LibraryStore(process.argv[1],{keyFile:process.argv[2]});await library.ready();
 await new ShoppingSettings(library).saveFavorite({source:'manmanbuy',id:'123',title:'购物界面测试耳机',platform:'jd',shop:'测试店铺',priceCents:9990,priceLabel:'测试报价',sourceUrl:'https://item.jd.com/123.html',conditions:'合成测试数据，不是真实报价',observedAt:'2026-10-26T00:00:00Z'});"""
+seed += """await new ShoppingSettings(library).saveAccount('pdd',[{name:'PDDAccessToken',value:'synthetic-test-only',domain:'.yangkeduo.com',path:'/',expires:-1},{name:'pdd_user_id',value:'123',domain:'.yangkeduo.com',path:'/',expires:-1}]);"""
 installed = CONFIG / "extensions/opencode-moyu"
 subprocess.run(["node", "--input-type=module", "-e", seed, str(installed / "books"), str(installed / "keys/library.key")], cwd=ROOT, check=True, capture_output=True)
 with socket.socket() as sock:
@@ -109,7 +110,7 @@ try:
     tmux("send-keys", "-t", "reader:0.0", "Enter")
     wait_for(lambda text: "墨鱼 · 选择功能" in text and "购物" in text, "unified-moyu-menu-visible")
     click("低价搜索", "shopping-open")
-    wait_for(lambda text: "[来源/登录]" in text, "shopping-panel-visible")
+    wait_for(lambda text: "[来源]" in text and "[账号]" in text, "shopping-panel-visible")
     click("[搜索]", "search-open")
     wait_for(lambda text: "搜索商品 / 优惠券" in text, "search-dialog-stays-open")
     escape()
@@ -118,9 +119,18 @@ try:
     click("只看有券", "coupon-filter")
     wait_for(lambda text: "好价：开" in text, "coupon-filter-updated")
     escape()
-    click("[来源/登录]", "sources-open")
-    wait_for(lambda text: "应用未配置" in text and "京东官方登录页" in text, "source-and-login-status-visible")
+    click("[来源]", "sources-open")
+    wait_for(lambda text: "应用未配置" in text and "购物账号" in text, "source-and-login-status-visible")
     escape()
+    click("[账号]", "accounts-open")
+    wait_for(lambda text: "购物账号 · 扫码登录" in text and "拼多多" in text and "淘宝 / 天猫" in text, "three-shopping-accounts-visible")
+    click("拼多多 已扫码保存", "pdd-account-open")
+    wait_for(lambda text: "拼多多 · 已扫码保存" in text and "扫码登录" in text and "退出本地账号" in text, "saved-account-controls-visible")
+    click("退出本地账号", "pdd-account-logout")
+    current = wait_for(lambda text: "退出拼多多本地账号" in text and "confirm" in text.lower(), "account-logout-confirmation")
+    click("Confirm" if "Confirm" in current else "confirm", "account-logout-confirm")
+    wait_for(lambda text: "已删除本地登录态" in text, "account-logout-finished")
+    assert not (installed / "books/.moyu/shopping/account-pdd.enc").exists()
     click("[收藏]", "favorites-open")
     wait_for(lambda text: "购物收藏" in text and "购物界面测试耳机" in text, "encrypted-favorite-visible")
     click("购物界面测试耳机", "favorite-detail")
@@ -139,7 +149,7 @@ try:
     tmux("send-keys", "-t", "reader:0.0", "Enter")
     time.sleep(.4)
     tmux("send-keys", "-t", "reader:0.0", "Enter")
-    wait_for(lambda text: "[来源/登录]" in text and "墨鱼请求失败" not in text, "moyu-shopping-local-navigation")
+    wait_for(lambda text: "[来源]" in text and "墨鱼请求失败" not in text, "moyu-shopping-local-navigation")
     tmux("resize-window", "-t", "reader", "-x", "140", "-y", "30")
     wait_for(lambda text: "[购物]" in text and "[小说]" in text, "short-terminal-tabs-visible")
     print(json.dumps({"checks": CHECKS, "artifacts": str(WORK)}, ensure_ascii=False))

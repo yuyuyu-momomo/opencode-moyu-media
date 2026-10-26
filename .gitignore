@@ -7,4 +7,10 @@ keys/
 *.moyubook
 *.moyuvid
 .moyu/
+.env
+.env.*
+!.env.example
+*.enc
+cookies*.json
+cookies*.txt
 *.moyu-backup-*

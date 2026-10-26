@@ -2,6 +2,8 @@ import { mkdir, readFile, readdir, unlink } from "node:fs/promises"
 import { join } from "node:path"
 import { atomicWrite } from "../library/store.mjs"
 import { shoppingSource, shoppingOffer, offerKey } from "./contracts.mjs"
+import { randomBytes } from "node:crypto"
+import { shoppingAccount, accountCookies, accountAuthorized } from "./accounts.mjs"
 
 export class ShoppingSettings {
   constructor(library) { this.library = library; this.directory = join(library.internal, "shopping") }
@@ -31,6 +33,30 @@ export class ShoppingSettings {
     return this.status(source)
   }
   async removeCredentials(source) { shoppingSource(source); await this.remove("config-" + source); return this.status(source) }
+  async account(platform) {
+    shoppingAccount(platform)
+    const value = await this.read("account-" + platform, null)
+    return { platform, configured: Boolean(value?.cookies?.length), method: value?.method || "", savedAt: value?.savedAt || "" }
+  }
+  async accountVersion(platform) { shoppingAccount(platform); return (await this.read("version-" + platform, null))?.version || "0" }
+  async saveAccount(platform, input, { expectedVersion } = {}) {
+    const cookies = accountCookies(platform, input)
+    if (!accountAuthorized(platform, cookies)) throw new Error("尚未取得该平台的登录确认，请在官方窗口完成扫码")
+    return this.library.withJobLock("shopping-account-" + platform, async () => {
+      if (expectedVersion !== undefined && expectedVersion !== await this.accountVersion(platform)) throw new Error("账号设置已在其他窗口更改，请重新扫码")
+      await this.write("account-" + platform, { cookies, method: "qr-window", savedAt: new Date().toISOString() })
+      await this.write("version-" + platform, { version: randomBytes(16).toString("hex") })
+      return this.account(platform)
+    })
+  }
+  async logout(platform) {
+    shoppingAccount(platform)
+    return this.library.withJobLock("shopping-account-" + platform, async () => {
+      await this.write("version-" + platform, { version: randomBytes(16).toString("hex") })
+      await this.remove("account-" + platform)
+      return this.account(platform)
+    })
+  }
   async remove(name) { await unlink(join(this.directory, name + ".enc")).catch((error) => { if (error.code !== "ENOENT") throw error }) }
   async favorites() {
     let names

@@ -3555,9 +3555,9 @@ import { memo as _$memo4 } from "@opentui/solid";
 import { createComponent as _$createComponent4 } from "@opentui/solid";
 import { createEffect as createEffect2, createMemo, createSignal as createSignal4, onCleanup as onCleanup2, onMount, Show as Show4 } from "solid-js";
 import { ScrollBoxRenderable } from "@opentui/core";
-import { dirname as dirname5, resolve as resolve4, basename as basename4 } from "node:path";
+import { dirname as dirname5, resolve as resolve4, basename as basename5 } from "node:path";
 import { watch as watch2 } from "node:fs";
-import { access as access4 } from "node:fs/promises";
+import { access as access5 } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createHash as createHash8 } from "node:crypto";
 
@@ -7797,7 +7797,7 @@ function cents(input) {
   return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
 }
 var money = (value) => Number.isSafeInteger(value) && value >= 0 ? `\xA5${(value / 100).toFixed(2)}` : "\u4EF7\u683C\u5F85\u786E\u8BA4";
-var domains = ["jd.com", "3.cn", "taobao.com", "tmall.com", "tb.cn", "alimama.com", "manmanbuy.com"];
+var domains = ["jd.com", "3.cn", "taobao.com", "tmall.com", "tb.cn", "alimama.com", "manmanbuy.com", "yangkeduo.com", "pinduoduo.com"];
 function shoppingUrl(input, base) {
   try {
     if (typeof input !== "string" || !input || input.length > 4e3) return "";
@@ -7850,6 +7850,45 @@ function couponAvailable(coupon, now = Date.now()) {
 }
 
 // src/shopping/settings.mjs
+import { randomBytes as randomBytes6 } from "node:crypto";
+
+// src/shopping/accounts.mjs
+var SHOPPING_ACCOUNTS = [
+  { id: "jd", name: "\u4EAC\u4E1C", loginUrl: "https://passport.jd.com/new/login.aspx", home: "https://www.jd.com/", domains: ["jd.com"], scanner: "\u4EAC\u4E1C App" },
+  { id: "taobao", name: "\u6DD8\u5B9D / \u5929\u732B", loginUrl: "https://login.taobao.com/member/login.jhtml", home: "https://www.taobao.com/", domains: ["taobao.com", "tmall.com"], scanner: "\u624B\u673A\u6DD8\u5B9D / \u5929\u732B" },
+  { id: "pdd", name: "\u62FC\u591A\u591A", loginUrl: "https://mobile.yangkeduo.com/login.html", home: "https://mobile.yangkeduo.com/", domains: ["yangkeduo.com", "pinduoduo.com"], scanner: "\u62FC\u591A\u591A App" }
+];
+function shoppingAccount(platform) {
+  const account = SHOPPING_ACCOUNTS.find((item) => item.id === platform);
+  if (!account) throw new Error("\u4E0D\u652F\u6301\u7684\u8D2D\u7269\u8D26\u53F7\u5E73\u53F0");
+  return account;
+}
+function accountCookies(platform, input, now = Date.now()) {
+  const account = shoppingAccount(platform);
+  if (!Array.isArray(input) || input.length > 500) throw new Error("\u767B\u5F55\u4FE1\u606F\u683C\u5F0F\u5F02\u5E38");
+  const cookies = [];
+  let bytes = 0;
+  for (const value of input) {
+    const domain = String(value?.domain || "").toLowerCase().replace(/^\./, "");
+    if (!account.domains.some((allowed) => domain === allowed || domain.endsWith("." + allowed))) continue;
+    if (typeof value.name !== "string" || !/^[!#$%&'*+.^_`|~\w-]{1,100}$/.test(value.name) || typeof value.value !== "string" || /[\x00-\x20\x7f;]/.test(value.value) || !value.value || /^(deleted|expired|undefined|null)$/i.test(value.value)) continue;
+    const expires = Number(value.expires);
+    if (Number.isFinite(expires) && expires >= 0 && expires * 1e3 <= now) continue;
+    const path = typeof value.path === "string" && value.path.startsWith("/") && !/[\x00-\x1f\x7f]/.test(value.path) ? value.path.slice(0, 300) : "/";
+    bytes += value.name.length + value.value.length;
+    if (bytes > 65536 || cookies.length >= 100) throw new Error("\u767B\u5F55\u4FE1\u606F\u8D85\u8FC7\u5927\u5C0F\u9650\u5236");
+    cookies.push({ name: value.name, value: value.value, domain: String(value.domain).toLowerCase(), path, expires: Number.isFinite(expires) ? expires : -1, secure: value.secure === true, httpOnly: value.httpOnly === true, sameSite: ["Strict", "Lax", "None"].includes(value.sameSite) ? value.sameSite : "Lax" });
+  }
+  return cookies;
+}
+function accountAuthorized(platform, input) {
+  const cookies = accountCookies(platform, input), values = Object.fromEntries(cookies.map((cookie) => [cookie.name, cookie.value]));
+  if (platform === "jd") return Boolean(values.thor && (values.pin || values.pinId) || values.pt_key && values.pt_pin);
+  if (platform === "taobao") return Boolean(values.cookie2 && /^\d+$/.test(values.unb || "") && values.unb !== "0");
+  return Boolean((values.PASS_ID || values.PDDAccessToken) && /^\d+$/.test(values.pdd_user_id || "") && values.pdd_user_id !== "0");
+}
+
+// src/shopping/settings.mjs
 var ShoppingSettings = class {
   constructor(library) {
     this.library = library;
@@ -7897,6 +7936,33 @@ var ShoppingSettings = class {
     shoppingSource(source);
     await this.remove("config-" + source);
     return this.status(source);
+  }
+  async account(platform) {
+    shoppingAccount(platform);
+    const value = await this.read("account-" + platform, null);
+    return { platform, configured: Boolean(value?.cookies?.length), method: value?.method || "", savedAt: value?.savedAt || "" };
+  }
+  async accountVersion(platform) {
+    shoppingAccount(platform);
+    return (await this.read("version-" + platform, null))?.version || "0";
+  }
+  async saveAccount(platform, input, { expectedVersion } = {}) {
+    const cookies = accountCookies(platform, input);
+    if (!accountAuthorized(platform, cookies)) throw new Error("\u5C1A\u672A\u53D6\u5F97\u8BE5\u5E73\u53F0\u7684\u767B\u5F55\u786E\u8BA4\uFF0C\u8BF7\u5728\u5B98\u65B9\u7A97\u53E3\u5B8C\u6210\u626B\u7801");
+    return this.library.withJobLock("shopping-account-" + platform, async () => {
+      if (expectedVersion !== void 0 && expectedVersion !== await this.accountVersion(platform)) throw new Error("\u8D26\u53F7\u8BBE\u7F6E\u5DF2\u5728\u5176\u4ED6\u7A97\u53E3\u66F4\u6539\uFF0C\u8BF7\u91CD\u65B0\u626B\u7801");
+      await this.write("account-" + platform, { cookies, method: "qr-window", savedAt: (/* @__PURE__ */ new Date()).toISOString() });
+      await this.write("version-" + platform, { version: randomBytes6(16).toString("hex") });
+      return this.account(platform);
+    });
+  }
+  async logout(platform) {
+    shoppingAccount(platform);
+    return this.library.withJobLock("shopping-account-" + platform, async () => {
+      await this.write("version-" + platform, { version: randomBytes6(16).toString("hex") });
+      await this.remove("account-" + platform);
+      return this.account(platform);
+    });
   }
   async remove(name) {
     await unlink4(join11(this.directory, name + ".enc")).catch((error) => {
@@ -14163,14 +14229,375 @@ function createShoppingProviders({ http: http2 = createHttpClient({ timeoutMs: 1
   };
 }
 
+// src/shopping/browser.mjs
+import { spawn as spawn4, execFile as execFile3 } from "node:child_process";
+import { access as access4, mkdtemp as mkdtemp3, readFile as readFile7, rm as rm5 } from "node:fs/promises";
+import { join as join12, basename as basename4 } from "node:path";
+import { tmpdir as tmpdir2 } from "node:os";
+import { promisify as promisify3 } from "node:util";
+import { createInterface } from "node:readline";
+import { setTimeout as sleep } from "node:timers/promises";
+
+// src/shopping/windows-login.mjs
+var windowsLoginScript = String.raw`
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$profileDir = $null; $browser = $null; $socket = $null; $ready = $false
+function Emit($value) { [Console]::WriteLine(($value | ConvertTo-Json -Depth 12 -Compress)); [Console]::Out.Flush() }
+function Cdp($id, $method) {
+  $cts = New-Object System.Threading.CancellationTokenSource
+  $cts.CancelAfter(8000)
+  try {
+    $message = @{id=$id; method=$method} | ConvertTo-Json -Compress
+    $bytes = [Text.Encoding]::UTF8.GetBytes($message)
+    $segment = New-Object 'System.ArraySegment[byte]' -ArgumentList @(,$bytes)
+    $socket.SendAsync($segment,[Net.WebSockets.WebSocketMessageType]::Text,$true,$cts.Token).GetAwaiter().GetResult() | Out-Null
+    for ($event=0; $event -lt 200; $event++) {
+      $stream = New-Object IO.MemoryStream
+      try {
+        do {
+          $buffer = New-Object byte[] 16384
+          $part = New-Object 'System.ArraySegment[byte]' -ArgumentList @(,$buffer)
+          $result = $socket.ReceiveAsync($part,$cts.Token).GetAwaiter().GetResult()
+          if ($result.MessageType -eq [Net.WebSockets.WebSocketMessageType]::Close) { throw 'closed' }
+          $stream.Write($buffer,0,$result.Count)
+          if ($stream.Length -gt 2097152) { throw 'size' }
+        } while (!$result.EndOfMessage)
+        $reply = [Text.Encoding]::UTF8.GetString($stream.ToArray()) | ConvertFrom-Json
+        if ($reply.id -eq $id) {
+          if ($reply.error) { throw 'protocol' }
+          return $reply.result
+        }
+      } finally { $stream.Dispose() }
+    }
+    throw 'events'
+  } finally { $cts.Dispose() }
+}
+try {
+  $cfg = [Console]::ReadLine() | ConvertFrom-Json
+  $url = [Uri]$cfg.url
+  if ($url.Scheme -ne 'https' -or $url.UserInfo -or $url.Port -ne 443 -or $url.Host -notin @('passport.jd.com','login.taobao.com','mobile.yangkeduo.com')) { throw 'origin' }
+  if (!(Test-Path -LiteralPath $cfg.browser -PathType Leaf) -or [IO.Path]::GetFileName($cfg.browser) -notin @('chrome.exe','msedge.exe','chromium.exe')) { throw 'browser' }
+  $profileDir = Join-Path ([IO.Path]::GetTempPath()) ('moyu-shopping-private-' + [Guid]::NewGuid().ToString('N'))
+  [IO.Directory]::CreateDirectory($profileDir) | Out-Null
+  $psi = New-Object Diagnostics.ProcessStartInfo
+  $psi.FileName = $cfg.browser
+  $psi.Arguments = '--no-first-run --no-default-browser-check --disable-sync --disable-extensions --remote-debugging-address=127.0.0.1 --remote-debugging-port=0 --user-data-dir="' + $profileDir + '" --new-window "' + $url.AbsoluteUri + '"'
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
+  $browser = New-Object Diagnostics.Process; $browser.StartInfo = $psi
+  $browser.Start() | Out-Null
+  $discardOut = $browser.StandardOutput.ReadToEndAsync(); $discardErr = $browser.StandardError.ReadToEndAsync()
+  $active = Join-Path $profileDir 'DevToolsActivePort'
+  $deadline = [DateTime]::UtcNow.AddSeconds(25)
+  while (!(Test-Path -LiteralPath $active)) {
+    if ([DateTime]::UtcNow -gt $deadline -or $browser.HasExited) { throw 'startup' }
+    Start-Sleep -Milliseconds 100
+  }
+  $lines = [IO.File]::ReadAllLines($active)
+  if ($lines.Length -lt 2 -or $lines[0] -notmatch '^\d{1,5}$' -or $lines[1] -notmatch '^/devtools/browser/[a-zA-Z0-9-]+$') { throw 'endpoint' }
+  $socket = New-Object Net.WebSockets.ClientWebSocket
+  $cts = New-Object Threading.CancellationTokenSource; $cts.CancelAfter(8000)
+  try { $socket.ConnectAsync([Uri]('ws://127.0.0.1:'+$lines[0]+$lines[1]),$cts.Token).GetAwaiter().GetResult() | Out-Null } finally { $cts.Dispose() }
+  $ready = $true; Emit @{event='ready'}
+  while ($line = [Console]::ReadLine()) {
+    $request = $line | ConvertFrom-Json
+    if ($request.command -eq 'close') { try { Cdp 999999 'Browser.close' | Out-Null } catch {}; break }
+    if ($request.command -ne 'cookies') { throw 'command' }
+    $result = Cdp ([int]$request.id) 'Storage.getCookies'
+    Emit @{id=$request.id; cookies=@($result.cookies)}
+  }
+} catch { Emit @{event='error'; code=$(if($ready){'window-closed'}else{'browser-startup'})} }
+finally {
+  if ($socket) { $socket.Dispose() }
+  if ($browser) {
+    try { if (!$browser.HasExited) { $browser.CloseMainWindow() | Out-Null; if (!$browser.WaitForExit(2500)) { $browser.Kill(); $browser.WaitForExit(2500) | Out-Null } } } catch {}
+    $browser.Dispose()
+  }
+  if ($profileDir -and [IO.Path]::GetFileName($profileDir) -match '^moyu-shopping-private-[a-f0-9]{32}$') {
+    for ($i=0; $i -lt 20; $i++) {
+      try { Remove-Item -LiteralPath $profileDir -Force -Recurse -ErrorAction Stop; break } catch { Start-Sleep -Milliseconds 150 }
+    }
+  }
+}
+`;
+
+// src/shopping/browser.mjs
+var runFile = promisify3(execFile3);
+var winPowerShell = "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe";
+async function findShoppingBrowser() {
+  const candidates = [
+    process.env.MOYU_SHOPPING_BROWSER,
+    ...process.platform === "win32" ? [join12(process.env.PROGRAMFILES || "C:\\Program Files", "Google/Chrome/Application/chrome.exe"), join12(process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)", "Microsoft/Edge/Application/msedge.exe")] : process.platform === "darwin" ? ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"] : ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/opt/google/chrome/chrome", "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe", "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"]
+  ];
+  for (const path of candidates.filter(Boolean)) {
+    try {
+      await access4(path);
+      return { path, windows: process.platform === "win32" || /^\/mnt\/[a-z]\/.*\.exe$/i.test(path) };
+    } catch {
+    }
+  }
+  throw new Error("\u672A\u627E\u5230 Chrome / Edge\uFF0C\u8BF7\u5B89\u88C5\u6D4F\u89C8\u5668\uFF0C\u6216\u7528 MOYU_SHOPPING_BROWSER \u6307\u5B9A\u5176\u7A0B\u5E8F\u8DEF\u5F84");
+}
+function bridgeError(code) {
+  return new Error(code === "window-closed" ? "\u767B\u5F55\u7A97\u53E3\u5DF2\u5173\u95ED\u6216\u8FDE\u63A5\u65AD\u5F00\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u626B\u7801" : "\u65E0\u6CD5\u542F\u52A8\u72EC\u7ACB\u767B\u5F55\u7A97\u53E3\uFF0C\u8BF7\u786E\u8BA4 Chrome / Edge \u53CA WSL \u7684 Windows \u7A0B\u5E8F\u8C03\u7528\u53EF\u7528");
+}
+async function windowsSession(browser, url, { signal } = {}) {
+  const executable = process.platform === "win32" ? "powershell.exe" : winPowerShell;
+  const target = process.platform === "win32" ? browser.path : (await runFile("wslpath", ["-w", browser.path])).stdout.trim();
+  signal?.throwIfAborted();
+  const child = spawn4(executable, ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(windowsLoginScript, "utf16le").toString("base64")], { stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
+  const lines = createInterface({ input: child.stdout, crlfDelay: Infinity }), pending = /* @__PURE__ */ new Map();
+  let id = 0, closing = false, closed = false, readyResolve, readyReject, closeTask;
+  const ready = new Promise((resolve5, reject) => {
+    readyResolve = resolve5;
+    readyReject = reject;
+  });
+  const timer = setTimeout(() => readyReject(bridgeError("browser-startup")), 35e3);
+  function fail(error) {
+    readyReject(error);
+    for (const item of pending.values()) {
+      clearTimeout(item.timer);
+      item.reject(error);
+    }
+    pending.clear();
+  }
+  lines.on("line", (line) => {
+    if (line.length > 3 * 1024 * 1024) {
+      fail(bridgeError("window-closed"));
+      return;
+    }
+    let value;
+    try {
+      value = JSON.parse(line.replace(/^\uFEFF/, ""));
+    } catch {
+      return;
+    }
+    if (value.event === "ready") {
+      clearTimeout(timer);
+      readyResolve();
+      return;
+    }
+    if (value.event === "error") {
+      fail(bridgeError(value.code));
+      return;
+    }
+    const task = pending.get(value.id);
+    if (task) {
+      clearTimeout(task.timer);
+      pending.delete(value.id);
+      task.resolve(value.cookies);
+    }
+  });
+  child.once("error", () => fail(bridgeError("browser-startup")));
+  child.once("close", () => {
+    closed = true;
+    fail(bridgeError("window-closed"));
+  });
+  child.stdin.on("error", () => {
+    if (!closing) fail(bridgeError("window-closed"));
+  });
+  function close() {
+    return closeTask ||= finishClose();
+  }
+  async function finishClose() {
+    closing = true;
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", aborted);
+    if (!closed) {
+      child.stdin.end(JSON.stringify({ command: "close" }) + "\n");
+      for (let i = 0; i < 450 && !closed; i++) await sleep(100);
+      if (!closed) child.kill();
+    }
+    lines.close();
+    fail(new Error("\u626B\u7801\u767B\u5F55\u5DF2\u53D6\u6D88"));
+  }
+  const aborted = () => {
+    fail(signal.reason || new Error("\u626B\u7801\u767B\u5F55\u5DF2\u53D6\u6D88"));
+    void close();
+  };
+  signal?.addEventListener("abort", aborted, { once: true });
+  child.stdin.write(JSON.stringify({ browser: target, url }) + "\n");
+  try {
+    await ready;
+    signal?.throwIfAborted();
+  } catch (error) {
+    await close();
+    throw error;
+  }
+  return { async cookies() {
+    if (closed || closing) throw bridgeError("window-closed");
+    const request = ++id;
+    return new Promise((resolve5, reject) => {
+      pending.set(request, { resolve: resolve5, reject, timer: setTimeout(() => {
+        pending.delete(request);
+        reject(bridgeError("window-closed"));
+      }, 12e3) });
+      child.stdin.write(JSON.stringify({ command: "cookies", id: request }) + "\n");
+    });
+  }, close };
+}
+function browserEndpoint(text4) {
+  const [port, path] = text4.trim().split(/\r?\n/);
+  if (!/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535 || !/^\/devtools\/browser\/[\w-]+$/.test(path || "")) throw new Error("\u72EC\u7ACB\u767B\u5F55\u7A97\u53E3\u7684\u63A7\u5236\u5730\u5740\u5F02\u5E38");
+  return `ws://127.0.0.1:${port}${path}`;
+}
+async function nativeSession(browser, url, { signal } = {}) {
+  const directory = await mkdtemp3(join12(tmpdir2(), `moyu-shopping-login-${process.pid}-`));
+  const child = spawn4(browser.path, ["--no-first-run", "--no-default-browser-check", "--disable-sync", "--disable-extensions", "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=0", "--user-data-dir=" + directory, "--new-window", url], { stdio: "ignore" });
+  let error, exited = false, socket, closing = false, id = 0, closeTask;
+  const pending = /* @__PURE__ */ new Map();
+  child.once("error", () => {
+    error = bridgeError("browser-startup");
+  });
+  child.once("exit", () => {
+    exited = true;
+  });
+  child.once("close", () => {
+    exited = true;
+  });
+  function fail(error2) {
+    for (const task of pending.values()) {
+      clearTimeout(task.timer);
+      task.reject(error2);
+    }
+    pending.clear();
+  }
+  function request(method) {
+    if (socket?.readyState !== WebSocket.OPEN) return Promise.reject(bridgeError("window-closed"));
+    const key = ++id;
+    return new Promise((resolve5, reject) => {
+      pending.set(key, { resolve: resolve5, reject, timer: setTimeout(() => {
+        pending.delete(key);
+        reject(bridgeError("window-closed"));
+      }, 8e3) });
+      socket.send(JSON.stringify({ id: key, method }));
+    });
+  }
+  function close() {
+    return closeTask ||= finishClose();
+  }
+  async function finishClose() {
+    closing = true;
+    signal?.removeEventListener("abort", aborted);
+    try {
+      if (socket?.readyState === WebSocket.OPEN) await Promise.race([request("Browser.close").catch(() => {
+      }), sleep(1500)]);
+    } finally {
+      socket?.close();
+    }
+    if (!exited) child.kill("SIGTERM");
+    for (let i = 0; i < 30 && !exited; i++) await sleep(100);
+    if (!exited) {
+      child.kill("SIGKILL");
+      for (let i = 0; i < 10 && !exited; i++) await sleep(100);
+    }
+    fail(new Error("\u626B\u7801\u767B\u5F55\u5DF2\u53D6\u6D88"));
+    if (exited && basename4(directory).startsWith("moyu-shopping-login-")) await rm5(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+  const aborted = () => {
+    void close();
+  };
+  signal?.addEventListener("abort", aborted, { once: true });
+  try {
+    const until = Date.now() + 25e3;
+    let endpoint;
+    while (Date.now() < until) {
+      signal?.throwIfAborted();
+      if (error || exited) throw error || bridgeError("browser-startup");
+      try {
+        endpoint = browserEndpoint(await readFile7(join12(directory, "DevToolsActivePort"), "utf8"));
+        break;
+      } catch (err) {
+        if (err.code !== "ENOENT") throw err;
+      }
+      await sleep(100, void 0, { signal });
+    }
+    if (!endpoint) throw bridgeError("browser-startup");
+    socket = new WebSocket(endpoint);
+    await new Promise((resolve5, reject) => {
+      const timer = setTimeout(() => reject(bridgeError("browser-startup")), 8e3);
+      socket.addEventListener("open", () => {
+        clearTimeout(timer);
+        resolve5();
+      }, { once: true });
+      socket.addEventListener("error", () => {
+        clearTimeout(timer);
+        reject(bridgeError("browser-startup"));
+      }, { once: true });
+    });
+    socket.addEventListener("message", (event) => {
+      if (typeof event.data !== "string" || event.data.length > 2 * 1024 * 1024) {
+        fail(bridgeError("window-closed"));
+        return;
+      }
+      let data2;
+      try {
+        data2 = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      const task = pending.get(data2.id);
+      if (task) {
+        clearTimeout(task.timer);
+        pending.delete(data2.id);
+        data2.error ? task.reject(bridgeError("window-closed")) : task.resolve(data2.result);
+      }
+    });
+    socket.addEventListener("close", () => fail(bridgeError("window-closed")));
+    signal?.throwIfAborted();
+    return { async cookies() {
+      return (await request("Storage.getCookies")).cookies || [];
+    }, close };
+  } catch (error2) {
+    await close();
+    throw error2;
+  }
+}
+async function openShoppingLogin(platform, { signal, browser } = {}) {
+  const account = shoppingAccount(platform);
+  signal?.throwIfAborted();
+  const binary = browser || await findShoppingBrowser();
+  return binary.windows ? windowsSession(binary, account.loginUrl, { signal }) : nativeSession(binary, account.loginUrl, { signal });
+}
+
 // src/shopping/service.mjs
+import { setTimeout as sleep2 } from "node:timers/promises";
 var ShoppingService = class {
-  constructor(library, { providers = createShoppingProviders() } = {}) {
+  constructor(library, { providers = createShoppingProviders(), loginWindow = openShoppingLogin } = {}) {
     this.settings = new ShoppingSettings(library);
     this.providers = providers;
+    this.loginWindow = loginWindow;
+  }
+  /** @param {string} platform @param {{signal?: AbortSignal, onStatus?: (status: string) => void, timeoutMs?: number, intervalMs?: number}} options */
+  async login(platform, { signal, onStatus = () => {
+  }, timeoutMs = 18e4, intervalMs = 2e3 } = {}) {
+    shoppingAccount(platform);
+    const expectedVersion = await this.settings.accountVersion(platform);
+    signal?.throwIfAborted();
+    onStatus("opening");
+    let session;
+    try {
+      session = await this.loginWindow(platform, { signal });
+      const until = Date.now() + Math.min(3e5, Math.max(100, timeoutMs));
+      onStatus("waiting");
+      while (Date.now() < until) {
+        signal?.throwIfAborted();
+        const cookies = await session.cookies();
+        signal?.throwIfAborted();
+        if (accountAuthorized(platform, cookies)) {
+          onStatus("saving");
+          return await this.settings.saveAccount(platform, cookies, { expectedVersion });
+        }
+        await sleep2(Math.max(10, intervalMs), void 0, { signal });
+      }
+      throw new Error("\u7B49\u5F85\u626B\u7801\u8D85\u65F6\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u5B98\u65B9\u767B\u5F55\u7A97\u53E3");
+    } finally {
+      await session?.close();
+    }
   }
   async sources() {
-    return Promise.all(SHOPPING_SOURCES.map(async (source) => ({ ...source, ...await this.settings.status(source.id), capabilities: ["search", "offers", "favorites"], login: "platform-page" })));
+    return Promise.all(SHOPPING_SOURCES.map(async (source) => ({ ...source, ...await this.settings.status(source.id), capabilities: ["search", "offers", "favorites"], login: "isolated-platform-window" })));
   }
   /** @param {string} query @param {{source?: string, platform?: string, onlyCoupons?: boolean, maxPriceCents?: number|null, limit?: number, page?: number, signal?: AbortSignal}} options */
   async search(query, { source = "all", platform = "all", onlyCoupons = false, maxPriceCents = null, limit = 10, page = 1, signal } = {}) {
@@ -14228,7 +14655,10 @@ function createShoppingReader(api, library, settings) {
   const [notice, setNotice] = createSignal3("\u641C\u7D22\u5546\u54C1\uFF0C\u67E5\u770B\u597D\u4EF7\u4E0E\u4F18\u60E0\u6761\u4EF6");
   const [lastQuery, setLastQuery] = createSignal3("");
   const [page, setPage] = createSignal3(1);
-  let pending, disposed = false;
+  const [loginStatus, setLoginStatus] = createSignal3("");
+  const [loginBusy, setLoginBusy] = createSignal3(false);
+  let pending, loginAbort, disposed = false;
+  const loginTasks = /* @__PURE__ */ new Set();
   function toast(message, error = false) {
     if (!disposed && !api.lifecycle.signal.aborted) api.ui.toast({
       title: "\u58A8\u9C7C\u8D2D\u7269",
@@ -14238,6 +14668,118 @@ function createShoppingReader(api, library, settings) {
   }
   function fail(error) {
     toast(error instanceof Error ? error.message : "\u8D2D\u7269\u64CD\u4F5C\u5931\u8D25", true);
+  }
+  function cancelLogin() {
+    loginAbort?.abort(new Error("\u626B\u7801\u767B\u5F55\u5DF2\u53D6\u6D88"));
+    loginAbort = void 0;
+    setLoginBusy(false);
+    setLoginStatus("");
+  }
+  function startLogin(id) {
+    cancelLogin();
+    const account = shoppingAccount(id), abort = loginAbort = new AbortController();
+    setLoginBusy(true);
+    setLoginStatus(`${account.name}\uFF1A\u6B63\u5728\u6253\u5F00\u72EC\u7ACB\u767B\u5F55\u7A97\u53E3\u2026`);
+    const task = (async () => {
+      try {
+        await service.login(id, {
+          signal: abort.signal,
+          onStatus(status) {
+            if (abort.signal.aborted || disposed) return;
+            setLoginStatus(`${account.name}\uFF1A${status === "opening" ? "\u6B63\u5728\u6253\u5F00\u5B98\u65B9\u767B\u5F55\u7A97\u53E3\u2026" : status === "saving" ? "\u624B\u673A\u5DF2\u786E\u8BA4\uFF0C\u6B63\u5728\u52A0\u5BC6\u4FDD\u5B58\u2026" : `\u8BF7\u5728\u5B98\u65B9\u7A97\u53E3\u9009\u62E9\u626B\u7801\uFF0C\u7528${account.scanner}\u626B\u63CF\u5E76\u786E\u8BA4`}`);
+          }
+        });
+        if (!abort.signal.aborted && !disposed) {
+          setLoginStatus(`${account.name}\u767B\u5F55\u6001\u5DF2\u52A0\u5BC6\u4FDD\u5B58`);
+          toast(`${account.name}\u767B\u5F55\u6001\u5DF2\u52A0\u5BC6\u4FDD\u5B58`);
+        }
+      } catch (error) {
+        if (!abort.signal.aborted && !disposed) {
+          setLoginStatus(error instanceof Error ? error.message : "\u626B\u7801\u767B\u5F55\u5931\u8D25");
+          fail(error);
+        }
+      } finally {
+        if (loginAbort === abort) {
+          loginAbort = void 0;
+          setLoginBusy(false);
+        }
+      }
+    })();
+    loginTasks.add(task);
+    void task.finally(() => loginTasks.delete(task)).catch(() => {
+    });
+  }
+  async function accountMenu(id) {
+    const account = shoppingAccount(id), state = await service.settings.account(id);
+    if (disposed || api.lifecycle.signal.aborted) return;
+    settings.dialog(() => _$createComponent3(api.ui.DialogSelect, {
+      get title() {
+        return `${account.name} \xB7 ${state.configured ? "\u5DF2\u626B\u7801\u4FDD\u5B58" : "\u672A\u4FDD\u5B58\u767B\u5F55\u6001"}`;
+      },
+      placeholder: "\u4F7F\u7528\u72EC\u7ACB\u7684\u4E34\u65F6 Chrome / Edge \u7A97\u53E3\uFF0C\u624B\u673A\u786E\u8BA4\u540E\u672C\u5730\u52A0\u5BC6\u4FDD\u5B58",
+      get options() {
+        return [{
+          title: "\u626B\u7801\u767B\u5F55",
+          value: "qr",
+          description: `\u6253\u5F00\u5B98\u65B9\u9875\u9762\uFF0C\u7528${account.scanner}\u626B\u7801\uFF1B\u9700\u8981\u9A8C\u8BC1\u65F6\u5728\u8BE5\u9875\u9762\u5B8C\u6210`
+        }, ...loginBusy() ? [{
+          title: "\u53D6\u6D88\u6B63\u5728\u7B49\u5F85\u7684\u626B\u7801",
+          value: "cancel",
+          description: "\u5173\u95ED\u672C\u6B21\u72EC\u7ACB\u767B\u5F55\u7A97\u53E3\uFF0C\u505C\u6B62\u63A5\u6536\u7ED3\u679C"
+        }] : [], {
+          title: "\u53EA\u6253\u5F00\u5B98\u65B9\u767B\u5F55\u9875",
+          value: "page",
+          description: "\u4F7F\u7528\u9ED8\u8BA4\u6D4F\u89C8\u5668\uFF1B\u6B64\u65B9\u5F0F\u4E0D\u628A\u767B\u5F55\u6001\u4FDD\u5B58\u5230\u63D2\u4EF6"
+        }, ...state.configured ? [{
+          title: "\u9000\u51FA\u672C\u5730\u8D26\u53F7",
+          value: "logout",
+          description: "\u5220\u9664\u8BE5\u5E73\u53F0\u4FDD\u5B58\u7684\u767B\u5F55\u6001\uFF0C\u4FDD\u7559\u5176\u4ED6\u8D26\u53F7\u548C\u6536\u85CF"
+        }] : []];
+      },
+      onSelect: (item) => {
+        settings.close();
+        if (item.value === "qr") return startLogin(id);
+        if (item.value === "cancel") return cancelLogin();
+        if (item.value === "page") return void open3(account.loginUrl).catch(fail);
+        settings.dialog(() => _$createComponent3(api.ui.DialogConfirm, {
+          get title() {
+            return `\u9000\u51FA${account.name}\u672C\u5730\u8D26\u53F7`;
+          },
+          message: "\u5220\u9664\u63D2\u4EF6\u91CC\u4FDD\u5B58\u7684\u8BE5\u5E73\u53F0\u767B\u5F55\u6001\uFF1F\u5176\u4ED6\u5E73\u53F0\u3001\u6536\u85CF\u548C\u8054\u76DF\u5E94\u7528\u51ED\u636E\u4FDD\u7559\u3002",
+          get onCancel() {
+            return settings.close;
+          },
+          onConfirm: () => {
+            settings.close();
+            cancelLogin();
+            void service.settings.logout(id).then(() => toast("\u5DF2\u5220\u9664\u672C\u5730\u767B\u5F55\u6001")).catch(fail);
+          }
+        }));
+      }
+    }));
+  }
+  async function accounts() {
+    try {
+      const states = await Promise.all(SHOPPING_ACCOUNTS.map((account) => service.settings.account(account.id)));
+      if (disposed || api.lifecycle.signal.aborted) return;
+      settings.dialog(() => _$createComponent3(api.ui.DialogSelect, {
+        title: "\u8D2D\u7269\u8D26\u53F7 \xB7 \u626B\u7801\u767B\u5F55",
+        placeholder: "\u4EAC\u4E1C\u3001\u6DD8\u5B9D / \u5929\u732B\u3001\u62FC\u591A\u591A\u5206\u522B\u4FDD\u5B58\uFF1B\u4E0D\u9700\u8981\u8054\u76DF API Key",
+        get options() {
+          return SHOPPING_ACCOUNTS.map((account, i) => ({
+            title: account.name,
+            value: account.id,
+            description: states[i].configured ? `\u5DF2\u626B\u7801\u4FDD\u5B58 \xB7 ${states[i].savedAt}` : `\u672A\u4FDD\u5B58 \xB7 \u652F\u6301${account.scanner}\u626B\u7801`
+          }));
+        },
+        onSelect: (item) => {
+          settings.close();
+          void accountMenu(item.value).catch(fail);
+        }
+      }));
+    } catch (error) {
+      fail(error);
+    }
   }
   async function open3(url) {
     const target = shoppingUrl(url);
@@ -14501,26 +15043,22 @@ function createShoppingReader(api, library, settings) {
       const states = await service.sources();
       if (disposed || api.lifecycle.signal.aborted) return;
       settings.dialog(() => _$createComponent3(api.ui.DialogSelect, {
-        title: "\u8D2D\u7269\u6765\u6E90\u4E0E\u767B\u5F55",
-        placeholder: "\u516C\u5F00\u597D\u4EF7\u65E0\u9700\u5BC6\u94A5\uFF1B\u5E73\u53F0\u767B\u5F55\u5728\u5B98\u65B9\u9875\u9762\u5B8C\u6210\uFF0C\u63D2\u4EF6\u4E0D\u63A5\u6536\u4E70\u5BB6\u5BC6\u7801",
+        title: "\u8D2D\u7269\u67E5\u8BE2\u6765\u6E90",
+        placeholder: "\u8054\u76DF\u5E94\u7528\u51ED\u636E\u4E0E\u4E70\u5BB6\u626B\u7801\u8D26\u53F7\u5206\u522B\u7BA1\u7406\uFF1B\u516C\u5F00\u597D\u4EF7\u65E0\u9700\u5BC6\u94A5",
         get options() {
           return [...states.map((item) => ({
             title: `${item.name} \xB7 ${!item.credential ? "\u516C\u5F00\u7F51\u9875" : item.configured ? "\u5E94\u7528\u5DF2\u914D\u7F6E" : "\u5E94\u7528\u672A\u914D\u7F6E"}`,
             value: item.id,
             description: item.credential ? "\u914D\u7F6E / \u5220\u9664\u8054\u76DF\u5E94\u7528\u51ED\u636E" : "\u76F4\u63A5\u641C\u7D22\u516C\u5F00\u6298\u6263\u7206\u6599\uFF1B\u9047\u5230\u9A8C\u8BC1\u65F6\u505C\u6B62"
           })), {
-            title: "\u6253\u5F00\u4EAC\u4E1C\u5B98\u65B9\u767B\u5F55\u9875",
-            value: "login-jd",
-            description: "\u767B\u5F55\u4FDD\u7559\u5728\u6D4F\u89C8\u5668\uFF0C\u7528\u4E8E\u9886\u5238\u53CA\u8D2D\u4E70"
-          }, {
-            title: "\u6253\u5F00\u6DD8\u5B9D / \u5929\u732B\u5B98\u65B9\u767B\u5F55\u9875",
-            value: "login-taobao",
-            description: "\u767B\u5F55\u4FDD\u7559\u5728\u6D4F\u89C8\u5668\uFF0C\u7528\u4E8E\u9886\u5238\u53CA\u8D2D\u4E70"
+            title: "\u8D2D\u7269\u8D26\u53F7 \xB7 \u626B\u7801\u767B\u5F55\u2026",
+            value: "accounts",
+            description: "\u7BA1\u7406\u4EAC\u4E1C\u3001\u6DD8\u5B9D / \u5929\u732B\u3001\u62FC\u591A\u591A\u7684\u672C\u5730\u8D26\u53F7"
           }];
         },
         onSelect: (item) => {
           settings.close();
-          if (item.value.startsWith("login-")) return void open3(item.value === "login-jd" ? "https://passport.jd.com/new/login.aspx" : "https://login.taobao.com/member/login.jhtml").catch(fail);
+          if (item.value === "accounts") return void accounts();
           if (item.value === "manmanbuy") {
             setSource("manmanbuy");
             return promptSearch();
@@ -14590,13 +15128,14 @@ function createShoppingReader(api, library, settings) {
         action: filters2
       }), null);
       _$insert3(_el$2, _$createComponent3(Button, {
-        label: "[\u6765\u6E90/\u767B\u5F55]",
+        label: "[\u6765\u6E90]",
         action: sources
       }), null);
-      _$insert3(_el$3, (() => {
-        var _c$ = _$memo3(() => !!busy());
-        return () => _c$() ? "\u6B63\u5728\u67E5\u8BE2\uFF0C\u53EF\u70B9\u51FB\u53D6\u6D88" : notice();
-      })());
+      _$insert3(_el$2, _$createComponent3(Button, {
+        label: "[\u8D26\u53F7]",
+        action: accounts
+      }), null);
+      _$insert3(_el$3, () => loginStatus() || (busy() ? "\u6B63\u5728\u67E5\u8BE2\uFF0C\u53EF\u70B9\u51FB\u53D6\u6D88" : notice()));
       _$insert3(_el$, _$createComponent3(For2, {
         get each() {
           return results().slice(0, count2());
@@ -14640,34 +15179,47 @@ function createShoppingReader(api, library, settings) {
       _$setProp3(_el$5, "gap", 1);
       _$insert3(_el$5, _$createComponent3(Show3, {
         get when() {
-          return busy();
+          return loginBusy();
         },
         get fallback() {
           return _$createComponent3(Show3, {
             get when() {
-              return lastQuery();
+              return busy();
+            },
+            get fallback() {
+              return _$createComponent3(Show3, {
+                get when() {
+                  return lastQuery();
+                },
+                get children() {
+                  return [_$createComponent3(Button, {
+                    label: "[\u5237\u65B0]",
+                    action: () => search(lastQuery(), page())
+                  }), _$createComponent3(Button, {
+                    label: "[\u4E0B\u4E00\u9875]",
+                    action: () => search(lastQuery(), page() + 1),
+                    get muted() {
+                      return page() >= 100;
+                    }
+                  })];
+                }
+              });
             },
             get children() {
-              return [_$createComponent3(Button, {
-                label: "[\u5237\u65B0]",
-                action: () => search(lastQuery(), page())
-              }), _$createComponent3(Button, {
-                label: "[\u4E0B\u4E00\u9875]",
-                action: () => search(lastQuery(), page() + 1),
-                get muted() {
-                  return page() >= 100;
+              return _$createComponent3(Button, {
+                label: "[\u53D6\u6D88]",
+                action: () => {
+                  pending?.abort();
+                  setNotice("\u5DF2\u53D6\u6D88\u67E5\u8BE2");
                 }
-              })];
+              });
             }
           });
         },
         get children() {
           return _$createComponent3(Button, {
-            label: "[\u53D6\u6D88]",
-            action: () => {
-              pending?.abort();
-              setNotice("\u5DF2\u53D6\u6D88\u67E5\u8BE2");
-            }
+            label: "[\u53D6\u6D88\u626B\u7801]",
+            action: cancelLogin
           });
         }
       }));
@@ -14695,10 +15247,14 @@ function createShoppingReader(api, library, settings) {
     results: showResults,
     favorites,
     sources,
+    accounts,
+    login: startLogin,
     View,
-    dispose() {
+    async dispose() {
       disposed = true;
       pending?.abort();
+      cancelLogin();
+      await Promise.allSettled([...loginTasks]);
     }
   };
 }
@@ -14710,8 +15266,8 @@ import { randomUUID as randomUUID4 } from "node:crypto";
 // src/runtime/channel.mjs
 import { createHash as createHash7 } from "node:crypto";
 import { realpath as realpath3, mkdir as mkdir8 } from "node:fs/promises";
-import { join as join12 } from "node:path";
-import { tmpdir as tmpdir2 } from "node:os";
+import { join as join13 } from "node:path";
+import { tmpdir as tmpdir3 } from "node:os";
 var MAX_FRAME = 512 * 1024;
 async function runtimeAddress(library) {
   await library.ready();
@@ -14720,9 +15276,9 @@ async function runtimeAddress(library) {
   const scope = createHash7("sha256").update(identity).update(key).digest("hex").slice(0, 32);
   if (process.platform === "win32") return { path: "\\\\.\\pipe\\opencode-moyu-" + scope, scope };
   if (process.platform === "linux") return { path: "\0opencode-moyu-" + scope, scope };
-  const folder = join12(tmpdir2(), `moyu-${process.getuid?.() ?? "user"}-${scope}`);
+  const folder = join13(tmpdir3(), `moyu-${process.getuid?.() ?? "user"}-${scope}`);
   await mkdir8(folder, { recursive: true, mode: 448 });
-  return { path: join12(folder, "media.sock"), scope };
+  return { path: join13(folder, "media.sock"), scope };
 }
 function channel(socket, vault, receive, failed) {
   let buffer = "", reads = Promise.resolve(), writes = Promise.resolve(), ended = false;
@@ -14767,10 +15323,10 @@ import { createServer } from "node:net";
 import { randomUUID as randomUUID3 } from "node:crypto";
 
 // src/music/player.mjs
-import { execFile as execFile3 } from "node:child_process";
-import { promisify as promisify3 } from "node:util";
+import { execFile as execFile4 } from "node:child_process";
+import { promisify as promisify4 } from "node:util";
 import { performance } from "node:perf_hooks";
-var execute3 = promisify3(execFile3);
+var execute3 = promisify4(execFile4);
 async function inspectAudio(path) {
   const binary = await mediaBinary("ffprobe");
   const { stdout } = await execute3(binary, ["-v", "error", "-protocol_whitelist", "file,pipe", "-show_entries", "stream=codec_type:format=duration", "-of", "json", await nativeMediaPath(binary, path)], { timeout: 15e3, maxBuffer: 65536, windowsHide: true });
@@ -15755,6 +16311,10 @@ var tui = async (host, options) => {
   moyu?.registerNavigation?.((next2) => {
     if (["novel", "video", "music", "shopping"].includes(next2) && !api.lifecycle.signal.aborted) return navigateMoyu(next2);
   });
+  moyu?.registerShoppingLogin?.((platform) => {
+    navigateMoyu("shopping");
+    shopping.login(platform);
+  });
   moyu?.registerMusicLogin?.((platform) => {
     if (api.lifecycle.signal.aborted) return;
     selectMode("music");
@@ -16241,11 +16801,11 @@ var tui = async (host, options) => {
   let refresh;
   const watcher = watch2(booksDir, (_event, filename) => {
     const current = book();
-    if (!current || filename?.toString() !== basename4(current.path)) return;
+    if (!current || filename?.toString() !== basename5(current.path)) return;
     clearTimeout(refresh);
     refresh = setTimeout(() => {
       if (api.lifecycle.signal.aborted || book()?.path !== current.path) return;
-      void access4(current.path).then(() => open3(current.path, true)).catch((error) => {
+      void access5(current.path).then(() => open3(current.path, true)).catch((error) => {
         if (error.code !== "ENOENT" || api.lifecycle.signal.aborted || book()?.path !== current.path) return;
         setBook(void 0);
         setOffset(0);
@@ -16288,8 +16848,7 @@ var tui = async (host, options) => {
     watcher.close();
     clearTimeout(refresh);
     save();
-    shopping.dispose();
-    const disposing = Promise.all([video.dispose(), music.dispose()]).then(() => playback.dispose());
+    const disposing = Promise.all([video.dispose(), music.dispose(), shopping.dispose()]).then(() => playback.dispose());
     api.renderer.off("resize", resize);
     if (ownsDialog) closeDialog();
     return disposing;
@@ -17013,6 +17572,13 @@ function moyuNavigation(input) {
   const sections = { "\u5C0F\u8BF4": "novel", "\u9605\u8BFB": "novel", novel: "novel", "\u89C6\u9891": "video", video: "video", "\u97F3\u4E50": "music", music: "music", "\u8D2D\u7269": "shopping", "\u6BD4\u4EF7": "shopping", shopping: "shopping", shop: "shopping" };
   return Object.hasOwn(sections, query) ? sections[query] : void 0;
 }
+function shoppingLoginRequest(input) {
+  const query = collectionQuery(input).replace(/\s+/gu, "").replace(/[。！!]+$/u, "");
+  const name = "(\u4EAC\u4E1C|jd|\u6DD8\u5B9D|\u5929\u732B|tb|taobao|tmall|\u62FC\u591A\u591A|pdd|pinduoduo)";
+  const match = new RegExp(`^(?:\u8BF7)?(?:\u5E2E\u6211)?(?:\u626B\u7801)?\u767B\u5F55${name}(?:\u8D26\u53F7)?$`, "iu").exec(query) || new RegExp(`^${name}(?:\u626B\u7801)?\u767B\u5F55$`, "iu").exec(query);
+  if (!match) return;
+  return /京东|^jd$/i.test(match[1]) ? "jd" : /拼多多|pdd|pinduoduo/i.test(match[1]) ? "pdd" : "taobao";
+}
 function musicLoginRequest(input) {
   const query = collectionQuery(input).replace(/\s+/gu, "").replace(/[。！!]+$/u, "");
   const platform = "(qq(?:\u97F3\u4E50|music)?|\u7F51\u6613\u4E91(?:\u97F3\u4E50)?|\u9177\u72D7(?:\u97F3\u4E50)?|netease|kugou)";
@@ -17020,12 +17586,18 @@ function musicLoginRequest(input) {
   if (!match) return;
   return /^(?:qq)/i.test(match[1]) ? "qq" : /网易|netease/i.test(match[1]) ? "netease" : "kugou";
 }
-async function dispatchMoyu(host, input, { login, navigate } = {}) {
+async function dispatchMoyu(host, input, { login, shoppingLogin, navigate } = {}) {
   const mode = moyuNavigation(input);
   if (mode) {
     if (!navigate) throw new Error("\u58A8\u9C7C\u529F\u80FD\u5165\u53E3\u5C1A\u672A\u51C6\u5907\u597D\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
     await navigate(mode);
     return { kind: "navigation", mode };
+  }
+  const shopping = shoppingLoginRequest(input);
+  if (shopping) {
+    if (!shoppingLogin) throw new Error("\u8D2D\u7269\u767B\u5F55\u5165\u53E3\u5C1A\u672A\u51C6\u5907\u597D\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u6216\u6253\u5F00 /moyu \u8D2D\u7269 \u7684\u8D26\u53F7\u83DC\u5355");
+    await shoppingLogin(shopping);
+    return { kind: "shopping-login", platform: shopping };
   }
   const platform = musicLoginRequest(input);
   if (platform) {
@@ -17064,6 +17636,7 @@ var v2_default = Plugin.define({
     let onClose;
     let musicLogin;
     let navigation;
+    let shoppingLogin;
     const finish = () => {
       const callback = onClose;
       onClose = void 0;
@@ -17107,7 +17680,10 @@ var v2_default = Plugin.define({
     }
     async function collect(query) {
       try {
-        const result = await dispatchMoyu(context, query, { navigate(mode) {
+        const result = await dispatchMoyu(context, query, { shoppingLogin(platform) {
+          if (!shoppingLogin) throw new Error("\u8D2D\u7269\u767B\u5F55\u5165\u53E3\u5C1A\u672A\u51C6\u5907\u597D\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+          shoppingLogin(platform);
+        }, navigate(mode) {
           if (!navigation) throw new Error("\u58A8\u9C7C\u529F\u80FD\u5165\u53E3\u5C1A\u672A\u51C6\u5907\u597D\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
           return navigation(mode);
         }, login(platform) {
@@ -17123,6 +17699,12 @@ var v2_default = Plugin.define({
     const bridge = {
       moyu: {
         collect,
+        registerShoppingLogin(handler) {
+          shoppingLogin = handler;
+          cleanup.push(() => {
+            shoppingLogin = void 0;
+          });
+        },
         registerNavigation(handler) {
           navigation = handler;
           cleanup.push(() => {

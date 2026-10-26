@@ -20,7 +20,7 @@ export function cents(input) {
   return Number(whole) * 100 + Number(fraction.padEnd(2, "0"))
 }
 export const money = (value) => Number.isSafeInteger(value) && value >= 0 ? `¥${(value / 100).toFixed(2)}` : "价格待确认"
-const domains = ["jd.com", "3.cn", "taobao.com", "tmall.com", "tb.cn", "alimama.com", "manmanbuy.com"]
+const domains = ["jd.com", "3.cn", "taobao.com", "tmall.com", "tb.cn", "alimama.com", "manmanbuy.com", "yangkeduo.com", "pinduoduo.com"]
 export function shoppingUrl(input, base) {
   try {
     if (typeof input !== "string" || !input || input.length > 4000) return ""

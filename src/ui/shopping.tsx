@@ -7,6 +7,7 @@ import { LibraryStore } from "../library/store.mjs"
 import { ShoppingService } from "../shopping/service.mjs"
 import { SHOPPING_SOURCES, shoppingOffer, shoppingSource, shoppingUrl, offerKey, money, cents, couponAvailable } from "../shopping/contracts.mjs"
 import { openMusicPage as openPage } from "../music/login.mjs"
+import { SHOPPING_ACCOUNTS, shoppingAccount } from "../shopping/accounts.mjs"
 
 type API = Parameters<TuiPlugin>[0]
 type Offer = ReturnType<typeof shoppingOffer>
@@ -25,9 +26,57 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
   const [notice, setNotice] = createSignal("搜索商品，查看好价与优惠条件")
   const [lastQuery, setLastQuery] = createSignal("")
   const [page, setPage] = createSignal(1)
-  let pending: AbortController | undefined, disposed = false
+  const [loginStatus, setLoginStatus] = createSignal("")
+  const [loginBusy, setLoginBusy] = createSignal(false)
+  let pending: AbortController | undefined, loginAbort: AbortController | undefined, disposed = false
+  const loginTasks = new Set<Promise<void>>()
   function toast(message: string, error = false) { if (!disposed && !api.lifecycle.signal.aborted) api.ui.toast({ title: "墨鱼购物", message, variant: error ? "error" : "info" }) }
   function fail(error: unknown) { toast(error instanceof Error ? error.message : "购物操作失败", true) }
+  function cancelLogin() { loginAbort?.abort(new Error("扫码登录已取消")); loginAbort = undefined; setLoginBusy(false); setLoginStatus("") }
+  function startLogin(id: string) {
+    cancelLogin()
+    const account = shoppingAccount(id), abort = loginAbort = new AbortController()
+    setLoginBusy(true); setLoginStatus(`${account.name}：正在打开独立登录窗口…`)
+    const task = (async () => {
+      try {
+        await service.login(id, { signal: abort.signal, onStatus(status) {
+          if (abort.signal.aborted || disposed) return
+          setLoginStatus(`${account.name}：${status === "opening" ? "正在打开官方登录窗口…" : status === "saving" ? "手机已确认，正在加密保存…" : `请在官方窗口选择扫码，用${account.scanner}扫描并确认`}`)
+        } })
+        if (!abort.signal.aborted && !disposed) { setLoginStatus(`${account.name}登录态已加密保存`); toast(`${account.name}登录态已加密保存`) }
+      } catch (error) {
+        if (!abort.signal.aborted && !disposed) { setLoginStatus(error instanceof Error ? error.message : "扫码登录失败"); fail(error) }
+      } finally { if (loginAbort === abort) { loginAbort = undefined; setLoginBusy(false) } }
+    })()
+    loginTasks.add(task); void task.finally(() => loginTasks.delete(task)).catch(() => {})
+  }
+  async function accountMenu(id: string) {
+    const account = shoppingAccount(id), state = await service.settings.account(id)
+    if (disposed || api.lifecycle.signal.aborted) return
+    settings.dialog(() => <api.ui.DialogSelect title={`${account.name} · ${state.configured ? "已扫码保存" : "未保存登录态"}`} placeholder="使用独立的临时 Chrome / Edge 窗口，手机确认后本地加密保存"
+      options={[
+        { title: "扫码登录", value: "qr", description: `打开官方页面，用${account.scanner}扫码；需要验证时在该页面完成` },
+        ...(loginBusy() ? [{ title: "取消正在等待的扫码", value: "cancel", description: "关闭本次独立登录窗口，停止接收结果" }] : []),
+        { title: "只打开官方登录页", value: "page", description: "使用默认浏览器；此方式不把登录态保存到插件" },
+        ...(state.configured ? [{ title: "退出本地账号", value: "logout", description: "删除该平台保存的登录态，保留其他账号和收藏" }] : []),
+      ]} onSelect={(item) => {
+        settings.close()
+        if (item.value === "qr") return startLogin(id)
+        if (item.value === "cancel") return cancelLogin()
+        if (item.value === "page") return void open(account.loginUrl).catch(fail)
+        settings.dialog(() => <api.ui.DialogConfirm title={`退出${account.name}本地账号`} message="删除插件里保存的该平台登录态？其他平台、收藏和联盟应用凭据保留。" onCancel={settings.close}
+          onConfirm={() => { settings.close(); cancelLogin(); void service.settings.logout(id).then(() => toast("已删除本地登录态")).catch(fail) }} />)
+      }} />)
+  }
+  async function accounts() {
+    try {
+      const states = await Promise.all(SHOPPING_ACCOUNTS.map((account) => service.settings.account(account.id)))
+      if (disposed || api.lifecycle.signal.aborted) return
+      settings.dialog(() => <api.ui.DialogSelect title="购物账号 · 扫码登录" placeholder="京东、淘宝 / 天猫、拼多多分别保存；不需要联盟 API Key"
+        options={SHOPPING_ACCOUNTS.map((account, i) => ({ title: account.name, value: account.id, description: states[i].configured ? `已扫码保存 · ${states[i].savedAt}` : `未保存 · 支持${account.scanner}扫码` }))}
+        onSelect={(item) => { settings.close(); void accountMenu(item.value).catch(fail) }} />)
+    } catch (error) { fail(error) }
+  }
   async function open(url: string) {
     const target = shoppingUrl(url)
     if (!target) throw new Error("无效的购物平台链接")
@@ -121,14 +170,13 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
     try {
       const states = await service.sources()
       if (disposed || api.lifecycle.signal.aborted) return
-      settings.dialog(() => <api.ui.DialogSelect title="购物来源与登录" placeholder="公开好价无需密钥；平台登录在官方页面完成，插件不接收买家密码"
+      settings.dialog(() => <api.ui.DialogSelect title="购物查询来源" placeholder="联盟应用凭据与买家扫码账号分别管理；公开好价无需密钥"
         options={[
           ...states.map((item) => ({ title: `${item.name} · ${!item.credential ? "公开网页" : item.configured ? "应用已配置" : "应用未配置"}`, value: item.id, description: item.credential ? "配置 / 删除联盟应用凭据" : "直接搜索公开折扣爆料；遇到验证时停止" })),
-          { title: "打开京东官方登录页", value: "login-jd", description: "登录保留在浏览器，用于领券及购买" },
-          { title: "打开淘宝 / 天猫官方登录页", value: "login-taobao", description: "登录保留在浏览器，用于领券及购买" },
+          { title: "购物账号 · 扫码登录…", value: "accounts", description: "管理京东、淘宝 / 天猫、拼多多的本地账号" },
         ]} onSelect={(item) => {
           settings.close()
-          if (item.value.startsWith("login-")) return void open(item.value === "login-jd" ? "https://passport.jd.com/new/login.aspx" : "https://login.taobao.com/member/login.jhtml").catch(fail)
+          if (item.value === "accounts") return void accounts()
           if (item.value === "manmanbuy") { setSource("manmanbuy"); return promptSearch() }
           configure(item.value)
         }} />)
@@ -152,8 +200,8 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
     const textRows = () => settings.rows() < 8 ? 1 : 2
     const count = () => Math.max(0, Math.floor((settings.rows() - 2 - textRows() * 2) / 3))
     return <box flexDirection="column" height={settings.rows()} flexShrink={0}>
-      <box height={1} flexShrink={0} flexDirection="row" gap={1}><Button label="[筛选]" action={filters} /><Button label="[来源/登录]" action={sources} /></box>
-      <text fg={theme().textMuted} height={textRows()}>{busy() ? "正在查询，可点击取消" : notice()}</text>
+      <box height={1} flexShrink={0} flexDirection="row" gap={1}><Button label="[筛选]" action={filters} /><Button label="[来源]" action={sources} /><Button label="[账号]" action={accounts} /></box>
+      <text fg={theme().textMuted} height={textRows()}>{loginStatus() || (busy() ? "正在查询，可点击取消" : notice())}</text>
       <For each={results().slice(0, count())}>{(offer) => <box height={3} flexShrink={0}>
         <Button label={`${money(offer.priceCents)} ${offer.title}`} action={() => detail(offer)} />
         <text fg={theme().textMuted} height={1} wrapMode="none">{offer.priceLabel} · {offer.shop || offer.platform}</text>
@@ -161,10 +209,10 @@ export function createShoppingReader(api: API, library: LibraryStore, settings: 
       </box>}</For>
       <box flexGrow={1} />
       <box height={1} flexShrink={0} flexDirection="row" gap={1}>
-        <Show when={busy()} fallback={<Show when={lastQuery()}><Button label="[刷新]" action={() => search(lastQuery(), page())} /><Button label="[下一页]" action={() => search(lastQuery(), page() + 1)} muted={page() >= 100} /></Show>}><Button label="[取消]" action={() => { pending?.abort(); setNotice("已取消查询") }} /></Show>
+        <Show when={loginBusy()} fallback={<Show when={busy()} fallback={<Show when={lastQuery()}><Button label="[刷新]" action={() => search(lastQuery(), page())} /><Button label="[下一页]" action={() => search(lastQuery(), page() + 1)} muted={page() >= 100} /></Show>}><Button label="[取消]" action={() => { pending?.abort(); setNotice("已取消查询") }} /></Show>}><Button label="[取消扫码]" action={cancelLogin} /></Show>
       </box>
       <text fg={theme().textMuted} height={textRows()}>报价需核对规格和优惠条件；领券、登录及购买在平台页面完成</text>
     </box>
   }
-  return { search: promptSearch, results: showResults, favorites, sources, View, dispose() { disposed = true; pending?.abort() } }
+  return { search: promptSearch, results: showResults, favorites, sources, accounts, login: startLogin, View, async dispose() { disposed = true; pending?.abort(); cancelLogin(); await Promise.allSettled([...loginTasks]) } }
 }
