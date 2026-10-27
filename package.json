@@ -1,6 +1,6 @@
 {
   "name": "opencode-moyu",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "墨鱼多媒体：OpenCode 内的小说、视频、聚合音乐与购物比价",
   "type": "module",
   "license": "MIT",
@@ -18,6 +18,8 @@
     "README.md",
     "assets/brand",
     "TERMS.md",
+    "PRIVACY.md",
+    "SAFETY.md",
     "THIRD_PARTY_NOTICES.txt",
     "docs/MUSIC.md",
     "docs/SHOPPING.md",
@@ -33,7 +35,9 @@
     "test": "node --test test/*.test.mjs",
     "install:plugin": "node dist/install.mjs",
     "uninstall:plugin": "node dist/install.mjs --remove",
-    "package:zip": "python3 scripts/package.py"
+    "package:zip": "python3 scripts/package.py",
+    "test:privacy": "python3 -m unittest discover -s test -p public_privacy_test.py",
+    "audit:public": "python3 scripts/audit-public.py --history HEAD"
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",

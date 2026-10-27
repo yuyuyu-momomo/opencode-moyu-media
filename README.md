@@ -10,13 +10,15 @@
 
 **本软件按“现状”提供，无任何明示或默示担保。在适用法律允许的最大范围内，作者、版权所有者、贡献者、维护者和分发者不对因本软件、使用或无法使用本软件而产生的任何索赔、损害或其他责任承担责任；依法不得排除或限制的责任除外。**
 
-安装、登录、导入、采集或播放前，请阅读完整的 [使用条款与免责声明](TERMS.md) 和 [MIT 许可证](LICENSE)。用户应自行核实内容授权并遵守适用法律、平台条款及使用环境的管理要求。可访问、个人使用或加密保存不等于取得版权许可；本项目不提供第三方内容、账号或会员授权，也不代表相关平台。软件及第三方服务可能失效，账号、数据及运行风险应由使用者结合实际情况评估。
+安装、登录、导入、采集、播放或购物查询前，请阅读 [使用条款与免责声明](TERMS.md)、[隐私与数据说明](PRIVACY.md)、[安全使用说明](SAFETY.md) 和 [MIT 许可证](LICENSE)。用户应自行核实内容授权并遵守适用法律、平台条款及使用环境的管理要求。可访问、个人使用或加密保存不等于取得版权许可；本项目不提供第三方内容、账号或会员授权，也不代表相关平台。购物报价与券条件以平台实际结算为准，插件不代下单或付款。
 
 代码仍按 MIT 许可开放使用、修改和分发；上述说明不增加“禁止商用”等许可限制，也不承诺声明本身可以排除所有法律责任。
 
+资料库与账号设置在本地加密保存；密钥默认与安装目录同机保存。模型采集的输入、搜索结果和工具输出可能进入所配置的模型服务，第三方平台仍可见请求信息。本地加密、删除记录和重写 Git 历史均不等于绝对安全、彻底擦除或匿名；仓库所属 GitHub 账号仍公开可见。
+
 ## 快速安装
 
-[下载安装包 ZIP](https://github.com/yuyuyu-momomo/opencode-moyu-media/raw/refs/heads/main/releases/opencode-moyu-media-v0.8.1.zip)，解压后阅读 `TERMS.md` 和 `LICENSE`，再运行 `bash install.sh`；Windows 原生 OpenCode 可双击 `install.cmd`。
+[下载安装包 ZIP](https://github.com/yuyuyu-momomo/opencode-moyu-media/raw/refs/heads/main/releases/opencode-moyu-media-v0.8.2.zip)，解压后阅读 `TERMS.md` 和 `LICENSE`，再运行 `bash install.sh`；Windows 原生 OpenCode 可双击 `install.cmd`。
 
 也可直接安装仓库中的预编译版本：
 

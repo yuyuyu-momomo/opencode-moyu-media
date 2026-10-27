@@ -74,14 +74,14 @@ if (!values.remove) {
     await copyFile(source, temporary, constants.COPYFILE_EXCL)
     await rename(temporary, destination)
   }
-  for (const name of ["LICENSE", "THIRD_PARTY_NOTICES.txt", "TERMS.md"]) {
+  for (const name of ["LICENSE", "THIRD_PARTY_NOTICES.txt", "TERMS.md", "PRIVACY.md", "SAFETY.md"]) {
     const source = join(root, name), destination = join(installedRoot, name)
     if (source === destination || !await exists(source)) continue
     const temporary = destination + "." + randomUUID() + ".tmp"
     await copyFile(source, temporary, constants.COPYFILE_EXCL)
     await rename(temporary, destination)
   }
-  await writeFile(join(installedRoot, "package.json"), JSON.stringify({ name: "opencode-moyu", version: "0.8.1", type: "module", exports: { ".": "./dist/server-v2.js", "./tui": "./dist/tui-v2.js" } }, null, 2) + "\n", { mode: 0o600 })
+  await writeFile(join(installedRoot, "package.json"), JSON.stringify({ name: "opencode-moyu", version: "0.8.2", type: "module", exports: { ".": "./dist/server-v2.js", "./tui": "./dist/tui-v2.js" } }, null, 2) + "\n", { mode: 0o600 })
   // Local directories resolve conventional entry names; npm packages use exports.
   await writeFile(join(installedRoot, "index.js"), 'export { default } from "./dist/server-v2.js"\n', { mode: 0o600 })
   await writeFile(join(installedRoot, "tui.js"), 'export { default } from "./dist/tui-v2.js"\n', { mode: 0o600 })
@@ -110,4 +110,4 @@ try {
   throw error
 }
 console.log(`已${values.remove ? "移除" : "安装 / 更新"} OpenCode ${version}.x 阅读侧栏与模型工具；重启 OpenCode 后生效。`)
-if (!values.remove) console.log(`书架：${tui.settings.booksDir}\n密钥：${defaults.keyFile}\n许可及免责声明：${join(installedRoot, "TERMS.md")}（代码许可见 LICENSE）\n安装后可删除解压目录。\n卸载：node ${join(installedRoot, "dist/install.mjs")} --remove`)
+if (!values.remove) console.log(`书架：${tui.settings.booksDir}\n密钥：${defaults.keyFile}\n使用前请阅读安装目录的 TERMS.md、PRIVACY.md、SAFETY.md 和 LICENSE。\n软件按现状提供；责任仅在适用法律允许范围内排除。\n安装后可删除解压目录。\n卸载：node ${join(installedRoot, "dist/install.mjs")} --remove`)

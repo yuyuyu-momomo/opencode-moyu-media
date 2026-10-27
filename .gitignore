@@ -14,3 +14,12 @@ keys/
 cookies*.json
 cookies*.txt
 *.moyu-backup-*
+__pycache__/
+*.pyc
+*.pem
+*.p12
+*.pfx
+*.p8
+*.credentials.json
+*private-patterns*.json
+hosts.yml

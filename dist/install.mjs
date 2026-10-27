@@ -1460,14 +1460,14 @@ if (!values.remove) {
     await copyFile(source, temporary, constants.COPYFILE_EXCL);
     await rename(temporary, destination);
   }
-  for (const name of ["LICENSE", "THIRD_PARTY_NOTICES.txt", "TERMS.md"]) {
+  for (const name of ["LICENSE", "THIRD_PARTY_NOTICES.txt", "TERMS.md", "PRIVACY.md", "SAFETY.md"]) {
     const source = join(root, name), destination = join(installedRoot, name);
     if (source === destination || !await exists(source)) continue;
     const temporary = destination + "." + randomUUID() + ".tmp";
     await copyFile(source, temporary, constants.COPYFILE_EXCL);
     await rename(temporary, destination);
   }
-  await writeFile(join(installedRoot, "package.json"), JSON.stringify({ name: "opencode-moyu", version: "0.8.1", type: "module", exports: { ".": "./dist/server-v2.js", "./tui": "./dist/tui-v2.js" } }, null, 2) + "\n", { mode: 384 });
+  await writeFile(join(installedRoot, "package.json"), JSON.stringify({ name: "opencode-moyu", version: "0.8.2", type: "module", exports: { ".": "./dist/server-v2.js", "./tui": "./dist/tui-v2.js" } }, null, 2) + "\n", { mode: 384 });
   await writeFile(join(installedRoot, "index.js"), 'export { default } from "./dist/server-v2.js"\n', { mode: 384 });
   await writeFile(join(installedRoot, "tui.js"), 'export { default } from "./dist/tui-v2.js"\n', { mode: 384 });
   const sample = join(tui.settings.booksDir, "\u591C\u73ED\u4FBF\u5229\u5E97.txt");
@@ -1496,6 +1496,7 @@ try {
 console.log(`\u5DF2${values.remove ? "\u79FB\u9664" : "\u5B89\u88C5 / \u66F4\u65B0"} OpenCode ${version}.x \u9605\u8BFB\u4FA7\u680F\u4E0E\u6A21\u578B\u5DE5\u5177\uFF1B\u91CD\u542F OpenCode \u540E\u751F\u6548\u3002`);
 if (!values.remove) console.log(`\u4E66\u67B6\uFF1A${tui.settings.booksDir}
 \u5BC6\u94A5\uFF1A${defaults.keyFile}
-\u8BB8\u53EF\u53CA\u514D\u8D23\u58F0\u660E\uFF1A${join(installedRoot, "TERMS.md")}\uFF08\u4EE3\u7801\u8BB8\u53EF\u89C1 LICENSE\uFF09
+\u4F7F\u7528\u524D\u8BF7\u9605\u8BFB\u5B89\u88C5\u76EE\u5F55\u7684 TERMS.md\u3001PRIVACY.md\u3001SAFETY.md \u548C LICENSE\u3002
+\u8F6F\u4EF6\u6309\u73B0\u72B6\u63D0\u4F9B\uFF1B\u8D23\u4EFB\u4EC5\u5728\u9002\u7528\u6CD5\u5F8B\u5141\u8BB8\u8303\u56F4\u5185\u6392\u9664\u3002
 \u5B89\u88C5\u540E\u53EF\u5220\u9664\u89E3\u538B\u76EE\u5F55\u3002
 \u5378\u8F7D\uFF1Anode ${join(installedRoot, "dist/install.mjs")} --remove`);

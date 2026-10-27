@@ -70,6 +70,9 @@ test("OpenCode 2 使用包目录与双入口，重复安装、卸载保留模型
   const server = parse(await readFile(join(dir, "opencode.json"), "utf8"))
   assert.ok(server.plugins[1].package.endsWith("/extensions/opencode-moyu"))
   const pkg = JSON.parse(await readFile(join(fileURLToPath(server.plugins[1].package), "package.json"), "utf8"))
+  for (const name of ["LICENSE", "TERMS.md", "PRIVACY.md", "SAFETY.md", "THIRD_PARTY_NOTICES.txt"]) {
+    assert.equal(await readFile(join(fileURLToPath(server.plugins[1].package), name), "utf8"), await readFile(new URL("../" + name, import.meta.url), "utf8"))
+  }
   assert.equal(pkg.exports["."], "./dist/server-v2.js")
   assert.equal(pkg.exports["./tui"], "./dist/tui-v2.js")
   assert.equal(server.model, "test/model")
